@@ -597,93 +597,75 @@ impl eframe::App for CodexShellApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.drain_send_results();
 
+        egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
+            ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
+            egui::Frame::default()
+                .inner_margin(egui::Margin::same(16))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            RichText::new(format!(
+                                "Codex状態: {}",
+                                self.codex_runtime_state.label()
+                            ))
+                            .color(Color32::BLACK),
+                        );
+
+                        if ui.button("Codex起動").clicked() {
+                            self.send_codex_command();
+                        }
+                        if ui.button("停止").clicked() {
+                            self.request_interrupt();
+                        }
+
+                        ui.with_layout(
+                            egui::Layout::right_to_left(egui::Align::Center),
+                            |ui| {
+                                if ui.button("設定").clicked() {
+                                    self.show_settings_dialog = true;
+                                }
+                            },
+                        );
+                    });
+                });
+        });
+
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
-            ui.add_space(16.0);
+            egui::Frame::default()
+                .inner_margin(egui::Margin::same(16))
+                .show(ui, |ui| {
+                    let button_width = 96.0;
+                    let input_height = ui.available_height().max(280.0);
 
-            ui.vertical_centered(|ui| {
-                ui.heading(RichText::new("Codex Shell Wrapper").color(Color32::BLACK));
-            });
+                    ui.horizontal(|ui| {
+                        let text_width = (ui.available_width() - button_width - 8.0).max(220.0);
+                        egui::Frame::group(ui.style()).show(ui, |ui| {
+                            ui.set_width(text_width);
+                            ui.label(RichText::new("送信コマンド").color(Color32::BLACK));
+                            ui.add_sized(
+                                [ui.available_width(), input_height],
+                                TextEdit::multiline(&mut self.input_command),
+                            );
+                        });
 
-            ui.add_space(12.0);
-            ui.vertical_centered(|ui| {
-                if ui.button("設定").clicked() {
-                    self.show_settings_dialog = true;
-                }
-            });
-
-            ui.add_space(12.0);
-            ui.vertical_centered(|ui| {
-                ui.label(RichText::new("送信履歴").strong().color(Color32::BLACK));
-            });
-            egui::Frame::group(ui.style()).show(ui, |ui| {
-                egui::ScrollArea::vertical()
-                    .max_height(220.0)
-                    .show(ui, |ui| {
-                        for entry in self.history.iter().rev() {
-                            ui.label(RichText::new(entry).color(Color32::BLACK));
-                        }
+                        ui.vertical(|ui| {
+                            if ui
+                                .add_sized([button_width, 26.0], egui::Button::new("入力送信"))
+                                .clicked()
+                            {
+                                self.send_input_command_by_button();
+                            }
+                            if ui
+                                .add_sized([button_width, 26.0], egui::Button::new("ビルド"))
+                                .clicked()
+                            {
+                                self.send_build_command();
+                            }
+                        });
                     });
-            });
-
-            ui.add_space(12.0);
-            let mut send_by_enter = false;
-            ui.horizontal(|ui| {
-                let button_width = 96.0;
-                let text_width = (ui.available_width() - button_width - 8.0).max(120.0);
-                let response = ui.add_sized(
-                    [text_width, 30.0],
-                    TextEdit::singleline(&mut self.input_command).hint_text("送信コマンド"),
-                );
-                if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                    send_by_enter = true;
-                }
-
-                ui.vertical(|ui| {
-                    if ui
-                        .add_sized([button_width, 26.0], egui::Button::new("入力送信"))
-                        .clicked()
-                    {
-                        self.send_input_command_by_button();
-                    }
-                    if ui
-                        .add_sized([button_width, 26.0], egui::Button::new("ビルド"))
-                        .clicked()
-                    {
-                        self.send_build_command();
-                    }
-                    if ui
-                        .add_sized([button_width, 26.0], egui::Button::new("Codex起動"))
-                        .clicked()
-                    {
-                        self.send_codex_command();
-                    }
-                    if ui
-                        .add_sized([button_width, 26.0], egui::Button::new("停止"))
-                        .clicked()
-                    {
-                        self.request_interrupt();
-                    }
                 });
             });
-
-            if send_by_enter {
-                self.send_input_command();
-            }
-
-            ui.add_space(8.0);
-            ui.vertical_centered(|ui| {
-                ui.label(
-                    RichText::new(format!("Codex状態: {}", self.codex_runtime_state.label()))
-                        .color(Color32::BLACK),
-                );
-            });
-
-            ui.add_space(12.0);
-            ui.vertical_centered(|ui| {
-                ui.label(RichText::new(&self.status_message).color(Color32::BLACK));
-            });
-        });
 
         self.render_settings_dialog(ctx);
     }
