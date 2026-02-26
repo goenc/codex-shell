@@ -12,6 +12,11 @@ use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use windows::Win32::Foundation::GetLastError;
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, SendInput,
+    VIRTUAL_KEY, VK_CONTROL, VK_MENU, VK_RIGHT,
+};
 
 const DEFAULT_PIPE_NAME: &str = "codex_shell_pipe";
 const DEFAULT_BUILD_COMMAND: &str = "cargo build";
@@ -41,7 +46,7 @@ const FIXED_INPUT_ROWS: usize = 10;
 const INPUT_FONT_SIZE: f32 = 15.0;
 const FIXED_INPUT_HEIGHT_PADDING: f32 = 12.0;
 const INPUT_COMMAND_ID_SALT: &str = "input_command_text_edit";
-const VOICE_INPUT_TOGGLE_COMMAND: &str = "Ctrl+Alt+Right";
+const VOICE_INPUT_HOTKEY_LABEL: &str = "Ctrl+Alt+Right";
 
 const LISTENER_SCRIPT: &str = r#"
 param(
@@ -374,6 +379,7 @@ struct CodexShellApp {
     input_area_size: egui::Vec2,
     resize_enabled: bool,
     voice_input_active: bool,
+    pending_input_focus: bool,
 }
 
 impl CodexShellApp {
@@ -404,6 +410,7 @@ impl CodexShellApp {
             input_area_size: egui::vec2(0.0, 0.0),
             resize_enabled: false,
             voice_input_active: false,
+            pending_input_focus: false,
         };
 
         app.push_history(format!(
@@ -538,6 +545,7 @@ impl CodexShellApp {
         let command = self.input_command.trim().to_string();
         self.input_command.clear();
         self.send_command(command, "入力", BUTTON_COMMAND_DELAY_MS);
+        self.pending_input_focus = true;
     }
 
     fn send_build_command(&mut self) {
@@ -548,15 +556,28 @@ impl CodexShellApp {
         );
     }
 
-    fn toggle_voice_input(&mut self, ctx: &egui::Context) {
-        self.send_command(
-            VOICE_INPUT_TOGGLE_COMMAND.to_string(),
-            "音声入力",
-            BUTTON_COMMAND_DELAY_MS,
-        );
-        self.voice_input_active = !self.voice_input_active;
-        if self.voice_input_active {
-            ctx.memory_mut(|mem| mem.request_focus(egui::Id::new(INPUT_COMMAND_ID_SALT)));
+    fn toggle_voice_input(&mut self) {
+        self.pending_input_focus = true;
+        match send_voice_input_hotkey() {
+            Ok(()) => {
+                self.voice_input_active = !self.voice_input_active;
+                self.update_status(format!(
+                    "音声入力ホットキー送信済み: {VOICE_INPUT_HOTKEY_LABEL}"
+                ));
+                self.push_history(format!(
+                    "音声入力ホットキー送信: {} -> {}",
+                    VOICE_INPUT_HOTKEY_LABEL,
+                    if self.voice_input_active {
+                        "読み取り中"
+                    } else {
+                        "音声入力"
+                    }
+                ));
+            }
+            Err(err) => {
+                self.update_status(format!("音声入力ホットキー送信失敗: {err}"));
+                self.push_history(format!("音声入力ホットキー送信失敗: {err}"));
+            }
         }
     }
 
@@ -687,6 +708,19 @@ impl CodexShellApp {
 }
 
 impl eframe::App for CodexShellApp {
+    fn raw_input_hook(&mut self, _ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+        raw_input.events.retain(|event| {
+            !matches!(
+                event,
+                egui::Event::Key {
+                    key: egui::Key::ArrowRight,
+                    modifiers,
+                    ..
+                } if modifiers.ctrl && modifiers.alt
+            )
+        });
+    }
+
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         self.stop_listener_process();
     }
@@ -794,6 +828,7 @@ impl eframe::App for CodexShellApp {
                                         .stroke(egui::Stroke::new(1.0, Color32::BLACK))
                                         .inner_margin(egui::Margin::same(4))
                                         .show(ui, |ui| {
+                                            let should_focus = self.pending_input_focus;
                                             if needs_scroll {
                                                 egui::ScrollArea::vertical()
                                                     .id_salt("input_command_scroll")
@@ -802,7 +837,7 @@ impl eframe::App for CodexShellApp {
                                                         egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded,
                                                     )
                                                     .show(ui, |ui| {
-                                                        ui.add(
+                                                        let response = ui.add(
                                                             TextEdit::multiline(
                                                                 &mut self.input_command,
                                                             )
@@ -812,9 +847,12 @@ impl eframe::App for CodexShellApp {
                                                             .desired_width(f32::INFINITY)
                                                             .desired_rows(input_rows),
                                                         );
+                                                        if should_focus {
+                                                            response.request_focus();
+                                                        }
                                                     });
                                             } else {
-                                                ui.add(
+                                                let response = ui.add(
                                                     TextEdit::multiline(&mut self.input_command)
                                                         .id_source(INPUT_COMMAND_ID_SALT)
                                                         .font(input_font_id.clone())
@@ -822,6 +860,12 @@ impl eframe::App for CodexShellApp {
                                                         .desired_width(f32::INFINITY)
                                                         .desired_rows(input_rows),
                                                 );
+                                                if should_focus {
+                                                    response.request_focus();
+                                                }
+                                            }
+                                            if should_focus {
+                                                self.pending_input_focus = false;
                                             }
                                         });
                                 },
@@ -837,7 +881,7 @@ impl eframe::App for CodexShellApp {
                                 .add_sized([input_width, 26.0], egui::Button::new(voice_button_label))
                                 .clicked()
                             {
-                                self.toggle_voice_input(ctx);
+                                self.toggle_voice_input();
                             }
                         });
 
@@ -894,6 +938,43 @@ fn unix_timestamp() -> String {
         Ok(duration) => duration.as_secs().to_string(),
         Err(_) => "0".to_string(),
     }
+}
+
+fn keyboard_input(vk: VIRTUAL_KEY, flags: KEYBD_EVENT_FLAGS) -> INPUT {
+    INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: vk,
+                wScan: 0,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    }
+}
+
+fn send_voice_input_hotkey() -> Result<()> {
+    let inputs = [
+        keyboard_input(VK_CONTROL, KEYBD_EVENT_FLAGS(0)),
+        keyboard_input(VK_MENU, KEYBD_EVENT_FLAGS(0)),
+        keyboard_input(VK_RIGHT, KEYBD_EVENT_FLAGS(0)),
+        keyboard_input(VK_RIGHT, KEYEVENTF_KEYUP),
+        keyboard_input(VK_MENU, KEYEVENTF_KEYUP),
+        keyboard_input(VK_CONTROL, KEYEVENTF_KEYUP),
+    ];
+
+    let sent = unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32) };
+    if sent != inputs.len() as u32 {
+        let err = unsafe { GetLastError() };
+        return Err(anyhow!(
+            "SendInput失敗 sent={sent}/{} last_error={}",
+            inputs.len(),
+            err.0
+        ));
+    }
+    Ok(())
 }
 
 fn load_config() -> Result<AppConfig> {
