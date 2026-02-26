@@ -29,7 +29,8 @@ const CODEX_CONFIG_BACKUP_PATH: &str = r"C:\Users\gonec\.codex\config.toml.bak";
 const FIXED_WINDOW_WIDTH: f32 = 980.0;
 const FIXED_WINDOW_HEIGHT: f32 = 400.0;
 const FIXED_INPUT_WIDTH: f32 = 828.0;
-const FIXED_INPUT_HEIGHT: f32 = 260.0;
+const FIXED_INPUT_ROWS: usize = 10;
+const FIXED_INPUT_HEIGHT_PADDING: f32 = 12.0;
 
 const LISTENER_SCRIPT: &str = r#"
 param(
@@ -302,6 +303,7 @@ struct AppConfig {
     build_command: String,
     codex_command: String,
     pipe_name: String,
+    show_size_overlay: bool,
 }
 
 impl Default for AppConfig {
@@ -313,6 +315,7 @@ impl Default for AppConfig {
             build_command: DEFAULT_BUILD_COMMAND.to_string(),
             codex_command: DEFAULT_CODEX_COMMAND.to_string(),
             pipe_name: DEFAULT_PIPE_NAME.to_string(),
+            show_size_overlay: true,
         }
     }
 }
@@ -600,6 +603,12 @@ impl CodexShellApp {
                         TextEdit::singleline(&mut self.config.pipe_name),
                     );
                 });
+                ui.horizontal(|ui| {
+                    ui.checkbox(
+                        &mut self.config.show_size_overlay,
+                        RichText::new("サイズ表示を表示").color(Color32::BLACK),
+                    );
+                });
 
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
@@ -702,14 +711,54 @@ impl eframe::App for CodexShellApp {
 
                     let button_width = 96.0;
                     let input_width = FIXED_INPUT_WIDTH;
-                    let input_height = FIXED_INPUT_HEIGHT;
+                    let row_height = ui.text_style_height(&egui::TextStyle::Monospace);
+                    let input_height =
+                        (row_height * FIXED_INPUT_ROWS as f32 + FIXED_INPUT_HEIGHT_PADDING).ceil();
 
                     ui.horizontal(|ui| {
-                        let input_response = ui.add_sized(
-                            [input_width, input_height],
-                            TextEdit::multiline(&mut self.input_command),
+                        let input_response = ui.allocate_ui_with_layout(
+                            egui::vec2(input_width, input_height),
+                            egui::Layout::top_down(egui::Align::Min),
+                            |ui| {
+                                let line_count = self.input_command.lines().count().max(1);
+                                let needs_scroll = line_count > FIXED_INPUT_ROWS;
+                                let input_rows = if needs_scroll {
+                                    line_count
+                                } else {
+                                    FIXED_INPUT_ROWS
+                                };
+                                egui::Frame::default()
+                                    .fill(Color32::WHITE)
+                                    .stroke(egui::Stroke::new(1.0, Color32::BLACK))
+                                    .inner_margin(egui::Margin::same(4))
+                                    .show(ui, |ui| {
+                                        if needs_scroll {
+                                            egui::ScrollArea::vertical()
+                                                .id_salt("input_command_scroll")
+                                                .auto_shrink([false, false])
+                                                .scroll_bar_visibility(
+                                                    egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded,
+                                                )
+                                                .show(ui, |ui| {
+                                                    ui.add(
+                                                        TextEdit::multiline(&mut self.input_command)
+                                                            .frame(false)
+                                                            .desired_width(f32::INFINITY)
+                                                            .desired_rows(input_rows),
+                                                    );
+                                                });
+                                        } else {
+                                            ui.add(
+                                                TextEdit::multiline(&mut self.input_command)
+                                                    .frame(false)
+                                                    .desired_width(f32::INFINITY)
+                                                    .desired_rows(input_rows),
+                                            );
+                                        }
+                                    });
+                            },
                         );
-                        self.input_area_size = input_response.rect.size();
+                        self.input_area_size = input_response.response.rect.size();
 
                         ui.vertical(|ui| {
                             if ui
@@ -729,29 +778,31 @@ impl eframe::App for CodexShellApp {
                 });
             });
 
-        egui::Area::new(egui::Id::new("size_overlay"))
-            .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-12.0, -12.0))
-            .interactable(false)
-            .show(ctx, |ui| {
-                egui::Frame::default()
-                    .fill(Color32::from_white_alpha(232))
-                    .stroke(egui::Stroke::new(1.0, Color32::from_gray(140)))
-                    .inner_margin(egui::Margin::same(8))
-                    .show(ui, |ui| {
-                        let win_x = self.window_size.x.max(0.0).round() as i32;
-                        let win_y = self.window_size.y.max(0.0).round() as i32;
-                        let input_x = self.input_area_size.x.max(0.0).round() as i32;
-                        let input_y = self.input_area_size.y.max(0.0).round() as i32;
-                        ui.label(
-                            RichText::new(format!("ウィンサイズ x={win_x} y={win_y}"))
-                                .color(Color32::BLACK),
-                        );
-                        ui.label(
-                            RichText::new(format!("入力サイズ x={input_x} y={input_y}"))
-                                .color(Color32::BLACK),
-                        );
-                    });
-            });
+        if self.config.show_size_overlay {
+            egui::Area::new(egui::Id::new("size_overlay"))
+                .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-12.0, -12.0))
+                .interactable(false)
+                .show(ctx, |ui| {
+                    egui::Frame::default()
+                        .fill(Color32::from_white_alpha(232))
+                        .stroke(egui::Stroke::new(1.0, Color32::from_gray(140)))
+                        .inner_margin(egui::Margin::same(8))
+                        .show(ui, |ui| {
+                            let win_x = self.window_size.x.max(0.0).round() as i32;
+                            let win_y = self.window_size.y.max(0.0).round() as i32;
+                            let input_x = self.input_area_size.x.max(0.0).round() as i32;
+                            let input_y = self.input_area_size.y.max(0.0).round() as i32;
+                            ui.label(
+                                RichText::new(format!("ウィンサイズ x={win_x} y={win_y}"))
+                                    .color(Color32::BLACK),
+                            );
+                            ui.label(
+                                RichText::new(format!("入力サイズ x={input_x} y={input_y}"))
+                                    .color(Color32::BLACK),
+                            );
+                        });
+                });
+        }
 
         self.render_settings_dialog(ctx);
     }
