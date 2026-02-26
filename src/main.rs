@@ -648,7 +648,21 @@ impl eframe::App for CodexShellApp {
                             "xhigh",
                         );
 
-                        if ui.button("Codex起動").clicked() {
+                        let can_start_codex =
+                            self.codex_runtime_state != CodexRuntimeState::Calculating;
+                        let mut codex_start_clicked = false;
+                        ui.scope(|ui| {
+                            if !can_start_codex {
+                                ui.visuals_mut().override_text_color = Some(Color32::from_gray(150));
+                            }
+                            if ui
+                                .add_enabled(can_start_codex, egui::Button::new("Codex起動"))
+                                .clicked()
+                            {
+                                codex_start_clicked = true;
+                            }
+                        });
+                        if codex_start_clicked {
                             self.send_codex_command();
                         }
                         if ui.button("停止").clicked() {
