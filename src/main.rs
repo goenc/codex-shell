@@ -636,18 +636,14 @@ impl eframe::App for CodexShellApp {
                 .inner_margin(egui::Margin::same(16))
                 .show(ui, |ui| {
                     let button_width = 96.0;
-                    let input_height = ui.available_height().max(280.0);
+                    let input_height = ui.available_height().max(320.0);
 
                     ui.horizontal(|ui| {
                         let text_width = (ui.available_width() - button_width - 8.0).max(220.0);
-                        egui::Frame::group(ui.style()).show(ui, |ui| {
-                            ui.set_width(text_width);
-                            ui.label(RichText::new("送信コマンド").color(Color32::BLACK));
-                            ui.add_sized(
-                                [ui.available_width(), input_height],
-                                TextEdit::multiline(&mut self.input_command),
-                            );
-                        });
+                        ui.add_sized(
+                            [text_width, input_height],
+                            TextEdit::multiline(&mut self.input_command),
+                        );
 
                         ui.vertical(|ui| {
                             if ui
