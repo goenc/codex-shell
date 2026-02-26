@@ -26,6 +26,10 @@ const FONT_OFL_RELATIVE_PATH: &str = "assets/fonts/OFL.txt";
 const FONT_SOURCE_RELATIVE_PATH: &str = "assets/fonts/FONT_SOURCE.txt";
 const CODEX_CONFIG_PATH: &str = r"C:\Users\gonec\.codex\config.toml";
 const CODEX_CONFIG_BACKUP_PATH: &str = r"C:\Users\gonec\.codex\config.toml.bak";
+const FIXED_WINDOW_WIDTH: f32 = 980.0;
+const FIXED_WINDOW_HEIGHT: f32 = 400.0;
+const FIXED_INPUT_WIDTH: f32 = 828.0;
+const FIXED_INPUT_HEIGHT: f32 = 260.0;
 
 const LISTENER_SCRIPT: &str = r#"
 param(
@@ -352,6 +356,8 @@ struct CodexShellApp {
     send_tx: Sender<SendRequest>,
     send_result_rx: Receiver<SendResult>,
     listener_script_path: PathBuf,
+    window_size: egui::Vec2,
+    input_area_size: egui::Vec2,
 }
 
 impl CodexShellApp {
@@ -378,6 +384,8 @@ impl CodexShellApp {
             send_tx,
             send_result_rx,
             listener_script_path,
+            window_size: egui::vec2(0.0, 0.0),
+            input_area_size: egui::vec2(0.0, 0.0),
         };
 
         app.push_history(format!(
@@ -617,6 +625,7 @@ impl CodexShellApp {
 impl eframe::App for CodexShellApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.drain_send_results();
+        self.window_size = ctx.content_rect().size();
 
         egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
             ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
@@ -692,14 +701,15 @@ impl eframe::App for CodexShellApp {
                     ui.add_space(8.0);
 
                     let button_width = 96.0;
-                    let input_height = ui.available_height().max(320.0);
+                    let input_width = FIXED_INPUT_WIDTH;
+                    let input_height = FIXED_INPUT_HEIGHT;
 
                     ui.horizontal(|ui| {
-                        let text_width = (ui.available_width() - button_width - 8.0).max(220.0);
-                        ui.add_sized(
-                            [text_width, input_height],
+                        let input_response = ui.add_sized(
+                            [input_width, input_height],
                             TextEdit::multiline(&mut self.input_command),
                         );
+                        self.input_area_size = input_response.rect.size();
 
                         ui.vertical(|ui| {
                             if ui
@@ -717,6 +727,30 @@ impl eframe::App for CodexShellApp {
                         });
                     });
                 });
+            });
+
+        egui::Area::new(egui::Id::new("size_overlay"))
+            .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-12.0, -12.0))
+            .interactable(false)
+            .show(ctx, |ui| {
+                egui::Frame::default()
+                    .fill(Color32::from_white_alpha(232))
+                    .stroke(egui::Stroke::new(1.0, Color32::from_gray(140)))
+                    .inner_margin(egui::Margin::same(8))
+                    .show(ui, |ui| {
+                        let win_x = self.window_size.x.max(0.0).round() as i32;
+                        let win_y = self.window_size.y.max(0.0).round() as i32;
+                        let input_x = self.input_area_size.x.max(0.0).round() as i32;
+                        let input_y = self.input_area_size.y.max(0.0).round() as i32;
+                        ui.label(
+                            RichText::new(format!("ウィンサイズ x={win_x} y={win_y}"))
+                                .color(Color32::BLACK),
+                        );
+                        ui.label(
+                            RichText::new(format!("入力サイズ x={input_x} y={input_y}"))
+                                .color(Color32::BLACK),
+                        );
+                    });
             });
 
         self.render_settings_dialog(ctx);
@@ -1080,8 +1114,10 @@ fn update_reasoning_effort(selected: &str) -> Result<(), String> {
 fn main() -> Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([760.0, 560.0])
-            .with_min_inner_size([640.0, 500.0]),
+            .with_inner_size([FIXED_WINDOW_WIDTH, FIXED_WINDOW_HEIGHT])
+            .with_min_inner_size([FIXED_WINDOW_WIDTH, FIXED_WINDOW_HEIGHT])
+            .with_max_inner_size([FIXED_WINDOW_WIDTH, FIXED_WINDOW_HEIGHT])
+            .with_resizable(false),
         ..Default::default()
     };
 
