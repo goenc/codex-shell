@@ -1,6 +1,7 @@
 use anyhow::{Context, Result, anyhow};
 use directories::ProjectDirs;
 use eframe::egui::{self, Color32, RichText, TextEdit};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::{self, OpenOptions};
@@ -23,6 +24,8 @@ const BUTTON_COMMAND_DELAY_MS: u64 = 400;
 const FONT_RELATIVE_PATH: &str = "assets/fonts/NotoSansJP-Regular.ttf";
 const FONT_OFL_RELATIVE_PATH: &str = "assets/fonts/OFL.txt";
 const FONT_SOURCE_RELATIVE_PATH: &str = "assets/fonts/FONT_SOURCE.txt";
+const CODEX_CONFIG_PATH: &str = r"C:\Users\gonec\.codex\config.toml";
+const CODEX_CONFIG_BACKUP_PATH: &str = r"C:\Users\gonec\.codex\config.toml.bak";
 
 const LISTENER_SCRIPT: &str = r#"
 param(
@@ -339,6 +342,7 @@ impl CodexRuntimeState {
 
 struct CodexShellApp {
     config: AppConfig,
+    selected_reasoning_effort: String,
     input_command: String,
     status_message: String,
     codex_runtime_state: CodexRuntimeState,
@@ -364,6 +368,7 @@ impl CodexShellApp {
 
         let mut app = Self {
             config,
+            selected_reasoning_effort: "medium".to_string(),
             input_command: String::new(),
             status_message: "待機中".to_string(),
             codex_runtime_state: CodexRuntimeState::Stopped,
@@ -490,12 +495,21 @@ impl CodexShellApp {
     }
 
     fn send_codex_command(&mut self) {
-        self.send_command(
-            self.config.codex_command.clone(),
-            "Codex",
-            BUTTON_COMMAND_DELAY_MS,
-        );
-        self.set_codex_runtime_state(CodexRuntimeState::Calculating);
+        let selected = self.selected_reasoning_effort.clone();
+        match update_reasoning_effort(&selected) {
+            Ok(()) => {
+                self.push_history(format!(
+                    "config.toml を更新しました: model_reasoning_effort = \"{selected}\""
+                ));
+                let command = self.config.codex_command.trim().to_string();
+                self.send_command(command, "Codex", BUTTON_COMMAND_DELAY_MS);
+            }
+            Err(err) => {
+                self.update_status(format!("config.toml 更新失敗: {err}"));
+                self.push_history(format!("config.toml 更新失敗: {err}"));
+                self.set_codex_runtime_state(CodexRuntimeState::Stopped);
+            }
+        }
     }
 
     fn request_interrupt(&mut self) {
@@ -511,6 +525,10 @@ impl CodexShellApp {
                         self.update_status("停止要求を送信しました");
                         self.push_history("停止要求を送信しました");
                         self.set_codex_runtime_state(CodexRuntimeState::Stopped);
+                    } else if source == "Codex" {
+                        self.update_status("Codex起動コマンドを送信しました");
+                        self.push_history(format!("{source}: {command}"));
+                        self.set_codex_runtime_state(CodexRuntimeState::Calculating);
                     } else {
                         self.update_status(format!("{source}コマンド送信済み"));
                         self.push_history(format!("{source}: {command}"));
@@ -519,6 +537,9 @@ impl CodexShellApp {
                 SendResult::Failed { source, error } => {
                     self.update_status(format!("送信失敗: {error}"));
                     self.push_history(format!("送信失敗 ({source}): {error}"));
+                    if source == "Codex" {
+                        self.set_codex_runtime_state(CodexRuntimeState::Stopped);
+                    }
                 }
             }
         }
@@ -610,6 +631,22 @@ impl eframe::App for CodexShellApp {
                             ))
                             .color(Color32::BLACK),
                         );
+                        ui.label(RichText::new("思考深度").color(Color32::BLACK));
+                        ui.radio_value(
+                            &mut self.selected_reasoning_effort,
+                            "medium".to_string(),
+                            "medium",
+                        );
+                        ui.radio_value(
+                            &mut self.selected_reasoning_effort,
+                            "high".to_string(),
+                            "high",
+                        );
+                        ui.radio_value(
+                            &mut self.selected_reasoning_effort,
+                            "xhigh".to_string(),
+                            "xhigh",
+                        );
 
                         if ui.button("Codex起動").clicked() {
                             self.send_codex_command();
@@ -635,6 +672,11 @@ impl eframe::App for CodexShellApp {
             egui::Frame::default()
                 .inner_margin(egui::Margin::same(16))
                 .show(ui, |ui| {
+                    ui.label(
+                        RichText::new(format!("状態: {}", self.status_message)).color(Color32::BLACK),
+                    );
+                    ui.add_space(8.0);
+
                     let button_width = 96.0;
                     let input_height = ui.available_height().max(320.0);
 
@@ -932,6 +974,93 @@ fn spawn_send_worker(send_rx: Receiver<SendRequest>, result_tx: Sender<SendResul
             }
         }
     });
+}
+
+fn update_reasoning_effort(selected: &str) -> Result<(), String> {
+    if !matches!(selected, "medium" | "high" | "xhigh") {
+        return Err(format!("不正な思考深度です: {selected}"));
+    }
+
+    let config_path = Path::new(CODEX_CONFIG_PATH);
+    let backup_path = Path::new(CODEX_CONFIG_BACKUP_PATH);
+
+    if let Some(parent) = config_path.parent() {
+        fs::create_dir_all(parent).map_err(|err| {
+            format!(
+                "設定ディレクトリ作成に失敗しました: {} ({err})",
+                parent.display()
+            )
+        })?;
+    }
+
+    if !config_path.exists() {
+        fs::write(config_path, "").map_err(|err| {
+            format!(
+                "設定ファイル初期化に失敗しました: {} ({err})",
+                config_path.display()
+            )
+        })?;
+    }
+
+    fs::copy(config_path, backup_path).map_err(|err| {
+        format!(
+            "バックアップ作成に失敗しました: {} -> {} ({err})",
+            config_path.display(),
+            backup_path.display()
+        )
+    })?;
+
+    let current = fs::read_to_string(config_path).map_err(|err| {
+        format!(
+            "設定ファイル読み込みに失敗しました: {} ({err})",
+            config_path.display()
+        )
+    })?;
+
+    let key_pattern = Regex::new(r#"model_reasoning_effort\s*=\s*".*?""#)
+        .map_err(|err| format!("正規表現の構築に失敗しました: {err}"))?;
+    let replacement = format!(r#"model_reasoning_effort = "{selected}""#);
+
+    let updated = if key_pattern.is_match(&current) {
+        key_pattern
+            .replace_all(&current, replacement.as_str())
+            .into_owned()
+    } else {
+        let mut body = current;
+        if !body.is_empty() && !body.ends_with('\n') {
+            body.push('\n');
+        }
+        body.push_str(&replacement);
+        body.push('\n');
+        body
+    };
+
+    fs::write(config_path, updated).map_err(|err| {
+        format!(
+            "設定ファイル書き込みに失敗しました: {} ({err})",
+            config_path.display()
+        )
+    })?;
+
+    let verified = fs::read_to_string(config_path).map_err(|err| {
+        format!(
+            "更新後確認の読み込みに失敗しました: {} ({err})",
+            config_path.display()
+        )
+    })?;
+    let verify_pattern = Regex::new(r#"model_reasoning_effort\s*=\s*"(.*?)""#)
+        .map_err(|err| format!("確認用正規表現の構築に失敗しました: {err}"))?;
+    let reflected = verify_pattern
+        .captures_iter(&verified)
+        .filter_map(|caps| caps.get(1).map(|m| m.as_str()))
+        .any(|value| value == selected);
+    if !reflected {
+        return Err(format!(
+            "更新後確認に失敗しました: model_reasoning_effort が {selected} ではありません"
+        ));
+    }
+
+    Ok(())
 }
 
 fn main() -> Result<()> {
