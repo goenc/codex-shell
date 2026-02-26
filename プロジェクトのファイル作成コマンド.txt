@@ -1,0 +1,21 @@
+cargo new codex-shell --vcs git
+cd codex-shell
+
+
+cargo add anyhow
+cargo add clap --features derive
+cargo add tracing
+cargo add tracing-subscriber
+cargo add serde --features derive
+cargo add serde_json
+cargo add directories
+cargo add once_cell
+cargo add windows
+cargo add eframe
+cargo add tray-icon
+cargo add tokio --features rt-multi-thread,macros
+cargo add notify
+cargo add single-instance
+cargo add global-hotkey
+cargo add auto-launch
+cargo add interprocess

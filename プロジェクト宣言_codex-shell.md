@@ -1,0 +1,4 @@
+CodexShell
+codex-shell
+C:\Users\gonec\RustProjects\codex-shell
+ASSUME_ENVIRONMENT_COMPLETE_ON_RESUME
