@@ -26,11 +26,22 @@ const FONT_OFL_RELATIVE_PATH: &str = "assets/fonts/OFL.txt";
 const FONT_SOURCE_RELATIVE_PATH: &str = "assets/fonts/FONT_SOURCE.txt";
 const CODEX_CONFIG_PATH: &str = r"C:\Users\gonec\.codex\config.toml";
 const CODEX_CONFIG_BACKUP_PATH: &str = r"C:\Users\gonec\.codex\config.toml.bak";
-const FIXED_WINDOW_WIDTH: f32 = 980.0;
+const UI_BASE_OUTER_MARGIN: f32 = 16.0;
+const UI_BASE_COMPONENT_GAP: f32 = 8.0;
+const PANEL_HORIZONTAL_PADDING: f32 = 8.0;
+const INPUT_ACTION_BUTTON_WIDTH: f32 = 96.0;
+const FIXED_INPUT_WIDTH: f32 = 780.0;
+const FIXED_WINDOW_WIDTH: f32 = FIXED_INPUT_WIDTH
+    + INPUT_ACTION_BUTTON_WIDTH
+    + UI_BASE_COMPONENT_GAP
+    + UI_BASE_OUTER_MARGIN * 2.0
+    + PANEL_HORIZONTAL_PADDING * 2.0;
 const FIXED_WINDOW_HEIGHT: f32 = 400.0;
-const FIXED_INPUT_WIDTH: f32 = 828.0;
 const FIXED_INPUT_ROWS: usize = 10;
+const INPUT_FONT_SIZE: f32 = 15.0;
 const FIXED_INPUT_HEIGHT_PADDING: f32 = 12.0;
+const INPUT_COMMAND_ID_SALT: &str = "input_command_text_edit";
+const VOICE_INPUT_TOGGLE_COMMAND: &str = "Ctrl+Alt+Right";
 
 const LISTENER_SCRIPT: &str = r#"
 param(
@@ -361,6 +372,8 @@ struct CodexShellApp {
     listener_script_path: PathBuf,
     window_size: egui::Vec2,
     input_area_size: egui::Vec2,
+    resize_enabled: bool,
+    voice_input_active: bool,
 }
 
 impl CodexShellApp {
@@ -389,6 +402,8 @@ impl CodexShellApp {
             listener_script_path,
             window_size: egui::vec2(0.0, 0.0),
             input_area_size: egui::vec2(0.0, 0.0),
+            resize_enabled: false,
+            voice_input_active: false,
         };
 
         app.push_history(format!(
@@ -407,6 +422,34 @@ impl CodexShellApp {
                 self.update_status(format!("設定保存失敗: {err}"));
                 self.push_history(format!("設定保存に失敗しました: {err}"));
             }
+        }
+    }
+
+    fn apply_window_resize_policy(&mut self, ctx: &egui::Context) {
+        let allow_resize = self.config.show_size_overlay;
+        if self.resize_enabled == allow_resize {
+            return;
+        }
+        self.resize_enabled = allow_resize;
+
+        if allow_resize {
+            ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(egui::vec2(10.0, 10.0)));
+            ctx.send_viewport_cmd(egui::ViewportCommand::MaxInnerSize(egui::vec2(8192.0, 8192.0)));
+            ctx.send_viewport_cmd(egui::ViewportCommand::Resizable(true));
+        } else {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Resizable(false));
+            ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(egui::vec2(
+                FIXED_WINDOW_WIDTH,
+                FIXED_WINDOW_HEIGHT,
+            )));
+            ctx.send_viewport_cmd(egui::ViewportCommand::MaxInnerSize(egui::vec2(
+                FIXED_WINDOW_WIDTH,
+                FIXED_WINDOW_HEIGHT,
+            )));
+            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(
+                FIXED_WINDOW_WIDTH,
+                FIXED_WINDOW_HEIGHT,
+            )));
         }
     }
 
@@ -503,6 +546,18 @@ impl CodexShellApp {
             "ビルド",
             BUTTON_COMMAND_DELAY_MS,
         );
+    }
+
+    fn toggle_voice_input(&mut self, ctx: &egui::Context) {
+        self.send_command(
+            VOICE_INPUT_TOGGLE_COMMAND.to_string(),
+            "音声入力",
+            BUTTON_COMMAND_DELAY_MS,
+        );
+        self.voice_input_active = !self.voice_input_active;
+        if self.voice_input_active {
+            ctx.memory_mut(|mem| mem.request_focus(egui::Id::new(INPUT_COMMAND_ID_SALT)));
+        }
     }
 
     fn send_codex_command(&mut self) {
@@ -632,7 +687,12 @@ impl CodexShellApp {
 }
 
 impl eframe::App for CodexShellApp {
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.stop_listener_process();
+    }
+
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.apply_window_resize_policy(ctx);
         self.drain_send_results();
         self.window_size = ctx.content_rect().size();
 
@@ -709,56 +769,77 @@ impl eframe::App for CodexShellApp {
                     );
                     ui.add_space(8.0);
 
-                    let button_width = 96.0;
+                    let button_width = INPUT_ACTION_BUTTON_WIDTH;
                     let input_width = FIXED_INPUT_WIDTH;
-                    let row_height = ui.text_style_height(&egui::TextStyle::Monospace);
+                    let input_font_id = egui::FontId::monospace(INPUT_FONT_SIZE);
+                    let row_height = ui.fonts_mut(|f| f.row_height(&input_font_id));
                     let input_height =
                         (row_height * FIXED_INPUT_ROWS as f32 + FIXED_INPUT_HEIGHT_PADDING).ceil();
 
                     ui.horizontal(|ui| {
-                        let input_response = ui.allocate_ui_with_layout(
-                            egui::vec2(input_width, input_height),
-                            egui::Layout::top_down(egui::Align::Min),
-                            |ui| {
-                                let line_count = self.input_command.lines().count().max(1);
-                                let needs_scroll = line_count > FIXED_INPUT_ROWS;
-                                let input_rows = if needs_scroll {
-                                    line_count
-                                } else {
-                                    FIXED_INPUT_ROWS
-                                };
-                                egui::Frame::default()
-                                    .fill(Color32::WHITE)
-                                    .stroke(egui::Stroke::new(1.0, Color32::BLACK))
-                                    .inner_margin(egui::Margin::same(4))
-                                    .show(ui, |ui| {
-                                        if needs_scroll {
-                                            egui::ScrollArea::vertical()
-                                                .id_salt("input_command_scroll")
-                                                .auto_shrink([false, false])
-                                                .scroll_bar_visibility(
-                                                    egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded,
-                                                )
-                                                .show(ui, |ui| {
-                                                    ui.add(
-                                                        TextEdit::multiline(&mut self.input_command)
+                        ui.vertical(|ui| {
+                            let input_response = ui.allocate_ui_with_layout(
+                                egui::vec2(input_width, input_height),
+                                egui::Layout::top_down(egui::Align::Min),
+                                |ui| {
+                                    let line_count = self.input_command.lines().count().max(1);
+                                    let needs_scroll = line_count > FIXED_INPUT_ROWS;
+                                    let input_rows = if needs_scroll {
+                                        line_count
+                                    } else {
+                                        FIXED_INPUT_ROWS
+                                    };
+                                    egui::Frame::default()
+                                        .fill(Color32::WHITE)
+                                        .stroke(egui::Stroke::new(1.0, Color32::BLACK))
+                                        .inner_margin(egui::Margin::same(4))
+                                        .show(ui, |ui| {
+                                            if needs_scroll {
+                                                egui::ScrollArea::vertical()
+                                                    .id_salt("input_command_scroll")
+                                                    .auto_shrink([false, false])
+                                                    .scroll_bar_visibility(
+                                                        egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded,
+                                                    )
+                                                    .show(ui, |ui| {
+                                                        ui.add(
+                                                            TextEdit::multiline(
+                                                                &mut self.input_command,
+                                                            )
+                                                            .id_source(INPUT_COMMAND_ID_SALT)
+                                                            .font(input_font_id.clone())
                                                             .frame(false)
                                                             .desired_width(f32::INFINITY)
                                                             .desired_rows(input_rows),
-                                                    );
-                                                });
-                                        } else {
-                                            ui.add(
-                                                TextEdit::multiline(&mut self.input_command)
-                                                    .frame(false)
-                                                    .desired_width(f32::INFINITY)
-                                                    .desired_rows(input_rows),
-                                            );
-                                        }
-                                    });
-                            },
-                        );
-                        self.input_area_size = input_response.response.rect.size();
+                                                        );
+                                                    });
+                                            } else {
+                                                ui.add(
+                                                    TextEdit::multiline(&mut self.input_command)
+                                                        .id_source(INPUT_COMMAND_ID_SALT)
+                                                        .font(input_font_id.clone())
+                                                        .frame(false)
+                                                        .desired_width(f32::INFINITY)
+                                                        .desired_rows(input_rows),
+                                                );
+                                            }
+                                        });
+                                },
+                            );
+                            self.input_area_size = input_response.response.rect.size();
+
+                            let voice_button_label = if self.voice_input_active {
+                                "読み取り中"
+                            } else {
+                                "音声入力"
+                            };
+                            if ui
+                                .add_sized([input_width, 26.0], egui::Button::new(voice_button_label))
+                                .clicked()
+                            {
+                                self.toggle_voice_input(ctx);
+                            }
+                        });
 
                         ui.vertical(|ui| {
                             if ui
