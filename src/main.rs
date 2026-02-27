@@ -3,7 +3,7 @@ use directories::ProjectDirs;
 use eframe::egui::{self, Color32, RichText, TextEdit};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -11,7 +11,7 @@ use std::process::{Child, Command};
 use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use windows::Win32::Foundation::GetLastError;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, SendInput,
@@ -31,6 +31,9 @@ const FONT_OFL_RELATIVE_PATH: &str = "assets/fonts/OFL.txt";
 const FONT_SOURCE_RELATIVE_PATH: &str = "assets/fonts/FONT_SOURCE.txt";
 const CODEX_CONFIG_PATH: &str = r"C:\Users\gonec\.codex\config.toml";
 const CODEX_CONFIG_BACKUP_PATH: &str = r"C:\Users\gonec\.codex\config.toml.bak";
+const UI_INIT_RELATIVE_PATH: &str = "runtime/ui/init/ui.json";
+const UI_LIVE_RELATIVE_PATH: &str = "runtime/ui/live/ui.json";
+const UI_RELOAD_CHECK_INTERVAL_MS: u64 = 250;
 const UI_BASE_OUTER_MARGIN: f32 = 16.0;
 const UI_BASE_COMPONENT_GAP: f32 = 8.0;
 const PANEL_HORIZONTAL_PADDING: f32 = 8.0;
@@ -42,7 +45,6 @@ const FIXED_WINDOW_WIDTH: f32 = FIXED_INPUT_WIDTH
     + UI_BASE_OUTER_MARGIN * 2.0
     + PANEL_HORIZONTAL_PADDING * 2.0;
 const FIXED_WINDOW_HEIGHT: f32 = 400.0;
-const FIXED_INPUT_ROWS: usize = 10;
 const INPUT_FONT_SIZE: f32 = 15.0;
 const FIXED_INPUT_HEIGHT_PADDING: f32 = 12.0;
 const INPUT_COMMAND_ID_SALT: &str = "input_command_text_edit";
@@ -336,6 +338,184 @@ impl Default for AppConfig {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+struct UiDefinition {
+    version: u32,
+    assets: UiAssets,
+    objects: Vec<UiObject>,
+}
+
+impl Default for UiDefinition {
+    fn default() -> Self {
+        Self {
+            version: 1,
+            assets: UiAssets::default(),
+            objects: Vec::new(),
+        }
+    }
+}
+
+impl UiDefinition {
+    fn object_index(&self, id: &str) -> Option<usize> {
+        self.objects.iter().position(|object| object.id == id)
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+struct UiAssets {
+    base_dir: String,
+    images: HashMap<String, String>,
+}
+
+impl Default for UiAssets {
+    fn default() -> Self {
+        Self {
+            base_dir: "assets/ui".to_string(),
+            images: HashMap::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+struct UiObject {
+    id: String,
+    #[serde(rename = "type")]
+    object_type: String,
+    position: UiPosition,
+    size: UiSize,
+    visible: bool,
+    enabled: bool,
+    bind: UiBind,
+    visual: UiVisual,
+}
+
+impl Default for UiObject {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            object_type: "button".to_string(),
+            position: UiPosition::default(),
+            size: UiSize::default(),
+            visible: true,
+            enabled: true,
+            bind: UiBind::default(),
+            visual: UiVisual::default(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(default)]
+struct UiPosition {
+    x: f32,
+    y: f32,
+}
+
+impl Default for UiPosition {
+    fn default() -> Self {
+        Self { x: 0.0, y: 0.0 }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(default)]
+struct UiSize {
+    w: f32,
+    h: f32,
+}
+
+impl Default for UiSize {
+    fn default() -> Self {
+        Self { w: 120.0, h: 32.0 }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(default)]
+struct UiBind {
+    command: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+struct UiVisual {
+    background: UiBackground,
+    icon: UiIcon,
+    text: UiText,
+    states: UiStates,
+}
+
+impl Default for UiVisual {
+    fn default() -> Self {
+        Self {
+            background: UiBackground::default(),
+            icon: UiIcon::default(),
+            text: UiText::default(),
+            states: UiStates::default(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(default)]
+struct UiBackground {
+    image: String,
+    fit: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+struct UiIcon {
+    image: String,
+    anchor: String,
+    offset: UiPosition,
+    size: UiSize,
+}
+
+impl Default for UiIcon {
+    fn default() -> Self {
+        Self {
+            image: String::new(),
+            anchor: "center".to_string(),
+            offset: UiPosition::default(),
+            size: UiSize::default(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+struct UiText {
+    value: String,
+    align: String,
+}
+
+impl Default for UiText {
+    fn default() -> Self {
+        Self {
+            value: String::new(),
+            align: "center".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(default)]
+struct UiStates {
+    hover: UiStateVisual,
+    pressed: UiStateVisual,
+    disabled: UiStateVisual,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(default)]
+struct UiStateVisual {
+    background: UiBackground,
+}
+
 struct SendRequest {
     source: String,
     pipe_name: String,
@@ -365,6 +545,12 @@ impl CodexRuntimeState {
 
 struct CodexShellApp {
     config: AppConfig,
+    ui_definition: UiDefinition,
+    ui_live_path: PathBuf,
+    ui_last_modified: Option<SystemTime>,
+    ui_last_reload_check: Instant,
+    ui_edit_mode: bool,
+    ui_selected_object_id: String,
     selected_reasoning_effort: String,
     input_command: String,
     status_message: String,
@@ -389,6 +575,14 @@ impl CodexShellApp {
         apply_visual_fix(&cc.egui_ctx);
 
         let config = load_config().unwrap_or_default();
+        let ui_live_path = ensure_live_ui_file()?;
+        let ui_definition = load_ui_definition(&ui_live_path)?;
+        let ui_last_modified = ui_file_modified_time(&ui_live_path).ok();
+        let ui_selected_object_id = ui_definition
+            .objects
+            .first()
+            .map(|object| object.id.clone())
+            .unwrap_or_default();
         let listener_script_path = listener_script_path();
         let (send_tx, send_rx) = mpsc::channel::<SendRequest>();
         let (send_result_tx, send_result_rx) = mpsc::channel::<SendResult>();
@@ -396,6 +590,12 @@ impl CodexShellApp {
 
         let mut app = Self {
             config,
+            ui_definition,
+            ui_live_path,
+            ui_last_modified,
+            ui_last_reload_check: Instant::now(),
+            ui_edit_mode: false,
+            ui_selected_object_id,
             selected_reasoning_effort: "medium".to_string(),
             input_command: String::new(),
             status_message: "待機中".to_string(),
@@ -417,6 +617,7 @@ impl CodexShellApp {
             "同梱フォントを読み込みました: {}",
             loaded_font.display()
         ));
+        app.push_history(format!("UI定義を読み込みました: {}", app.ui_live_path.display()));
         app.save_config();
         app.start_listener();
         Ok(app)
@@ -535,12 +736,6 @@ impl CodexShellApp {
         }
     }
 
-    fn send_input_command(&mut self) {
-        let command = self.input_command.trim().to_string();
-        self.input_command.clear();
-        self.send_command(command, "入力", 0);
-    }
-
     fn send_input_command_by_button(&mut self) {
         let command = self.input_command.trim().to_string();
         self.input_command.clear();
@@ -630,6 +825,443 @@ impl CodexShellApp {
                 }
             }
         }
+    }
+
+    fn save_live_ui_definition(&mut self, summary: &str) {
+        match save_ui_definition(&self.ui_live_path, &self.ui_definition) {
+            Ok(()) => {
+                self.ui_last_modified = ui_file_modified_time(&self.ui_live_path).ok();
+                self.push_history(summary);
+            }
+            Err(err) => {
+                self.update_status(format!("UI定義保存失敗: {err}"));
+                self.push_history(format!("UI定義保存に失敗しました: {err}"));
+            }
+        }
+    }
+
+    fn reload_ui_definition_if_changed(&mut self, ctx: &egui::Context) {
+        if self.ui_last_reload_check.elapsed() < Duration::from_millis(UI_RELOAD_CHECK_INTERVAL_MS) {
+            return;
+        }
+        self.ui_last_reload_check = Instant::now();
+
+        if !self.ui_live_path.exists() {
+            match ensure_live_ui_file() {
+                Ok(path) => {
+                    self.ui_live_path = path;
+                }
+                Err(err) => {
+                    self.update_status(format!("UI定義復元失敗: {err}"));
+                    return;
+                }
+            }
+        }
+
+        let modified = match ui_file_modified_time(&self.ui_live_path) {
+            Ok(modified) => modified,
+            Err(err) => {
+                self.update_status(format!("UI定義時刻取得失敗: {err}"));
+                return;
+            }
+        };
+
+        if self.ui_last_modified == Some(modified) {
+            return;
+        }
+
+        match load_ui_definition(&self.ui_live_path) {
+            Ok(definition) => {
+                self.ui_definition = definition;
+                self.ui_last_modified = Some(modified);
+                if self.ui_selected_object_id.is_empty()
+                    || self
+                        .ui_definition
+                        .object_index(&self.ui_selected_object_id)
+                        .is_none()
+                {
+                    self.ui_selected_object_id = self
+                        .ui_definition
+                        .objects
+                        .first()
+                        .map(|object| object.id.clone())
+                        .unwrap_or_default();
+                }
+                self.push_history("UI定義を再読み込みしました");
+                ctx.request_repaint();
+            }
+            Err(err) => {
+                self.update_status(format!("UI定義再読み込み失敗: {err}"));
+            }
+        }
+    }
+
+    fn is_bind_command_enabled(&self, command: &str) -> bool {
+        match command.trim() {
+            "mode.codex_start" => self.codex_runtime_state != CodexRuntimeState::Calculating,
+            _ => true,
+        }
+    }
+
+    fn resolve_object_text(&self, object: &UiObject) -> String {
+        match object.bind.command.trim() {
+            "status.message" => format!("状態: {}", self.status_message),
+            "codex.state" => format!("Codex状態: {}", self.codex_runtime_state.label()),
+            "input.voice_toggle" => {
+                if self.voice_input_active {
+                    "読み取り中".to_string()
+                } else if object.visual.text.value.trim().is_empty() {
+                    "音声入力".to_string()
+                } else {
+                    object.visual.text.value.clone()
+                }
+            }
+            _ => {
+                if object.visual.text.value.trim().is_empty() {
+                    if object.id.trim().is_empty() {
+                        object.object_type.clone()
+                    } else {
+                        object.id.clone()
+                    }
+                } else {
+                    object.visual.text.value.clone()
+                }
+            }
+        }
+    }
+
+    fn dispatch_ui_command(&mut self, command: &str) {
+        match command.trim() {
+            "" => {}
+            "mode.codex_start" => self.send_codex_command(),
+            "mode.stop" => self.request_interrupt(),
+            "mode.build" => self.send_build_command(),
+            "input.send" => self.send_input_command_by_button(),
+            "input.voice_toggle" => self.toggle_voice_input(),
+            "ui.settings" => self.show_settings_dialog = true,
+            "ui.edit.toggle" => {
+                self.ui_edit_mode = !self.ui_edit_mode;
+                self.update_status(if self.ui_edit_mode {
+                    "UI編集モードを有効化しました"
+                } else {
+                    "UI編集モードを無効化しました"
+                });
+            }
+            other => {
+                self.update_status(format!("未対応のUIコマンドです: {other}"));
+                self.push_history(format!("未対応UIコマンド: {other}"));
+            }
+        }
+    }
+
+    fn render_runtime_header(&mut self, ctx: &egui::Context) {
+        let mut edit_toggle_changed = false;
+        egui::Area::new(egui::Id::new("runtime_header"))
+            .fixed_pos(egui::pos2(UI_BASE_OUTER_MARGIN, 8.0))
+            .order(egui::Order::Foreground)
+            .show(ctx, |ui| {
+                egui::Frame::default()
+                    .fill(Color32::from_white_alpha(245))
+                    .stroke(egui::Stroke::new(1.0, Color32::from_gray(150)))
+                    .inner_margin(egui::Margin::same(8))
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                RichText::new(format!(
+                                    "Codex状態: {}",
+                                    self.codex_runtime_state.label()
+                                ))
+                                .color(Color32::BLACK),
+                            );
+                            ui.label(RichText::new("思考深度").color(Color32::BLACK));
+                            ui.radio_value(
+                                &mut self.selected_reasoning_effort,
+                                "medium".to_string(),
+                                "medium",
+                            );
+                            ui.radio_value(
+                                &mut self.selected_reasoning_effort,
+                                "high".to_string(),
+                                "high",
+                            );
+                            ui.radio_value(
+                                &mut self.selected_reasoning_effort,
+                                "xhigh".to_string(),
+                                "xhigh",
+                            );
+                            if ui.checkbox(&mut self.ui_edit_mode, "UI編集").changed() {
+                                edit_toggle_changed = true;
+                            }
+                        });
+                    });
+            });
+
+        if edit_toggle_changed {
+            self.update_status(if self.ui_edit_mode {
+                "UI編集モードを有効化しました"
+            } else {
+                "UI編集モードを無効化しました"
+            });
+            self.push_history(if self.ui_edit_mode {
+                "UI編集モードを有効化しました"
+            } else {
+                "UI編集モードを無効化しました"
+            });
+            if self.ui_selected_object_id.is_empty() {
+                self.ui_selected_object_id = self
+                    .ui_definition
+                    .objects
+                    .first()
+                    .map(|object| object.id.clone())
+                    .unwrap_or_default();
+            }
+        }
+    }
+
+    fn render_runtime_ui_objects(&mut self, ctx: &egui::Context) {
+        let mut clicked_commands = Vec::new();
+        let mut position_changed = false;
+
+        for index in 0..self.ui_definition.objects.len() {
+            let object = self.ui_definition.objects[index].clone();
+            if !object.visible {
+                continue;
+            }
+
+            let object_type = object.object_type.trim().to_string();
+            let object_id = object.id.clone();
+            let object_command = object.bind.command.trim().to_string();
+            let object_size = egui::vec2(object.size.w.max(12.0), object.size.h.max(12.0));
+            let mut clicked = false;
+
+            let area_response = egui::Area::new(egui::Id::new(("ui_object", object_id.clone())))
+                .order(if object_type == "panel" {
+                    egui::Order::Background
+                } else {
+                    egui::Order::Foreground
+                })
+                .movable(self.ui_edit_mode)
+                .fixed_pos(egui::pos2(object.position.x, object.position.y))
+                .show(ctx, |ui| match object_type.as_str() {
+                    "panel" => {
+                        let fill = if object.visual.background.image.trim().is_empty() {
+                            Color32::from_gray(250)
+                        } else {
+                            Color32::from_gray(242)
+                        };
+                        egui::Frame::default()
+                            .fill(fill)
+                            .stroke(egui::Stroke::new(1.0, Color32::BLACK))
+                            .inner_margin(egui::Margin::same(4))
+                            .show(ui, |ui| {
+                                ui.set_min_size(object_size);
+                            });
+                    }
+                    "label" => {
+                        let text = self.resolve_object_text(&object);
+                        ui.add_sized(
+                            [object_size.x, object_size.y],
+                            egui::Label::new(RichText::new(text).color(Color32::BLACK)),
+                        );
+                    }
+                    "input" => {
+                        let input_font_id = egui::FontId::monospace(INPUT_FONT_SIZE);
+                        let row_height = ui.fonts_mut(|fonts| fonts.row_height(&input_font_id));
+                        let desired_rows = ((object_size.y - FIXED_INPUT_HEIGHT_PADDING)
+                            .max(row_height)
+                            / row_height)
+                            .floor()
+                            .max(1.0) as usize;
+                        let input_response = egui::Frame::default()
+                            .fill(Color32::WHITE)
+                            .stroke(egui::Stroke::new(1.0, Color32::BLACK))
+                            .inner_margin(egui::Margin::same(4))
+                            .show(ui, |ui| {
+                                ui.add_sized(
+                                    [(object_size.x - 8.0).max(1.0), (object_size.y - 8.0).max(1.0)],
+                                    TextEdit::multiline(&mut self.input_command)
+                                        .id_source(INPUT_COMMAND_ID_SALT)
+                                        .font(input_font_id)
+                                        .desired_width(f32::INFINITY)
+                                        .desired_rows(desired_rows),
+                                )
+                            });
+                        if self.pending_input_focus {
+                            input_response.inner.request_focus();
+                            self.pending_input_focus = false;
+                        }
+                        self.input_area_size = input_response.response.rect.size();
+                    }
+                    "image" => {
+                        let image_key = object.visual.background.image.trim();
+                        let text = if image_key.is_empty() {
+                            "image".to_string()
+                        } else {
+                            format!("image: {image_key}")
+                        };
+                        egui::Frame::default()
+                            .fill(Color32::from_gray(245))
+                            .stroke(egui::Stroke::new(1.0, Color32::BLACK))
+                            .inner_margin(egui::Margin::same(4))
+                            .show(ui, |ui| {
+                                ui.set_min_size(object_size);
+                                ui.label(RichText::new(text).color(Color32::BLACK));
+                            });
+                    }
+                    _ => {
+                        let text = self.resolve_object_text(&object);
+                        let enabled =
+                            object.enabled && self.is_bind_command_enabled(&object_command);
+                        let response = ui.add_enabled_ui(enabled, |ui| {
+                            ui.add_sized([object_size.x, object_size.y], egui::Button::new(text))
+                        });
+                        if response.inner.clicked() {
+                            clicked = true;
+                        }
+                    }
+                });
+
+            if self.ui_edit_mode {
+                let moved_to = area_response.response.rect.min;
+                let target = &mut self.ui_definition.objects[index];
+                if (target.position.x - moved_to.x).abs() >= 0.5
+                    || (target.position.y - moved_to.y).abs() >= 0.5
+                {
+                    target.position.x = moved_to.x.round();
+                    target.position.y = moved_to.y.round();
+                    position_changed = true;
+                }
+            }
+
+            if clicked && !object_command.is_empty() {
+                clicked_commands.push(object_command);
+            }
+        }
+
+        if position_changed && !ctx.input(|input| input.pointer.primary_down()) {
+            self.save_live_ui_definition("UIオブジェクト位置を更新しました");
+        }
+
+        for command in clicked_commands {
+            self.dispatch_ui_command(&command);
+        }
+    }
+
+    fn render_ui_editor_contents(&mut self, ui: &mut egui::Ui) {
+        ui.label(
+            RichText::new("オブジェクトをドラッグすると位置を変更できます").color(Color32::BLACK),
+        );
+        ui.add_space(6.0);
+
+        if self.ui_definition.objects.is_empty() {
+            ui.label(RichText::new("objects が空です").color(Color32::BLACK));
+            return;
+        }
+        if self.ui_selected_object_id.is_empty() {
+            self.ui_selected_object_id = self.ui_definition.objects[0].id.clone();
+        }
+
+        egui::ComboBox::from_label("対象オブジェクト")
+            .selected_text(self.ui_selected_object_id.clone())
+            .show_ui(ui, |ui| {
+                for object in &self.ui_definition.objects {
+                    ui.selectable_value(
+                        &mut self.ui_selected_object_id,
+                        object.id.clone(),
+                        object.id.as_str(),
+                    );
+                }
+            });
+
+        if let Some(index) = self.ui_definition.object_index(&self.ui_selected_object_id) {
+            let mut changed = false;
+            let object = &mut self.ui_definition.objects[index];
+
+            ui.label(RichText::new(format!("type: {}", object.object_type)).color(Color32::BLACK));
+            changed |= ui.checkbox(&mut object.visible, "visible").changed();
+            changed |= ui.checkbox(&mut object.enabled, "enabled").changed();
+
+            ui.horizontal(|ui| {
+                ui.label("x");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut object.position.x).speed(1.0))
+                    .changed();
+                ui.label("y");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut object.position.y).speed(1.0))
+                    .changed();
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("w");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut object.size.w).speed(1.0))
+                    .changed();
+                ui.label("h");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut object.size.h).speed(1.0))
+                    .changed();
+            });
+
+            ui.label(RichText::new("bind.command").color(Color32::BLACK));
+            changed |= ui.text_edit_singleline(&mut object.bind.command).changed();
+
+            ui.label(RichText::new("visual.text.value").color(Color32::BLACK));
+            changed |= ui.text_edit_singleline(&mut object.visual.text.value).changed();
+
+            ui.label(RichText::new("visual.background.image").color(Color32::BLACK));
+            changed |= ui
+                .text_edit_singleline(&mut object.visual.background.image)
+                .changed();
+
+            ui.label(RichText::new("visual.background.fit").color(Color32::BLACK));
+            changed |= ui
+                .text_edit_singleline(&mut object.visual.background.fit)
+                .changed();
+
+            if changed {
+                self.save_live_ui_definition("UI編集で定義を更新しました");
+            }
+        } else {
+            ui.label(RichText::new("選択オブジェクトが見つかりません").color(Color32::BLACK));
+        }
+    }
+
+    fn render_ui_editor(&mut self, ctx: &egui::Context) {
+        if !self.ui_edit_mode {
+            return;
+        }
+
+        let viewport_id = egui::ViewportId::from_hash_of("ui_editor_viewport");
+        let builder = egui::ViewportBuilder::default()
+            .with_title("UI編集")
+            .with_inner_size([360.0, 520.0])
+            .with_min_inner_size([320.0, 420.0])
+            .with_resizable(true)
+            .with_close_button(true);
+
+        ctx.show_viewport_immediate(viewport_id, builder, |editor_ctx, viewport_class| {
+            if editor_ctx.input(|input| input.viewport().close_requested()) {
+                self.ui_edit_mode = false;
+                self.update_status("UI編集モードを無効化しました");
+                self.push_history("UI編集ウィンドウを閉じました");
+                return;
+            }
+
+            if viewport_class == egui::ViewportClass::Embedded {
+                egui::Window::new("UI編集")
+                    .default_width(340.0)
+                    .resizable(true)
+                    .show(editor_ctx, |ui| {
+                        self.render_ui_editor_contents(ui);
+                    });
+            } else {
+                egui::CentralPanel::default().show(editor_ctx, |ui| {
+                    self.render_ui_editor_contents(ui);
+                });
+            }
+            editor_ctx.request_repaint_after(Duration::from_millis(UI_RELOAD_CHECK_INTERVAL_MS));
+        });
     }
 
     fn render_settings_dialog(&mut self, ctx: &egui::Context) {
@@ -728,180 +1360,14 @@ impl eframe::App for CodexShellApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.apply_window_resize_policy(ctx);
         self.drain_send_results();
+        self.reload_ui_definition_if_changed(ctx);
         self.window_size = ctx.content_rect().size();
 
-        egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
-            ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
-            egui::Frame::default()
-                .inner_margin(egui::Margin::same(16))
-                .show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.label(
-                            RichText::new(format!(
-                                "Codex状態: {}",
-                                self.codex_runtime_state.label()
-                            ))
-                            .color(Color32::BLACK),
-                        );
-                        ui.label(RichText::new("思考深度").color(Color32::BLACK));
-                        ui.radio_value(
-                            &mut self.selected_reasoning_effort,
-                            "medium".to_string(),
-                            "medium",
-                        );
-                        ui.radio_value(
-                            &mut self.selected_reasoning_effort,
-                            "high".to_string(),
-                            "high",
-                        );
-                        ui.radio_value(
-                            &mut self.selected_reasoning_effort,
-                            "xhigh".to_string(),
-                            "xhigh",
-                        );
-
-                        let can_start_codex =
-                            self.codex_runtime_state != CodexRuntimeState::Calculating;
-                        let mut codex_start_clicked = false;
-                        ui.scope(|ui| {
-                            if !can_start_codex {
-                                ui.visuals_mut().override_text_color = Some(Color32::from_gray(150));
-                            }
-                            if ui
-                                .add_enabled(can_start_codex, egui::Button::new("Codex起動"))
-                                .clicked()
-                            {
-                                codex_start_clicked = true;
-                            }
-                        });
-                        if codex_start_clicked {
-                            self.send_codex_command();
-                        }
-                        if ui.button("停止").clicked() {
-                            self.request_interrupt();
-                        }
-
-                        ui.with_layout(
-                            egui::Layout::right_to_left(egui::Align::Center),
-                            |ui| {
-                                if ui.button("設定").clicked() {
-                                    self.show_settings_dialog = true;
-                                }
-                            },
-                        );
-                    });
-                });
-        });
-
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
-            egui::Frame::default()
-                .inner_margin(egui::Margin::same(16))
-                .show(ui, |ui| {
-                    ui.label(
-                        RichText::new(format!("状態: {}", self.status_message)).color(Color32::BLACK),
-                    );
-                    ui.add_space(8.0);
-
-                    let button_width = INPUT_ACTION_BUTTON_WIDTH;
-                    let input_width = FIXED_INPUT_WIDTH;
-                    let input_font_id = egui::FontId::monospace(INPUT_FONT_SIZE);
-                    let row_height = ui.fonts_mut(|f| f.row_height(&input_font_id));
-                    let input_height =
-                        (row_height * FIXED_INPUT_ROWS as f32 + FIXED_INPUT_HEIGHT_PADDING).ceil();
-
-                    ui.horizontal(|ui| {
-                        ui.vertical(|ui| {
-                            let input_response = ui.allocate_ui_with_layout(
-                                egui::vec2(input_width, input_height),
-                                egui::Layout::top_down(egui::Align::Min),
-                                |ui| {
-                                    let line_count = self.input_command.lines().count().max(1);
-                                    let needs_scroll = line_count > FIXED_INPUT_ROWS;
-                                    let input_rows = if needs_scroll {
-                                        line_count
-                                    } else {
-                                        FIXED_INPUT_ROWS
-                                    };
-                                    egui::Frame::default()
-                                        .fill(Color32::WHITE)
-                                        .stroke(egui::Stroke::new(1.0, Color32::BLACK))
-                                        .inner_margin(egui::Margin::same(4))
-                                        .show(ui, |ui| {
-                                            let should_focus = self.pending_input_focus;
-                                            if needs_scroll {
-                                                egui::ScrollArea::vertical()
-                                                    .id_salt("input_command_scroll")
-                                                    .auto_shrink([false, false])
-                                                    .scroll_bar_visibility(
-                                                        egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded,
-                                                    )
-                                                    .show(ui, |ui| {
-                                                        let response = ui.add(
-                                                            TextEdit::multiline(
-                                                                &mut self.input_command,
-                                                            )
-                                                            .id_source(INPUT_COMMAND_ID_SALT)
-                                                            .font(input_font_id.clone())
-                                                            .frame(false)
-                                                            .desired_width(f32::INFINITY)
-                                                            .desired_rows(input_rows),
-                                                        );
-                                                        if should_focus {
-                                                            response.request_focus();
-                                                        }
-                                                    });
-                                            } else {
-                                                let response = ui.add(
-                                                    TextEdit::multiline(&mut self.input_command)
-                                                        .id_source(INPUT_COMMAND_ID_SALT)
-                                                        .font(input_font_id.clone())
-                                                        .frame(false)
-                                                        .desired_width(f32::INFINITY)
-                                                        .desired_rows(input_rows),
-                                                );
-                                                if should_focus {
-                                                    response.request_focus();
-                                                }
-                                            }
-                                            if should_focus {
-                                                self.pending_input_focus = false;
-                                            }
-                                        });
-                                },
-                            );
-                            self.input_area_size = input_response.response.rect.size();
-
-                            let voice_button_label = if self.voice_input_active {
-                                "読み取り中"
-                            } else {
-                                "音声入力"
-                            };
-                            if ui
-                                .add_sized([input_width, 26.0], egui::Button::new(voice_button_label))
-                                .clicked()
-                            {
-                                self.toggle_voice_input();
-                            }
-                        });
-
-                        ui.vertical(|ui| {
-                            if ui
-                                .add_sized([button_width, 26.0], egui::Button::new("入力送信"))
-                                .clicked()
-                            {
-                                self.send_input_command_by_button();
-                            }
-                            if ui
-                                .add_sized([button_width, 26.0], egui::Button::new("ビルド"))
-                                .clicked()
-                            {
-                                self.send_build_command();
-                            }
-                        });
-                    });
-                });
-            });
+            ui.allocate_space(egui::Vec2::ZERO);
+        });
+        self.render_runtime_header(ctx);
+        self.render_runtime_ui_objects(ctx);
 
         if self.config.show_size_overlay {
             egui::Area::new(egui::Id::new("size_overlay"))
@@ -930,6 +1396,8 @@ impl eframe::App for CodexShellApp {
         }
 
         self.render_settings_dialog(ctx);
+        self.render_ui_editor(ctx);
+        ctx.request_repaint_after(Duration::from_millis(UI_RELOAD_CHECK_INTERVAL_MS));
     }
 }
 
@@ -1040,6 +1508,79 @@ fn asset_base_candidates() -> Vec<PathBuf> {
         .into_iter()
         .filter(|path| seen.insert(path.clone()))
         .collect()
+}
+
+fn ui_runtime_base_dir() -> PathBuf {
+    for candidate in asset_base_candidates() {
+        if candidate.join(UI_INIT_RELATIVE_PATH).is_file() {
+            return candidate;
+        }
+    }
+    if let Ok(current_dir) = std::env::current_dir() {
+        return current_dir;
+    }
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+}
+
+fn ui_init_file_path() -> PathBuf {
+    ui_runtime_base_dir().join(UI_INIT_RELATIVE_PATH)
+}
+
+fn ui_live_file_path() -> PathBuf {
+    ui_runtime_base_dir().join(UI_LIVE_RELATIVE_PATH)
+}
+
+fn ensure_live_ui_file() -> Result<PathBuf> {
+    let init_path = ui_init_file_path();
+    let live_path = ui_live_file_path();
+
+    if !init_path.is_file() {
+        return Err(anyhow!(
+            "初期UI定義が見つかりません: {}",
+            init_path.display()
+        ));
+    }
+
+    if !live_path.exists() {
+        if let Some(parent) = live_path.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("live UIディレクトリ作成に失敗: {}", parent.display()))?;
+        }
+        fs::copy(&init_path, &live_path).with_context(|| {
+            format!(
+                "初期UI定義コピーに失敗: {} -> {}",
+                init_path.display(),
+                live_path.display()
+            )
+        })?;
+    }
+
+    Ok(live_path)
+}
+
+fn load_ui_definition(path: &Path) -> Result<UiDefinition> {
+    let body = fs::read_to_string(path)
+        .with_context(|| format!("UI定義読み込みに失敗: {}", path.display()))?;
+    let definition: UiDefinition = serde_json::from_str(&body)
+        .with_context(|| format!("UI定義解析に失敗: {}", path.display()))?;
+    Ok(definition)
+}
+
+fn save_ui_definition(path: &Path, definition: &UiDefinition) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("UI定義ディレクトリ作成に失敗: {}", parent.display()))?;
+    }
+    let body = serde_json::to_string_pretty(definition).context("UI定義シリアライズに失敗")?;
+    fs::write(path, format!("{body}\n"))
+        .with_context(|| format!("UI定義保存に失敗: {}", path.display()))?;
+    Ok(())
+}
+
+fn ui_file_modified_time(path: &Path) -> Result<SystemTime> {
+    fs::metadata(path)
+        .and_then(|metadata| metadata.modified())
+        .with_context(|| format!("UI定義更新時刻取得に失敗: {}", path.display()))
 }
 
 fn required_asset_path(relative_path: &str) -> Result<PathBuf> {

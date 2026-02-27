@@ -1,0 +1,232 @@
+{
+  "version": 1,
+  "assets": {
+    "base_dir": "assets/ui",
+    "images": {
+      "panel_main": "panels/main.png",
+      "btn_primary": "buttons/primary.png",
+      "btn_hover": "buttons/hover.png",
+      "btn_pressed": "buttons/pressed.png",
+      "icon_voice": "icons/voice.png",
+      "icon_build": "icons/build.png"
+    }
+  },
+  "objects": [
+    {
+      "id": "panel_main",
+      "type": "panel",
+      "position": { "x": 12, "y": 48 },
+      "size": { "w": 908, "h": 340 },
+      "visible": true,
+      "enabled": true,
+      "bind": { "command": "" },
+      "visual": {
+        "background": { "image": "panel_main", "fit": "stretch" },
+        "icon": {
+          "image": "",
+          "anchor": "center",
+          "offset": { "x": 0, "y": 0 },
+          "size": { "w": 0, "h": 0 }
+        },
+        "text": { "value": "", "align": "left" },
+        "states": {
+          "hover": { "background": { "image": "", "fit": "stretch" } },
+          "pressed": { "background": { "image": "", "fit": "stretch" } },
+          "disabled": { "background": { "image": "", "fit": "stretch" } }
+        }
+      }
+    },
+    {
+      "id": "btn_codex_start",
+      "type": "button",
+      "position": { "x": 24, "y": 18 },
+      "size": { "w": 120, "h": 28 },
+      "visible": true,
+      "enabled": true,
+      "bind": { "command": "mode.codex_start" },
+      "visual": {
+        "background": { "image": "btn_primary", "fit": "stretch" },
+        "icon": {
+          "image": "",
+          "anchor": "center",
+          "offset": { "x": 0, "y": 0 },
+          "size": { "w": 0, "h": 0 }
+        },
+        "text": { "value": "Codex起動", "align": "center" },
+        "states": {
+          "hover": { "background": { "image": "btn_hover", "fit": "stretch" } },
+          "pressed": { "background": { "image": "btn_pressed", "fit": "stretch" } },
+          "disabled": { "background": { "image": "btn_primary", "fit": "stretch" } }
+        }
+      }
+    },
+    {
+      "id": "btn_stop",
+      "type": "button",
+      "position": { "x": 152, "y": 18 },
+      "size": { "w": 96, "h": 28 },
+      "visible": true,
+      "enabled": true,
+      "bind": { "command": "mode.stop" },
+      "visual": {
+        "background": { "image": "btn_primary", "fit": "stretch" },
+        "icon": {
+          "image": "",
+          "anchor": "center",
+          "offset": { "x": 0, "y": 0 },
+          "size": { "w": 0, "h": 0 }
+        },
+        "text": { "value": "停止", "align": "center" },
+        "states": {
+          "hover": { "background": { "image": "btn_hover", "fit": "stretch" } },
+          "pressed": { "background": { "image": "btn_pressed", "fit": "stretch" } },
+          "disabled": { "background": { "image": "btn_primary", "fit": "stretch" } }
+        }
+      }
+    },
+    {
+      "id": "btn_settings",
+      "type": "button",
+      "position": { "x": 812, "y": 18 },
+      "size": { "w": 96, "h": 28 },
+      "visible": true,
+      "enabled": true,
+      "bind": { "command": "ui.settings" },
+      "visual": {
+        "background": { "image": "btn_primary", "fit": "stretch" },
+        "icon": {
+          "image": "",
+          "anchor": "center",
+          "offset": { "x": 0, "y": 0 },
+          "size": { "w": 0, "h": 0 }
+        },
+        "text": { "value": "設定", "align": "center" },
+        "states": {
+          "hover": { "background": { "image": "btn_hover", "fit": "stretch" } },
+          "pressed": { "background": { "image": "btn_pressed", "fit": "stretch" } },
+          "disabled": { "background": { "image": "btn_primary", "fit": "stretch" } }
+        }
+      }
+    },
+    {
+      "id": "lbl_status",
+      "type": "label",
+      "position": { "x": 24, "y": 64 },
+      "size": { "w": 780, "h": 24 },
+      "visible": true,
+      "enabled": true,
+      "bind": { "command": "status.message" },
+      "visual": {
+        "background": { "image": "", "fit": "none" },
+        "icon": {
+          "image": "",
+          "anchor": "left",
+          "offset": { "x": 0, "y": 0 },
+          "size": { "w": 0, "h": 0 }
+        },
+        "text": { "value": "状態", "align": "left" },
+        "states": {
+          "hover": { "background": { "image": "", "fit": "none" } },
+          "pressed": { "background": { "image": "", "fit": "none" } },
+          "disabled": { "background": { "image": "", "fit": "none" } }
+        }
+      }
+    },
+    {
+      "id": "input_command",
+      "type": "input",
+      "position": { "x": 24, "y": 92 },
+      "size": { "w": 780, "h": 220 },
+      "visible": true,
+      "enabled": true,
+      "bind": { "command": "" },
+      "visual": {
+        "background": { "image": "", "fit": "stretch" },
+        "icon": {
+          "image": "",
+          "anchor": "left",
+          "offset": { "x": 0, "y": 0 },
+          "size": { "w": 0, "h": 0 }
+        },
+        "text": { "value": "", "align": "left" },
+        "states": {
+          "hover": { "background": { "image": "", "fit": "stretch" } },
+          "pressed": { "background": { "image": "", "fit": "stretch" } },
+          "disabled": { "background": { "image": "", "fit": "stretch" } }
+        }
+      }
+    },
+    {
+      "id": "btn_voice_input",
+      "type": "button",
+      "position": { "x": 24, "y": 320 },
+      "size": { "w": 780, "h": 28 },
+      "visible": true,
+      "enabled": true,
+      "bind": { "command": "input.voice_toggle" },
+      "visual": {
+        "background": { "image": "btn_primary", "fit": "stretch" },
+        "icon": {
+          "image": "icon_voice",
+          "anchor": "left",
+          "offset": { "x": 8, "y": 0 },
+          "size": { "w": 20, "h": 20 }
+        },
+        "text": { "value": "音声入力", "align": "center" },
+        "states": {
+          "hover": { "background": { "image": "btn_hover", "fit": "stretch" } },
+          "pressed": { "background": { "image": "btn_pressed", "fit": "stretch" } },
+          "disabled": { "background": { "image": "btn_primary", "fit": "stretch" } }
+        }
+      }
+    },
+    {
+      "id": "btn_input_send",
+      "type": "button",
+      "position": { "x": 812, "y": 92 },
+      "size": { "w": 96, "h": 28 },
+      "visible": true,
+      "enabled": true,
+      "bind": { "command": "input.send" },
+      "visual": {
+        "background": { "image": "btn_primary", "fit": "stretch" },
+        "icon": {
+          "image": "",
+          "anchor": "center",
+          "offset": { "x": 0, "y": 0 },
+          "size": { "w": 0, "h": 0 }
+        },
+        "text": { "value": "入力送信", "align": "center" },
+        "states": {
+          "hover": { "background": { "image": "btn_hover", "fit": "stretch" } },
+          "pressed": { "background": { "image": "btn_pressed", "fit": "stretch" } },
+          "disabled": { "background": { "image": "btn_primary", "fit": "stretch" } }
+        }
+      }
+    },
+    {
+      "id": "btn_build",
+      "type": "button",
+      "position": { "x": 812, "y": 130 },
+      "size": { "w": 96, "h": 28 },
+      "visible": true,
+      "enabled": true,
+      "bind": { "command": "mode.build" },
+      "visual": {
+        "background": { "image": "btn_primary", "fit": "stretch" },
+        "icon": {
+          "image": "icon_build",
+          "anchor": "center",
+          "offset": { "x": 0, "y": 0 },
+          "size": { "w": 20, "h": 20 }
+        },
+        "text": { "value": "ビルド", "align": "center" },
+        "states": {
+          "hover": { "background": { "image": "btn_hover", "fit": "stretch" } },
+          "pressed": { "background": { "image": "btn_pressed", "fit": "stretch" } },
+          "disabled": { "background": { "image": "btn_primary", "fit": "stretch" } }
+        }
+      }
+    }
+  ]
+}
