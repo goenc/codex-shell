@@ -1063,7 +1063,6 @@ impl CodexShellApp {
             let object_id = object.id.clone();
             let object_command = object.bind.command.trim().to_string();
             let object_size = egui::vec2(object.size.w.max(12.0), object.size.h.max(12.0));
-            let selected_for_move = self.ui_edit_mode && self.ui_selected_object_id == object_id;
             let area_interactable = true;
             let mut clicked = false;
             let mut checkbox_changed: Option<bool> = None;
@@ -1077,8 +1076,12 @@ impl CodexShellApp {
             let area_response = egui::Area::new(layer_id.id)
                 .order(egui::Order::Foreground)
                 .interactable(area_interactable)
-                .movable(selected_for_move)
                 .current_pos(egui::pos2(object.position.x, object.position.y))
+                .sense(if self.ui_edit_mode {
+                    egui::Sense::click_and_drag()
+                } else {
+                    egui::Sense::hover()
+                })
                 .show(ctx, |ui| match object_type.as_str() {
                     "panel" => {
                         let fill = if object.visual.background.image.trim().is_empty() {
@@ -1193,7 +1196,18 @@ impl CodexShellApp {
                     }
                 });
 
-            if self.ui_edit_mode && area_response.response.clicked() {
+            let pointer_clicked_on_area = ctx.input(|input| {
+                input.pointer.primary_clicked()
+                    && input
+                        .pointer
+                        .interact_pos()
+                        .is_some_and(|pos| area_response.response.rect.contains(pos))
+            });
+            if self.ui_edit_mode
+                && (area_response.response.clicked()
+                    || area_response.response.drag_started()
+                    || pointer_clicked_on_area)
+            {
                 self.ui_selected_object_id = object_id.clone();
             }
 
@@ -1245,14 +1259,12 @@ impl CodexShellApp {
                 );
             }
 
-            if selected_for_move {
-                let moved_to = area_response.response.rect.min;
+            if self.ui_edit_mode {
                 let target = &mut self.ui_definition.objects[index];
-                if (target.position.x - moved_to.x).abs() >= 0.5
-                    || (target.position.y - moved_to.y).abs() >= 0.5
-                {
-                    target.position.x = moved_to.x.round();
-                    target.position.y = moved_to.y.round();
+                let drag_delta = area_response.response.drag_delta();
+                if drag_delta != egui::Vec2::ZERO {
+                    target.position.x += drag_delta.x;
+                    target.position.y += drag_delta.y;
                     position_changed = true;
                 }
             }
