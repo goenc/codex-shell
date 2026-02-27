@@ -385,6 +385,7 @@ struct UiObject {
     #[serde(rename = "type")]
     object_type: String,
     z_index: i32,
+    checked: bool,
     position: UiPosition,
     size: UiSize,
     visible: bool,
@@ -399,6 +400,7 @@ impl Default for UiObject {
             id: String::new(),
             object_type: "button".to_string(),
             z_index: 0,
+            checked: false,
             position: UiPosition::default(),
             size: UiSize::default(),
             visible: true,
@@ -439,6 +441,7 @@ impl Default for UiSize {
 #[serde(default)]
 struct UiBind {
     command: String,
+    group: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -905,6 +908,49 @@ impl CodexShellApp {
         }
     }
 
+    fn runtime_checked_for_command(&self, command: &str) -> Option<bool> {
+        match command.trim() {
+            "ui.edit.toggle" => Some(self.ui_edit_mode),
+            "reasoning.medium" => Some(self.selected_reasoning_effort == "medium"),
+            "reasoning.high" => Some(self.selected_reasoning_effort == "high"),
+            "reasoning.xhigh" => Some(self.selected_reasoning_effort == "xhigh"),
+            _ => None,
+        }
+    }
+
+    fn sync_runtime_bound_states(&mut self) -> bool {
+        let mut changed = false;
+        let ui_edit_mode = self.ui_edit_mode;
+        let selected_reasoning_effort = self.selected_reasoning_effort.clone();
+        for object in &mut self.ui_definition.objects {
+            let desired = match object.bind.command.trim() {
+                "ui.edit.toggle" => Some(ui_edit_mode),
+                "reasoning.medium" => Some(selected_reasoning_effort == "medium"),
+                "reasoning.high" => Some(selected_reasoning_effort == "high"),
+                "reasoning.xhigh" => Some(selected_reasoning_effort == "xhigh"),
+                _ => None,
+            };
+            if let Some(desired_checked) = desired && object.checked != desired_checked {
+                object.checked = desired_checked;
+                changed = true;
+            }
+        }
+        changed
+    }
+
+    fn is_radio_object_type(object_type: &str) -> bool {
+        matches!(object_type.trim(), "radio" | "radio_button")
+    }
+
+    fn radio_group_key(object: &UiObject) -> String {
+        let key = object.bind.group.trim();
+        if key.is_empty() {
+            object.id.clone()
+        } else {
+            key.to_string()
+        }
+    }
+
     fn resolve_object_text(&self, object: &UiObject) -> String {
         match object.bind.command.trim() {
             "status.message" => format!("状態: {}", self.status_message),
@@ -941,6 +987,9 @@ impl CodexShellApp {
             "input.send" => self.send_input_command_by_button(),
             "input.voice_toggle" => self.toggle_voice_input(),
             "ui.settings" => self.show_settings_dialog = true,
+            "reasoning.medium" => self.selected_reasoning_effort = "medium".to_string(),
+            "reasoning.high" => self.selected_reasoning_effort = "high".to_string(),
+            "reasoning.xhigh" => self.selected_reasoning_effort = "xhigh".to_string(),
             "ui.edit.toggle" => {
                 self.ui_edit_mode = !self.ui_edit_mode;
                 self.update_status(if self.ui_edit_mode {
@@ -948,6 +997,19 @@ impl CodexShellApp {
                 } else {
                     "UI編集モードを無効化しました"
                 });
+                self.push_history(if self.ui_edit_mode {
+                    "UI編集モードを有効化しました"
+                } else {
+                    "UI編集モードを無効化しました"
+                });
+                if self.ui_edit_mode && self.ui_selected_object_id.is_empty() {
+                    self.ui_selected_object_id = self
+                        .ui_definition
+                        .objects
+                        .first()
+                        .map(|object| object.id.clone())
+                        .unwrap_or_default();
+                }
             }
             other => {
                 self.update_status(format!("未対応のUIコマンドです: {other}"));
@@ -957,7 +1019,6 @@ impl CodexShellApp {
     }
 
     fn render_runtime_header(&mut self, ctx: &egui::Context) {
-        let mut edit_toggle_changed = false;
         egui::Area::new(egui::Id::new("runtime_header"))
             .fixed_pos(egui::pos2(UI_BASE_OUTER_MARGIN, 8.0))
             .order(egui::Order::Foreground)
@@ -975,28 +1036,6 @@ impl CodexShellApp {
                                 ))
                                 .color(Color32::BLACK),
                             );
-                            let controls_enabled = !self.ui_edit_mode;
-                            ui.add_enabled_ui(controls_enabled, |ui| {
-                                ui.label(RichText::new("思考深度").color(Color32::BLACK));
-                                ui.radio_value(
-                                    &mut self.selected_reasoning_effort,
-                                    "medium".to_string(),
-                                    "medium",
-                                );
-                                ui.radio_value(
-                                    &mut self.selected_reasoning_effort,
-                                    "high".to_string(),
-                                    "high",
-                                );
-                                ui.radio_value(
-                                    &mut self.selected_reasoning_effort,
-                                    "xhigh".to_string(),
-                                    "xhigh",
-                                );
-                                if ui.checkbox(&mut self.ui_edit_mode, "UI編集").changed() {
-                                    edit_toggle_changed = true;
-                                }
-                            });
                             if self.ui_edit_mode {
                                 ui.label(
                                     RichText::new("編集モード中のため操作は無効")
@@ -1006,32 +1045,12 @@ impl CodexShellApp {
                         });
                     });
             });
-
-        if edit_toggle_changed {
-            self.update_status(if self.ui_edit_mode {
-                "UI編集モードを有効化しました"
-            } else {
-                "UI編集モードを無効化しました"
-            });
-            self.push_history(if self.ui_edit_mode {
-                "UI編集モードを有効化しました"
-            } else {
-                "UI編集モードを無効化しました"
-            });
-            if self.ui_selected_object_id.is_empty() {
-                self.ui_selected_object_id = self
-                    .ui_definition
-                    .objects
-                    .first()
-                    .map(|object| object.id.clone())
-                    .unwrap_or_default();
-            }
-        }
     }
 
     fn render_runtime_ui_objects(&mut self, ctx: &egui::Context) {
         let mut clicked_commands = Vec::new();
         let mut position_changed = false;
+        let mut state_changed = self.sync_runtime_bound_states();
         let controls_enabled = !self.ui_edit_mode;
         let mut ordered_indices: Vec<usize> = (0..self.ui_definition.objects.len()).collect();
         ordered_indices.sort_by(|left, right| {
@@ -1052,6 +1071,8 @@ impl CodexShellApp {
             let object_command = object.bind.command.trim().to_string();
             let object_size = egui::vec2(object.size.w.max(12.0), object.size.h.max(12.0));
             let mut clicked = false;
+            let mut checkbox_changed: Option<bool> = None;
+            let mut radio_selected = false;
 
             let area_response = egui::Area::new(egui::Id::new(("ui_object", object_id.clone())))
                 .order(egui::Order::Foreground)
@@ -1124,6 +1145,40 @@ impl CodexShellApp {
                                 ui.label(RichText::new(text).color(Color32::BLACK));
                             });
                     }
+                    "checkbox" => {
+                        let text = self.resolve_object_text(&object);
+                        let enabled =
+                            controls_enabled && object.enabled && self.is_bind_command_enabled(&object_command);
+                        let mut checked = self
+                            .runtime_checked_for_command(&object_command)
+                            .unwrap_or(object.checked);
+                        let response = ui.add_enabled_ui(enabled, |ui| {
+                            ui.add_sized(
+                                [object_size.x, object_size.y],
+                                egui::Checkbox::new(&mut checked, text),
+                            )
+                        });
+                        if response.inner.changed() {
+                            checkbox_changed = Some(checked);
+                        }
+                    }
+                    "radio" | "radio_button" => {
+                        let text = self.resolve_object_text(&object);
+                        let enabled =
+                            controls_enabled && object.enabled && self.is_bind_command_enabled(&object_command);
+                        let checked = self
+                            .runtime_checked_for_command(&object_command)
+                            .unwrap_or(object.checked);
+                        let response = ui.add_enabled_ui(enabled, |ui| {
+                            ui.add_sized(
+                                [object_size.x, object_size.y],
+                                egui::RadioButton::new(checked, text),
+                            )
+                        });
+                        if response.inner.clicked() && !checked {
+                            radio_selected = true;
+                        }
+                    }
                     _ => {
                         let text = self.resolve_object_text(&object);
                         let enabled =
@@ -1136,6 +1191,39 @@ impl CodexShellApp {
                         }
                     }
                 });
+
+            if let Some(next_checked) = checkbox_changed {
+                let target = &mut self.ui_definition.objects[index];
+                if target.checked != next_checked {
+                    target.checked = next_checked;
+                    state_changed = true;
+                    if !object_command.is_empty() {
+                        clicked_commands.push(object_command.clone());
+                    }
+                }
+            }
+
+            if radio_selected {
+                let group_key = Self::radio_group_key(&object);
+                let mut group_changed = false;
+                for (other_index, other) in self.ui_definition.objects.iter_mut().enumerate() {
+                    if Self::is_radio_object_type(&other.object_type)
+                        && Self::radio_group_key(other) == group_key
+                    {
+                        let next_checked = other_index == index;
+                        if other.checked != next_checked {
+                            other.checked = next_checked;
+                            group_changed = true;
+                        }
+                    }
+                }
+                if group_changed {
+                    state_changed = true;
+                    if !object_command.is_empty() {
+                        clicked_commands.push(object_command.clone());
+                    }
+                }
+            }
 
             if self.ui_edit_mode && self.ui_selected_object_id == object_id {
                 let highlight_rect = area_response.response.rect.expand(2.0);
@@ -1171,6 +1259,9 @@ impl CodexShellApp {
 
         if position_changed && !ctx.input(|input| input.pointer.primary_down()) {
             self.save_live_ui_definition("UIオブジェクト位置を更新しました");
+        }
+        if state_changed {
+            self.save_live_ui_definition("UIオブジェクト状態を更新しました");
         }
 
         if controls_enabled {
@@ -1226,6 +1317,13 @@ impl CodexShellApp {
             ui.label(RichText::new(format!("種別: {}", object.object_type)).color(Color32::BLACK));
             changed |= ui.checkbox(&mut object.visible, "表示").changed();
             changed |= ui.checkbox(&mut object.enabled, "有効").changed();
+            if matches!(object.object_type.trim(), "checkbox" | "radio" | "radio_button") {
+                changed |= ui.checkbox(&mut object.checked, "チェック状態").changed();
+            }
+            if Self::is_radio_object_type(&object.object_type) {
+                ui.label(RichText::new("ラジオグループ").color(Color32::BLACK));
+                changed |= ui.text_edit_singleline(&mut object.bind.group).changed();
+            }
 
             ui.horizontal(|ui| {
                 ui.label("座標X");

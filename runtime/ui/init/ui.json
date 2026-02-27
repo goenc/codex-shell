@@ -4,10 +4,10 @@
     "base_dir": "assets/ui",
     "images": {
       "panel_main": "panels/main.png",
-      "btn_primary": "buttons/primary.png",
       "btn_hover": "buttons/hover.png",
-      "btn_pressed": "buttons/pressed.png",
       "icon_voice": "icons/voice.png",
+      "btn_pressed": "buttons/pressed.png",
+      "btn_primary": "buttons/primary.png",
       "icon_build": "icons/build.png"
     }
   },
@@ -16,224 +16,849 @@
       "id": "panel_main",
       "type": "panel",
       "z_index": 0,
-      "position": { "x": 12, "y": 48 },
-      "size": { "w": 908, "h": 340 },
-      "visible": true,
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "size": {
+        "w": 908.0,
+        "h": 340.0
+      },
+      "visible": false,
       "enabled": true,
-      "bind": { "command": "" },
+      "bind": {
+        "command": ""
+      },
       "visual": {
-        "background": { "image": "panel_main", "fit": "stretch" },
+        "background": {
+          "image": "panel_main",
+          "fit": "stretch"
+        },
         "icon": {
           "image": "",
           "anchor": "center",
-          "offset": { "x": 0, "y": 0 },
-          "size": { "w": 0, "h": 0 }
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
         },
-        "text": { "value": "", "align": "left" },
+        "text": {
+          "value": "",
+          "align": "left"
+        },
         "states": {
-          "hover": { "background": { "image": "", "fit": "stretch" } },
-          "pressed": { "background": { "image": "", "fit": "stretch" } },
-          "disabled": { "background": { "image": "", "fit": "stretch" } }
+          "hover": {
+            "background": {
+              "image": "",
+              "fit": "stretch"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "",
+              "fit": "stretch"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "",
+              "fit": "stretch"
+            }
+          }
         }
       }
     },
     {
       "id": "btn_codex_start",
       "type": "button",
-      "z_index": 10,
-      "position": { "x": 24, "y": 18 },
-      "size": { "w": 120, "h": 28 },
+      "z_index": 90,
+      "position": {
+        "x": 24.0,
+        "y": 18.0
+      },
+      "size": {
+        "w": 120.0,
+        "h": 28.0
+      },
       "visible": true,
       "enabled": true,
-      "bind": { "command": "mode.codex_start" },
+      "bind": {
+        "command": "mode.codex_start"
+      },
       "visual": {
-        "background": { "image": "btn_primary", "fit": "stretch" },
+        "background": {
+          "image": "btn_primary",
+          "fit": "stretch"
+        },
         "icon": {
           "image": "",
           "anchor": "center",
-          "offset": { "x": 0, "y": 0 },
-          "size": { "w": 0, "h": 0 }
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
         },
-        "text": { "value": "Codex起動", "align": "center" },
+        "text": {
+          "value": "Codex起動",
+          "align": "center"
+        },
         "states": {
-          "hover": { "background": { "image": "btn_hover", "fit": "stretch" } },
-          "pressed": { "background": { "image": "btn_pressed", "fit": "stretch" } },
-          "disabled": { "background": { "image": "btn_primary", "fit": "stretch" } }
+          "hover": {
+            "background": {
+              "image": "btn_hover",
+              "fit": "stretch"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "btn_pressed",
+              "fit": "stretch"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "btn_primary",
+              "fit": "stretch"
+            }
+          }
         }
       }
     },
     {
       "id": "btn_stop",
       "type": "button",
-      "z_index": 11,
-      "position": { "x": 152, "y": 18 },
-      "size": { "w": 96, "h": 28 },
+      "z_index": 20,
+      "position": {
+        "x": 152.0,
+        "y": 18.0
+      },
+      "size": {
+        "w": 96.0,
+        "h": 28.0
+      },
       "visible": true,
       "enabled": true,
-      "bind": { "command": "mode.stop" },
+      "bind": {
+        "command": "mode.stop"
+      },
       "visual": {
-        "background": { "image": "btn_primary", "fit": "stretch" },
+        "background": {
+          "image": "btn_primary",
+          "fit": "stretch"
+        },
         "icon": {
           "image": "",
           "anchor": "center",
-          "offset": { "x": 0, "y": 0 },
-          "size": { "w": 0, "h": 0 }
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
         },
-        "text": { "value": "停止", "align": "center" },
+        "text": {
+          "value": "停止",
+          "align": "center"
+        },
         "states": {
-          "hover": { "background": { "image": "btn_hover", "fit": "stretch" } },
-          "pressed": { "background": { "image": "btn_pressed", "fit": "stretch" } },
-          "disabled": { "background": { "image": "btn_primary", "fit": "stretch" } }
+          "hover": {
+            "background": {
+              "image": "btn_hover",
+              "fit": "stretch"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "btn_pressed",
+              "fit": "stretch"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "btn_primary",
+              "fit": "stretch"
+            }
+          }
         }
       }
     },
     {
       "id": "btn_settings",
       "type": "button",
-      "z_index": 12,
-      "position": { "x": 812, "y": 18 },
-      "size": { "w": 96, "h": 28 },
+      "z_index": 30,
+      "position": {
+        "x": 794.0,
+        "y": 18.0
+      },
+      "size": {
+        "w": 96.0,
+        "h": 28.0
+      },
       "visible": true,
       "enabled": true,
-      "bind": { "command": "ui.settings" },
+      "bind": {
+        "command": "ui.settings"
+      },
       "visual": {
-        "background": { "image": "btn_primary", "fit": "stretch" },
+        "background": {
+          "image": "btn_primary",
+          "fit": "stretch"
+        },
         "icon": {
           "image": "",
           "anchor": "center",
-          "offset": { "x": 0, "y": 0 },
-          "size": { "w": 0, "h": 0 }
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
         },
-        "text": { "value": "設定", "align": "center" },
+        "text": {
+          "value": "設定",
+          "align": "center"
+        },
         "states": {
-          "hover": { "background": { "image": "btn_hover", "fit": "stretch" } },
-          "pressed": { "background": { "image": "btn_pressed", "fit": "stretch" } },
-          "disabled": { "background": { "image": "btn_primary", "fit": "stretch" } }
+          "hover": {
+            "background": {
+              "image": "btn_hover",
+              "fit": "stretch"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "btn_pressed",
+              "fit": "stretch"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "btn_primary",
+              "fit": "stretch"
+            }
+          }
         }
       }
     },
     {
       "id": "lbl_status",
       "type": "label",
-      "z_index": 20,
-      "position": { "x": 24, "y": 64 },
-      "size": { "w": 780, "h": 24 },
+      "z_index": 40,
+      "position": {
+        "x": 24.0,
+        "y": 64.0
+      },
+      "size": {
+        "w": 780.0,
+        "h": 24.0
+      },
       "visible": true,
       "enabled": true,
-      "bind": { "command": "status.message" },
+      "bind": {
+        "command": "status.message"
+      },
       "visual": {
-        "background": { "image": "", "fit": "none" },
+        "background": {
+          "image": "",
+          "fit": "none"
+        },
         "icon": {
           "image": "",
           "anchor": "left",
-          "offset": { "x": 0, "y": 0 },
-          "size": { "w": 0, "h": 0 }
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
         },
-        "text": { "value": "状態", "align": "left" },
+        "text": {
+          "value": "状態",
+          "align": "left"
+        },
         "states": {
-          "hover": { "background": { "image": "", "fit": "none" } },
-          "pressed": { "background": { "image": "", "fit": "none" } },
-          "disabled": { "background": { "image": "", "fit": "none" } }
+          "hover": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          }
         }
       }
     },
     {
       "id": "input_command",
       "type": "input",
-      "z_index": 30,
-      "position": { "x": 24, "y": 92 },
-      "size": { "w": 780, "h": 220 },
+      "z_index": 50,
+      "position": {
+        "x": 24.0,
+        "y": 92.0
+      },
+      "size": {
+        "w": 780.0,
+        "h": 220.0
+      },
       "visible": true,
       "enabled": true,
-      "bind": { "command": "" },
+      "bind": {
+        "command": ""
+      },
       "visual": {
-        "background": { "image": "", "fit": "stretch" },
+        "background": {
+          "image": "",
+          "fit": "stretch"
+        },
         "icon": {
           "image": "",
           "anchor": "left",
-          "offset": { "x": 0, "y": 0 },
-          "size": { "w": 0, "h": 0 }
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
         },
-        "text": { "value": "", "align": "left" },
+        "text": {
+          "value": "",
+          "align": "left"
+        },
         "states": {
-          "hover": { "background": { "image": "", "fit": "stretch" } },
-          "pressed": { "background": { "image": "", "fit": "stretch" } },
-          "disabled": { "background": { "image": "", "fit": "stretch" } }
+          "hover": {
+            "background": {
+              "image": "",
+              "fit": "stretch"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "",
+              "fit": "stretch"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "",
+              "fit": "stretch"
+            }
+          }
         }
       }
     },
     {
       "id": "btn_voice_input",
       "type": "button",
-      "z_index": 40,
-      "position": { "x": 24, "y": 320 },
-      "size": { "w": 780, "h": 28 },
+      "z_index": 60,
+      "position": {
+        "x": 24.0,
+        "y": 320.0
+      },
+      "size": {
+        "w": 780.0,
+        "h": 28.0
+      },
       "visible": true,
       "enabled": true,
-      "bind": { "command": "input.voice_toggle" },
+      "bind": {
+        "command": "input.voice_toggle"
+      },
       "visual": {
-        "background": { "image": "btn_primary", "fit": "stretch" },
+        "background": {
+          "image": "btn_primary",
+          "fit": "stretch"
+        },
         "icon": {
           "image": "icon_voice",
           "anchor": "left",
-          "offset": { "x": 8, "y": 0 },
-          "size": { "w": 20, "h": 20 }
+          "offset": {
+            "x": 8.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 20.0,
+            "h": 20.0
+          }
         },
-        "text": { "value": "音声入力", "align": "center" },
+        "text": {
+          "value": "音声入力",
+          "align": "center"
+        },
         "states": {
-          "hover": { "background": { "image": "btn_hover", "fit": "stretch" } },
-          "pressed": { "background": { "image": "btn_pressed", "fit": "stretch" } },
-          "disabled": { "background": { "image": "btn_primary", "fit": "stretch" } }
+          "hover": {
+            "background": {
+              "image": "btn_hover",
+              "fit": "stretch"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "btn_pressed",
+              "fit": "stretch"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "btn_primary",
+              "fit": "stretch"
+            }
+          }
         }
       }
     },
     {
       "id": "btn_input_send",
       "type": "button",
-      "z_index": 41,
-      "position": { "x": 812, "y": 92 },
-      "size": { "w": 96, "h": 28 },
+      "z_index": 70,
+      "position": {
+        "x": 794.0,
+        "y": 92.0
+      },
+      "size": {
+        "w": 96.0,
+        "h": 28.0
+      },
       "visible": true,
       "enabled": true,
-      "bind": { "command": "input.send" },
+      "bind": {
+        "command": "input.send"
+      },
       "visual": {
-        "background": { "image": "btn_primary", "fit": "stretch" },
+        "background": {
+          "image": "btn_primary",
+          "fit": "stretch"
+        },
         "icon": {
           "image": "",
           "anchor": "center",
-          "offset": { "x": 0, "y": 0 },
-          "size": { "w": 0, "h": 0 }
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
         },
-        "text": { "value": "入力送信", "align": "center" },
+        "text": {
+          "value": "入力送信",
+          "align": "center"
+        },
         "states": {
-          "hover": { "background": { "image": "btn_hover", "fit": "stretch" } },
-          "pressed": { "background": { "image": "btn_pressed", "fit": "stretch" } },
-          "disabled": { "background": { "image": "btn_primary", "fit": "stretch" } }
+          "hover": {
+            "background": {
+              "image": "btn_hover",
+              "fit": "stretch"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "btn_pressed",
+              "fit": "stretch"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "btn_primary",
+              "fit": "stretch"
+            }
+          }
         }
       }
     },
     {
       "id": "btn_build",
       "type": "button",
-      "z_index": 42,
-      "position": { "x": 812, "y": 130 },
-      "size": { "w": 96, "h": 28 },
+      "z_index": 80,
+      "position": {
+        "x": 794.0,
+        "y": 130.0
+      },
+      "size": {
+        "w": 96.0,
+        "h": 28.0
+      },
       "visible": true,
       "enabled": true,
-      "bind": { "command": "mode.build" },
+      "bind": {
+        "command": "mode.build"
+      },
       "visual": {
-        "background": { "image": "btn_primary", "fit": "stretch" },
+        "background": {
+          "image": "btn_primary",
+          "fit": "stretch"
+        },
         "icon": {
           "image": "icon_build",
           "anchor": "center",
-          "offset": { "x": 0, "y": 0 },
-          "size": { "w": 20, "h": 20 }
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 20.0,
+            "h": 20.0
+          }
         },
-        "text": { "value": "ビルド", "align": "center" },
+        "text": {
+          "value": "ビルド",
+          "align": "center"
+        },
         "states": {
-          "hover": { "background": { "image": "btn_hover", "fit": "stretch" } },
-          "pressed": { "background": { "image": "btn_pressed", "fit": "stretch" } },
-          "disabled": { "background": { "image": "btn_primary", "fit": "stretch" } }
+          "hover": {
+            "background": {
+              "image": "btn_hover",
+              "fit": "stretch"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "btn_pressed",
+              "fit": "stretch"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "btn_primary",
+              "fit": "stretch"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "lbl_reasoning_effort",
+      "type": "label",
+      "z_index": 86,
+      "checked": false,
+      "position": {
+        "x": 264.0,
+        "y": 18.0
+      },
+      "size": {
+        "w": 72.0,
+        "h": 28.0
+      },
+      "visible": true,
+      "enabled": true,
+      "bind": {
+        "command": "",
+        "group": ""
+      },
+      "visual": {
+        "background": {
+          "image": "",
+          "fit": "none"
+        },
+        "icon": {
+          "image": "",
+          "anchor": "center",
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
+        },
+        "text": {
+          "value": "思考深度",
+          "align": "left"
+        },
+        "states": {
+          "hover": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "radio_reasoning_medium",
+      "type": "radio",
+      "z_index": 87,
+      "checked": true,
+      "position": {
+        "x": 340.0,
+        "y": 18.0
+      },
+      "size": {
+        "w": 78.0,
+        "h": 28.0
+      },
+      "visible": true,
+      "enabled": true,
+      "bind": {
+        "command": "reasoning.medium",
+        "group": "reasoning_effort"
+      },
+      "visual": {
+        "background": {
+          "image": "",
+          "fit": "none"
+        },
+        "icon": {
+          "image": "",
+          "anchor": "center",
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
+        },
+        "text": {
+          "value": "medium",
+          "align": "center"
+        },
+        "states": {
+          "hover": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "radio_reasoning_high",
+      "type": "radio",
+      "z_index": 88,
+      "checked": false,
+      "position": {
+        "x": 422.0,
+        "y": 18.0
+      },
+      "size": {
+        "w": 66.0,
+        "h": 28.0
+      },
+      "visible": true,
+      "enabled": true,
+      "bind": {
+        "command": "reasoning.high",
+        "group": "reasoning_effort"
+      },
+      "visual": {
+        "background": {
+          "image": "",
+          "fit": "none"
+        },
+        "icon": {
+          "image": "",
+          "anchor": "center",
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
+        },
+        "text": {
+          "value": "high",
+          "align": "center"
+        },
+        "states": {
+          "hover": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "radio_reasoning_xhigh",
+      "type": "radio",
+      "z_index": 89,
+      "checked": false,
+      "position": {
+        "x": 492.0,
+        "y": 18.0
+      },
+      "size": {
+        "w": 72.0,
+        "h": 28.0
+      },
+      "visible": true,
+      "enabled": true,
+      "bind": {
+        "command": "reasoning.xhigh",
+        "group": "reasoning_effort"
+      },
+      "visual": {
+        "background": {
+          "image": "",
+          "fit": "none"
+        },
+        "icon": {
+          "image": "",
+          "anchor": "center",
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
+        },
+        "text": {
+          "value": "xhigh",
+          "align": "center"
+        },
+        "states": {
+          "hover": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "chk_ui_edit",
+      "type": "checkbox",
+      "z_index": 90,
+      "checked": false,
+      "position": {
+        "x": 568.0,
+        "y": 18.0
+      },
+      "size": {
+        "w": 88.0,
+        "h": 28.0
+      },
+      "visible": true,
+      "enabled": true,
+      "bind": {
+        "command": "ui.edit.toggle",
+        "group": ""
+      },
+      "visual": {
+        "background": {
+          "image": "",
+          "fit": "none"
+        },
+        "icon": {
+          "image": "",
+          "anchor": "center",
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
+        },
+        "text": {
+          "value": "UI編集",
+          "align": "center"
+        },
+        "states": {
+          "hover": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          }
         }
       }
     }
