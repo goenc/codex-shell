@@ -1037,6 +1037,7 @@ impl CodexShellApp {
         let mut position_changed = false;
         let mut state_changed = self.sync_runtime_bound_states();
         let controls_enabled = !self.ui_edit_mode;
+        let mut rendered_layers = Vec::new();
         let mut ordered_indices: Vec<usize> = (0..self.ui_definition.objects.len()).collect();
         ordered_indices.sort_by(|left, right| {
             self.ui_definition.objects[*left]
@@ -1055,14 +1056,22 @@ impl CodexShellApp {
             let object_id = object.id.clone();
             let object_command = object.bind.command.trim().to_string();
             let object_size = egui::vec2(object.size.w.max(12.0), object.size.h.max(12.0));
+            let selected_for_move = self.ui_edit_mode && self.ui_selected_object_id == object_id;
+            let area_interactable = true;
             let mut clicked = false;
             let mut checkbox_changed: Option<bool> = None;
             let mut radio_selected = false;
+            let layer_id = egui::LayerId::new(
+                egui::Order::Foreground,
+                egui::Id::new(("ui_object", object_id.clone())),
+            );
+            rendered_layers.push(layer_id);
 
-            let area_response = egui::Area::new(egui::Id::new(("ui_object", object_id.clone())))
+            let area_response = egui::Area::new(layer_id.id)
                 .order(egui::Order::Foreground)
-                .movable(self.ui_edit_mode)
-                .fixed_pos(egui::pos2(object.position.x, object.position.y))
+                .interactable(area_interactable)
+                .movable(selected_for_move)
+                .current_pos(egui::pos2(object.position.x, object.position.y))
                 .show(ctx, |ui| match object_type.as_str() {
                     "panel" => {
                         let fill = if object.visual.background.image.trim().is_empty() {
@@ -1177,6 +1186,10 @@ impl CodexShellApp {
                     }
                 });
 
+            if self.ui_edit_mode && area_response.response.clicked() {
+                self.ui_selected_object_id = object_id.clone();
+            }
+
             if let Some(next_checked) = checkbox_changed {
                 let target = &mut self.ui_definition.objects[index];
                 if target.checked != next_checked {
@@ -1225,7 +1238,7 @@ impl CodexShellApp {
                 );
             }
 
-            if self.ui_edit_mode {
+            if selected_for_move {
                 let moved_to = area_response.response.rect.min;
                 let target = &mut self.ui_definition.objects[index];
                 if (target.position.x - moved_to.x).abs() >= 0.5
@@ -1242,12 +1255,18 @@ impl CodexShellApp {
             }
         }
 
-        if position_changed && !ctx.input(|input| input.pointer.primary_down()) {
+        if position_changed {
             self.save_live_ui_definition("UIオブジェクト位置を更新しました");
         }
         if state_changed {
             self.save_live_ui_definition("UIオブジェクト状態を更新しました");
         }
+        ctx.memory_mut(|memory| {
+            let areas = memory.areas_mut();
+            for layer in rendered_layers {
+                areas.move_to_top(layer);
+            }
+        });
 
         if controls_enabled {
             for command in clicked_commands {
