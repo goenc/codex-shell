@@ -1182,7 +1182,7 @@ impl CodexShellApp {
         ui.add_space(6.0);
 
         if self.ui_definition.objects.is_empty() {
-            ui.label(RichText::new("objects が空です").color(Color32::BLACK));
+            ui.label(RichText::new("オブジェクトがありません").color(Color32::BLACK));
             return;
         }
         if self.ui_selected_object_id.is_empty() {
@@ -1205,44 +1205,44 @@ impl CodexShellApp {
             let mut changed = false;
             let object = &mut self.ui_definition.objects[index];
 
-            ui.label(RichText::new(format!("type: {}", object.object_type)).color(Color32::BLACK));
-            changed |= ui.checkbox(&mut object.visible, "visible").changed();
-            changed |= ui.checkbox(&mut object.enabled, "enabled").changed();
+            ui.label(RichText::new(format!("種別: {}", object.object_type)).color(Color32::BLACK));
+            changed |= ui.checkbox(&mut object.visible, "表示").changed();
+            changed |= ui.checkbox(&mut object.enabled, "有効").changed();
 
             ui.horizontal(|ui| {
-                ui.label("x");
+                ui.label("座標X");
                 changed |= ui
                     .add(egui::DragValue::new(&mut object.position.x).speed(1.0))
                     .changed();
-                ui.label("y");
+                ui.label("座標Y");
                 changed |= ui
                     .add(egui::DragValue::new(&mut object.position.y).speed(1.0))
                     .changed();
             });
 
             ui.horizontal(|ui| {
-                ui.label("w");
+                ui.label("幅");
                 changed |= ui
                     .add(egui::DragValue::new(&mut object.size.w).speed(1.0))
                     .changed();
-                ui.label("h");
+                ui.label("高さ");
                 changed |= ui
                     .add(egui::DragValue::new(&mut object.size.h).speed(1.0))
                     .changed();
             });
 
-            ui.label(RichText::new("bind.command").color(Color32::BLACK));
+            ui.label(RichText::new("コマンド").color(Color32::BLACK));
             changed |= ui.text_edit_singleline(&mut object.bind.command).changed();
 
-            ui.label(RichText::new("visual.text.value").color(Color32::BLACK));
+            ui.label(RichText::new("表示テキスト").color(Color32::BLACK));
             changed |= ui.text_edit_singleline(&mut object.visual.text.value).changed();
 
-            ui.label(RichText::new("visual.background.image").color(Color32::BLACK));
+            ui.label(RichText::new("背景画像キー").color(Color32::BLACK));
             changed |= ui
                 .text_edit_singleline(&mut object.visual.background.image)
                 .changed();
 
-            ui.label(RichText::new("visual.background.fit").color(Color32::BLACK));
+            ui.label(RichText::new("背景フィット").color(Color32::BLACK));
             changed |= ui
                 .text_edit_singleline(&mut object.visual.background.fit)
                 .changed();
