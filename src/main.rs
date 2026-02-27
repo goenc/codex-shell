@@ -1101,7 +1101,9 @@ impl CodexShellApp {
                         let text = self.resolve_object_text(&object);
                         ui.add_sized(
                             [object_size.x, object_size.y],
-                            egui::Label::new(RichText::new(text).color(Color32::BLACK)),
+                            egui::Label::new(RichText::new(text).color(Color32::BLACK))
+                                .selectable(false)
+                                .sense(egui::Sense::hover()),
                         );
                     }
                     "input" => {
@@ -1458,6 +1460,7 @@ impl CodexShellApp {
         let mut open = true;
         let mut close_by_button = false;
         egui::Window::new("設定")
+            .order(egui::Order::Foreground)
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
