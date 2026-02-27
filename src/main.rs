@@ -1231,9 +1231,6 @@ impl CodexShellApp {
                     .changed();
             });
 
-            ui.label(RichText::new("コマンド").color(Color32::BLACK));
-            changed |= ui.text_edit_singleline(&mut object.bind.command).changed();
-
             ui.label(RichText::new("表示テキスト").color(Color32::BLACK));
             changed |= ui.text_edit_singleline(&mut object.visual.text.value).changed();
 
