@@ -1044,6 +1044,11 @@ impl CodexShellApp {
         let mut position_changed = false;
         let mut state_changed = self.sync_runtime_bound_states();
         let controls_enabled = !self.ui_edit_mode;
+        let object_layer_order = if self.show_settings_dialog {
+            egui::Order::Middle
+        } else {
+            egui::Order::Foreground
+        };
         let mut rendered_layers = Vec::new();
         let mut ordered_indices: Vec<usize> = (0..self.ui_definition.objects.len()).collect();
         ordered_indices.sort_by(|left, right| {
@@ -1068,13 +1073,13 @@ impl CodexShellApp {
             let mut checkbox_changed: Option<bool> = None;
             let mut radio_selected = false;
             let layer_id = egui::LayerId::new(
-                egui::Order::Foreground,
+                object_layer_order,
                 egui::Id::new(("ui_object", object_id.clone())),
             );
             rendered_layers.push(layer_id);
 
             let area_response = egui::Area::new(layer_id.id)
-                .order(egui::Order::Foreground)
+                .order(object_layer_order)
                 .interactable(area_interactable)
                 .current_pos(egui::pos2(object.position.x, object.position.y))
                 .sense(if self.ui_edit_mode {
@@ -1460,7 +1465,7 @@ impl CodexShellApp {
         let mut open = true;
         let mut close_by_button = false;
         egui::Window::new("設定")
-            .order(egui::Order::Foreground)
+            .order(egui::Order::Tooltip)
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
