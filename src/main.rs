@@ -1121,6 +1121,21 @@ impl CodexShellApp {
                     }
                 });
 
+            if self.ui_edit_mode && self.ui_selected_object_id == object_id {
+                let highlight_rect = area_response.response.rect.expand(2.0);
+                let painter = ctx.layer_painter(egui::LayerId::new(
+                    egui::Order::Tooltip,
+                    egui::Id::new(("ui_selected_highlight", object_id.clone())),
+                ));
+                painter.rect(
+                    highlight_rect,
+                    egui::CornerRadius::same(2),
+                    Color32::from_rgba_unmultiplied(255, 0, 0, 26),
+                    egui::Stroke::new(2.0, Color32::from_rgba_unmultiplied(255, 0, 0, 180)),
+                    egui::StrokeKind::Outside,
+                );
+            }
+
             if self.ui_edit_mode {
                 let moved_to = area_response.response.rect.min;
                 let target = &mut self.ui_definition.objects[index];
