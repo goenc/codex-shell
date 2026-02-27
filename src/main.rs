@@ -955,6 +955,7 @@ impl CodexShellApp {
         match object.bind.command.trim() {
             "status.message" => format!("状態: {}", self.status_message),
             "codex.state" => format!("Codex状態: {}", self.codex_runtime_state.label()),
+            "ui.edit.locked_hint" => "編集モード中のため操作は無効".to_string(),
             "input.voice_toggle" => {
                 if self.voice_input_active {
                     "読み取り中".to_string()
@@ -975,6 +976,16 @@ impl CodexShellApp {
                     object.visual.text.value.clone()
                 }
             }
+        }
+    }
+
+    fn is_object_runtime_visible(&self, object: &UiObject) -> bool {
+        if !object.visible {
+            return false;
+        }
+        match object.bind.command.trim() {
+            "ui.edit.locked_hint" => self.ui_edit_mode,
+            _ => true,
         }
     }
 
@@ -1018,33 +1029,7 @@ impl CodexShellApp {
         }
     }
 
-    fn render_runtime_header(&mut self, ctx: &egui::Context) {
-        egui::Area::new(egui::Id::new("runtime_header"))
-            .fixed_pos(egui::pos2(UI_BASE_OUTER_MARGIN, 8.0))
-            .order(egui::Order::Foreground)
-            .show(ctx, |ui| {
-                egui::Frame::default()
-                    .fill(Color32::from_white_alpha(245))
-                    .stroke(egui::Stroke::new(1.0, Color32::from_gray(150)))
-                    .inner_margin(egui::Margin::same(8))
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label(
-                                RichText::new(format!(
-                                    "Codex状態: {}",
-                                    self.codex_runtime_state.label()
-                                ))
-                                .color(Color32::BLACK),
-                            );
-                            if self.ui_edit_mode {
-                                ui.label(
-                                    RichText::new("編集モード中のため操作は無効")
-                                        .color(Color32::from_rgb(128, 0, 0)),
-                                );
-                            }
-                        });
-                    });
-            });
+    fn render_runtime_header(&mut self, _ctx: &egui::Context) {
     }
 
     fn render_runtime_ui_objects(&mut self, ctx: &egui::Context) {
@@ -1062,7 +1047,7 @@ impl CodexShellApp {
 
         for index in ordered_indices {
             let object = self.ui_definition.objects[index].clone();
-            if !object.visible {
+            if !self.is_object_runtime_visible(&object) {
                 continue;
             }
 
