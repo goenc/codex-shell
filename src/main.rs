@@ -973,24 +973,33 @@ impl CodexShellApp {
                                 ))
                                 .color(Color32::BLACK),
                             );
-                            ui.label(RichText::new("思考深度").color(Color32::BLACK));
-                            ui.radio_value(
-                                &mut self.selected_reasoning_effort,
-                                "medium".to_string(),
-                                "medium",
-                            );
-                            ui.radio_value(
-                                &mut self.selected_reasoning_effort,
-                                "high".to_string(),
-                                "high",
-                            );
-                            ui.radio_value(
-                                &mut self.selected_reasoning_effort,
-                                "xhigh".to_string(),
-                                "xhigh",
-                            );
-                            if ui.checkbox(&mut self.ui_edit_mode, "UI編集").changed() {
-                                edit_toggle_changed = true;
+                            let controls_enabled = !self.ui_edit_mode;
+                            ui.add_enabled_ui(controls_enabled, |ui| {
+                                ui.label(RichText::new("思考深度").color(Color32::BLACK));
+                                ui.radio_value(
+                                    &mut self.selected_reasoning_effort,
+                                    "medium".to_string(),
+                                    "medium",
+                                );
+                                ui.radio_value(
+                                    &mut self.selected_reasoning_effort,
+                                    "high".to_string(),
+                                    "high",
+                                );
+                                ui.radio_value(
+                                    &mut self.selected_reasoning_effort,
+                                    "xhigh".to_string(),
+                                    "xhigh",
+                                );
+                                if ui.checkbox(&mut self.ui_edit_mode, "UI編集").changed() {
+                                    edit_toggle_changed = true;
+                                }
+                            });
+                            if self.ui_edit_mode {
+                                ui.label(
+                                    RichText::new("編集モード中のため操作は無効")
+                                        .color(Color32::from_rgb(128, 0, 0)),
+                                );
                             }
                         });
                     });
@@ -1021,6 +1030,7 @@ impl CodexShellApp {
     fn render_runtime_ui_objects(&mut self, ctx: &egui::Context) {
         let mut clicked_commands = Vec::new();
         let mut position_changed = false;
+        let controls_enabled = !self.ui_edit_mode;
 
         for index in 0..self.ui_definition.objects.len() {
             let object = self.ui_definition.objects[index].clone();
@@ -1082,11 +1092,12 @@ impl CodexShellApp {
                                     TextEdit::multiline(&mut self.input_command)
                                         .id_source(INPUT_COMMAND_ID_SALT)
                                         .font(input_font_id)
+                                        .interactive(controls_enabled)
                                         .desired_width(f32::INFINITY)
                                         .desired_rows(desired_rows),
                                 )
                             });
-                        if self.pending_input_focus {
+                        if controls_enabled && self.pending_input_focus {
                             input_response.inner.request_focus();
                             self.pending_input_focus = false;
                         }
@@ -1111,7 +1122,7 @@ impl CodexShellApp {
                     _ => {
                         let text = self.resolve_object_text(&object);
                         let enabled =
-                            object.enabled && self.is_bind_command_enabled(&object_command);
+                            controls_enabled && object.enabled && self.is_bind_command_enabled(&object_command);
                         let response = ui.add_enabled_ui(enabled, |ui| {
                             ui.add_sized([object_size.x, object_size.y], egui::Button::new(text))
                         });
@@ -1157,8 +1168,10 @@ impl CodexShellApp {
             self.save_live_ui_definition("UIオブジェクト位置を更新しました");
         }
 
-        for command in clicked_commands {
-            self.dispatch_ui_command(&command);
+        if controls_enabled {
+            for command in clicked_commands {
+                self.dispatch_ui_command(&command);
+            }
         }
     }
 
@@ -1293,59 +1306,68 @@ impl CodexShellApp {
             .open(&mut open)
             .show(ctx, |ui| {
                 ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
-                ui.vertical_centered(|ui| {
-                    ui.label(RichText::new("設定").strong().color(Color32::BLACK));
-                });
-                ui.add_space(8.0);
+                let controls_enabled = !self.ui_edit_mode;
+                ui.add_enabled_ui(controls_enabled, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.label(RichText::new("設定").strong().color(Color32::BLACK));
+                    });
+                    ui.add_space(8.0);
 
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("起動フォルダ").color(Color32::BLACK));
-                    ui.add_sized(
-                        [380.0, 24.0],
-                        TextEdit::singleline(&mut self.config.working_dir),
-                    );
-                });
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("ビルド").color(Color32::BLACK));
-                    ui.add_sized(
-                        [380.0, 24.0],
-                        TextEdit::singleline(&mut self.config.build_command),
-                    );
-                });
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("Codex").color(Color32::BLACK));
-                    ui.add_sized(
-                        [380.0, 24.0],
-                        TextEdit::singleline(&mut self.config.codex_command),
-                    );
-                });
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("パイプ名").color(Color32::BLACK));
-                    ui.add_sized(
-                        [380.0, 24.0],
-                        TextEdit::singleline(&mut self.config.pipe_name),
-                    );
-                });
-                ui.horizontal(|ui| {
-                    ui.checkbox(
-                        &mut self.config.show_size_overlay,
-                        RichText::new("サイズ表示を表示").color(Color32::BLACK),
-                    );
-                });
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("起動フォルダ").color(Color32::BLACK));
+                        ui.add_sized(
+                            [380.0, 24.0],
+                            TextEdit::singleline(&mut self.config.working_dir),
+                        );
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("ビルド").color(Color32::BLACK));
+                        ui.add_sized(
+                            [380.0, 24.0],
+                            TextEdit::singleline(&mut self.config.build_command),
+                        );
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Codex").color(Color32::BLACK));
+                        ui.add_sized(
+                            [380.0, 24.0],
+                            TextEdit::singleline(&mut self.config.codex_command),
+                        );
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("パイプ名").color(Color32::BLACK));
+                        ui.add_sized(
+                            [380.0, 24.0],
+                            TextEdit::singleline(&mut self.config.pipe_name),
+                        );
+                    });
+                    ui.horizontal(|ui| {
+                        ui.checkbox(
+                            &mut self.config.show_size_overlay,
+                            RichText::new("サイズ表示を表示").color(Color32::BLACK),
+                        );
+                    });
 
-                ui.add_space(8.0);
-                ui.horizontal(|ui| {
-                    if ui.button("設定保存").clicked() {
-                        self.save_config();
-                    }
-                    if ui.button("PowerShell再起動").clicked() {
-                        self.save_config();
-                        self.start_listener();
-                    }
-                    if ui.button("閉じる").clicked() {
-                        close_by_button = true;
-                    }
+                    ui.add_space(8.0);
+                    ui.horizontal(|ui| {
+                        if ui.button("設定保存").clicked() {
+                            self.save_config();
+                        }
+                        if ui.button("PowerShell再起動").clicked() {
+                            self.save_config();
+                            self.start_listener();
+                        }
+                        if ui.button("閉じる").clicked() {
+                            close_by_button = true;
+                        }
+                    });
                 });
+                if self.ui_edit_mode {
+                    ui.label(
+                        RichText::new("編集モード中のため設定操作は無効です")
+                            .color(Color32::from_rgb(128, 0, 0)),
+                    );
+                }
             });
 
         if !open || close_by_button {
