@@ -18,6 +18,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     VIRTUAL_KEY, VK_CONTROL, VK_MENU, VK_RIGHT,
 };
 
+mod ui_editor;
+
 const DEFAULT_PIPE_NAME: &str = "codex_shell_pipe";
 const DEFAULT_BUILD_COMMAND: &str = "cargo build";
 const DEFAULT_CODEX_COMMAND: &str = "codex --ask-for-approval on-request --sandbox read-only";
@@ -1301,160 +1303,29 @@ impl CodexShellApp {
         }
     }
 
-    fn render_ui_editor_contents(&mut self, ui: &mut egui::Ui) {
-        ui.label(
-            RichText::new("オブジェクトをドラッグすると位置を変更できます").color(Color32::BLACK),
-        );
-        ui.add_space(6.0);
-        ui.horizontal(|ui| {
-            let unsaved_text = if self.ui_has_unsaved_changes {
-                "未保存の変更があります"
-            } else {
-                "保存済み"
-            };
-            ui.label(RichText::new(unsaved_text).color(Color32::BLACK));
-            if ui
-                .add_enabled(self.ui_has_unsaved_changes, egui::Button::new("保存"))
-                .clicked()
-            {
-                self.save_live_ui_definition("UI編集内容を保存しました");
-                self.update_status("UI編集内容を保存しました");
-            }
-        });
-        ui.add_space(6.0);
-
-        if self.ui_definition.objects.is_empty() {
-            ui.label(RichText::new("オブジェクトがありません").color(Color32::BLACK));
-            return;
-        }
-        if self.ui_selected_object_id.is_empty() {
-            self.ui_selected_object_id = self.ui_definition.objects[0].id.clone();
-        }
-        ui.label(
-            RichText::new(format!("総オブジェクト数: {}", self.ui_definition.objects.len()))
-                .color(Color32::BLACK),
-        );
-
-        let mut ordered_objects: Vec<(usize, String, i32)> = self
-            .ui_definition
-            .objects
-            .iter()
-            .enumerate()
-            .map(|(index, object)| (index, object.id.clone(), object.z_index))
-            .collect();
-        ordered_objects.sort_by(|left, right| left.2.cmp(&right.2).then(left.0.cmp(&right.0)));
-
-        egui::ComboBox::from_label("対象オブジェクト")
-            .selected_text(self.ui_selected_object_id.clone())
-            .show_ui(ui, |ui| {
-                for (order, (_index, object_id, z_index)) in ordered_objects.iter().enumerate() {
-                    ui.selectable_value(
-                        &mut self.ui_selected_object_id,
-                        object_id.clone(),
-                        format!("{}: {} (z={})", order + 1, object_id, z_index),
-                    );
-                }
-            });
-
-        if let Some(index) = self.ui_definition.object_index(&self.ui_selected_object_id) {
-            let mut changed = false;
-            let object = &mut self.ui_definition.objects[index];
-
-            ui.label(RichText::new(format!("種別: {}", object.object_type)).color(Color32::BLACK));
-            changed |= ui.checkbox(&mut object.visible, "表示").changed();
-            changed |= ui.checkbox(&mut object.enabled, "有効").changed();
-            if matches!(object.object_type.trim(), "checkbox" | "radio" | "radio_button") {
-                changed |= ui.checkbox(&mut object.checked, "チェック状態").changed();
-            }
-            if Self::is_radio_object_type(&object.object_type) {
-                ui.label(RichText::new("ラジオグループ").color(Color32::BLACK));
-                changed |= ui.text_edit_singleline(&mut object.bind.group).changed();
-            }
-
-            ui.horizontal(|ui| {
-                ui.label("座標X");
-                changed |= ui
-                    .add(egui::DragValue::new(&mut object.position.x).speed(1.0))
-                    .changed();
-                ui.label("座標Y");
-                changed |= ui
-                    .add(egui::DragValue::new(&mut object.position.y).speed(1.0))
-                    .changed();
-            });
-
-            ui.horizontal(|ui| {
-                ui.label("幅");
-                changed |= ui
-                    .add(egui::DragValue::new(&mut object.size.w).speed(1.0))
-                    .changed();
-                ui.label("高さ");
-                changed |= ui
-                    .add(egui::DragValue::new(&mut object.size.h).speed(1.0))
-                    .changed();
-            });
-            ui.horizontal(|ui| {
-                ui.label("表示順");
-                changed |= ui
-                    .add(egui::DragValue::new(&mut object.z_index).speed(1.0))
-                    .changed();
-            });
-
-            ui.label(RichText::new("表示テキスト").color(Color32::BLACK));
-            changed |= ui.text_edit_singleline(&mut object.visual.text.value).changed();
-
-            ui.label(RichText::new("背景画像キー").color(Color32::BLACK));
-            changed |= ui
-                .text_edit_singleline(&mut object.visual.background.image)
-                .changed();
-
-            ui.label(RichText::new("背景フィット").color(Color32::BLACK));
-            changed |= ui
-                .text_edit_singleline(&mut object.visual.background.fit)
-                .changed();
-
-            if changed {
-                self.mark_ui_definition_dirty();
-            }
-        } else {
-            ui.label(RichText::new("選択オブジェクトが見つかりません").color(Color32::BLACK));
-        }
-    }
-
     fn render_ui_editor(&mut self, ctx: &egui::Context) {
         if !self.ui_edit_mode {
             return;
         }
 
-        let viewport_id = egui::ViewportId::from_hash_of("ui_editor_viewport");
-        let builder = egui::ViewportBuilder::default()
-            .with_title("UI編集")
-            .with_inner_size([360.0, 520.0])
-            .with_min_inner_size([320.0, 420.0])
-            .with_resizable(true)
-            .with_close_button(true);
-
-        ctx.show_viewport_immediate(viewport_id, builder, |editor_ctx, viewport_class| {
-            if editor_ctx.input(|input| input.viewport().close_requested()) {
-                self.ui_edit_mode = false;
-                self.update_status("UI編集モードを無効化しました");
-                self.push_history("UI編集ウィンドウを閉じました");
-                return;
-            }
-
-            if viewport_class == egui::ViewportClass::Embedded {
-                egui::Window::new("UI編集")
-                    .default_width(340.0)
-                    .resizable(true)
-                    .show(editor_ctx, |ui| {
-                        self.render_ui_editor_contents(ui);
-                    });
-            } else {
-                egui::CentralPanel::default().show(editor_ctx, |ui| {
-                    self.render_ui_editor_contents(ui);
-                });
-            }
-            editor_ctx.request_repaint_after(Duration::from_millis(UI_RELOAD_CHECK_INTERVAL_MS));
-        });
+        let events = ui_editor::render_ui_editor_viewport(
+            ctx,
+            &mut self.ui_definition,
+            &mut self.ui_selected_object_id,
+            self.ui_has_unsaved_changes,
+        );
+        if events.changed {
+            self.mark_ui_definition_dirty();
+        }
+        if events.save_requested {
+            self.save_live_ui_definition("UI編集内容を保存しました");
+            self.update_status("UI編集内容を保存しました");
+        }
+        if events.closed {
+            self.ui_edit_mode = false;
+            self.update_status("UI編集モードを無効化しました");
+            self.push_history("UI編集ウィンドウを閉じました");
+        }
     }
 
     fn render_settings_dialog(&mut self, ctx: &egui::Context) {
