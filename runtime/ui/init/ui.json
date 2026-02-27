@@ -15,6 +15,7 @@
     {
       "id": "panel_main",
       "type": "panel",
+      "z_index": 0,
       "position": { "x": 12, "y": 48 },
       "size": { "w": 908, "h": 340 },
       "visible": true,
@@ -39,6 +40,7 @@
     {
       "id": "btn_codex_start",
       "type": "button",
+      "z_index": 10,
       "position": { "x": 24, "y": 18 },
       "size": { "w": 120, "h": 28 },
       "visible": true,
@@ -63,6 +65,7 @@
     {
       "id": "btn_stop",
       "type": "button",
+      "z_index": 11,
       "position": { "x": 152, "y": 18 },
       "size": { "w": 96, "h": 28 },
       "visible": true,
@@ -87,6 +90,7 @@
     {
       "id": "btn_settings",
       "type": "button",
+      "z_index": 12,
       "position": { "x": 812, "y": 18 },
       "size": { "w": 96, "h": 28 },
       "visible": true,
@@ -111,6 +115,7 @@
     {
       "id": "lbl_status",
       "type": "label",
+      "z_index": 20,
       "position": { "x": 24, "y": 64 },
       "size": { "w": 780, "h": 24 },
       "visible": true,
@@ -135,6 +140,7 @@
     {
       "id": "input_command",
       "type": "input",
+      "z_index": 30,
       "position": { "x": 24, "y": 92 },
       "size": { "w": 780, "h": 220 },
       "visible": true,
@@ -159,6 +165,7 @@
     {
       "id": "btn_voice_input",
       "type": "button",
+      "z_index": 40,
       "position": { "x": 24, "y": 320 },
       "size": { "w": 780, "h": 28 },
       "visible": true,
@@ -183,6 +190,7 @@
     {
       "id": "btn_input_send",
       "type": "button",
+      "z_index": 41,
       "position": { "x": 812, "y": 92 },
       "size": { "w": 96, "h": 28 },
       "visible": true,
@@ -207,6 +215,7 @@
     {
       "id": "btn_build",
       "type": "button",
+      "z_index": 42,
       "position": { "x": 812, "y": 130 },
       "size": { "w": 96, "h": 28 },
       "visible": true,

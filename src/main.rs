@@ -384,6 +384,7 @@ struct UiObject {
     id: String,
     #[serde(rename = "type")]
     object_type: String,
+    z_index: i32,
     position: UiPosition,
     size: UiSize,
     visible: bool,
@@ -397,6 +398,7 @@ impl Default for UiObject {
         Self {
             id: String::new(),
             object_type: "button".to_string(),
+            z_index: 0,
             position: UiPosition::default(),
             size: UiSize::default(),
             visible: true,
@@ -1031,8 +1033,15 @@ impl CodexShellApp {
         let mut clicked_commands = Vec::new();
         let mut position_changed = false;
         let controls_enabled = !self.ui_edit_mode;
+        let mut ordered_indices: Vec<usize> = (0..self.ui_definition.objects.len()).collect();
+        ordered_indices.sort_by(|left, right| {
+            self.ui_definition.objects[*left]
+                .z_index
+                .cmp(&self.ui_definition.objects[*right].z_index)
+                .then(left.cmp(right))
+        });
 
-        for index in 0..self.ui_definition.objects.len() {
+        for index in ordered_indices {
             let object = self.ui_definition.objects[index].clone();
             if !object.visible {
                 continue;
@@ -1045,11 +1054,7 @@ impl CodexShellApp {
             let mut clicked = false;
 
             let area_response = egui::Area::new(egui::Id::new(("ui_object", object_id.clone())))
-                .order(if object_type == "panel" {
-                    egui::Order::Background
-                } else {
-                    egui::Order::Foreground
-                })
+                .order(egui::Order::Foreground)
                 .movable(self.ui_edit_mode)
                 .fixed_pos(egui::pos2(object.position.x, object.position.y))
                 .show(ctx, |ui| match object_type.as_str() {
@@ -1188,15 +1193,28 @@ impl CodexShellApp {
         if self.ui_selected_object_id.is_empty() {
             self.ui_selected_object_id = self.ui_definition.objects[0].id.clone();
         }
+        ui.label(
+            RichText::new(format!("総オブジェクト数: {}", self.ui_definition.objects.len()))
+                .color(Color32::BLACK),
+        );
+
+        let mut ordered_objects: Vec<(usize, String, i32)> = self
+            .ui_definition
+            .objects
+            .iter()
+            .enumerate()
+            .map(|(index, object)| (index, object.id.clone(), object.z_index))
+            .collect();
+        ordered_objects.sort_by(|left, right| left.2.cmp(&right.2).then(left.0.cmp(&right.0)));
 
         egui::ComboBox::from_label("対象オブジェクト")
             .selected_text(self.ui_selected_object_id.clone())
             .show_ui(ui, |ui| {
-                for object in &self.ui_definition.objects {
+                for (order, (_index, object_id, z_index)) in ordered_objects.iter().enumerate() {
                     ui.selectable_value(
                         &mut self.ui_selected_object_id,
-                        object.id.clone(),
-                        object.id.as_str(),
+                        object_id.clone(),
+                        format!("{}: {} (z={})", order + 1, object_id, z_index),
                     );
                 }
             });
@@ -1228,6 +1246,12 @@ impl CodexShellApp {
                 ui.label("高さ");
                 changed |= ui
                     .add(egui::DragValue::new(&mut object.size.h).speed(1.0))
+                    .changed();
+            });
+            ui.horizontal(|ui| {
+                ui.label("表示順");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut object.z_index).speed(1.0))
                     .changed();
             });
 
