@@ -3,7 +3,6 @@ use directories::ProjectDirs;
 use eframe::egui::{self, Color32, RichText, TextEdit};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
@@ -32,7 +31,6 @@ const FONT_OFL_RELATIVE_PATH: &str = "assets/fonts/OFL.txt";
 const FONT_SOURCE_RELATIVE_PATH: &str = "assets/fonts/FONT_SOURCE.txt";
 const CODEX_CONFIG_PATH: &str = r"C:\Users\gonec\.codex\config.toml";
 const CODEX_CONFIG_BACKUP_PATH: &str = r"C:\Users\gonec\.codex\config.toml.bak";
-const UI_INIT_RELATIVE_PATH: &str = "runtime/ui/init/ui.json";
 const UI_LIVE_RELATIVE_PATH: &str = "runtime/ui/live/ui.json";
 const UI_RELOAD_CHECK_INTERVAL_MS: u64 = 250;
 const UI_BASE_OUTER_MARGIN: f32 = 16.0;
@@ -556,6 +554,7 @@ struct CodexShellApp {
     ui_last_modified: Option<SystemTime>,
     ui_last_reload_check: Instant,
     ui_edit_mode: bool,
+    ui_has_unsaved_changes: bool,
     ui_selected_object_id: String,
     selected_reasoning_effort: String,
     input_command: String,
@@ -601,6 +600,7 @@ impl CodexShellApp {
             ui_last_modified,
             ui_last_reload_check: Instant::now(),
             ui_edit_mode: false,
+            ui_has_unsaved_changes: false,
             ui_selected_object_id,
             selected_reasoning_effort: "medium".to_string(),
             input_command: String::new(),
@@ -837,6 +837,7 @@ impl CodexShellApp {
         match save_ui_definition(&self.ui_live_path, &self.ui_definition) {
             Ok(()) => {
                 self.ui_last_modified = ui_file_modified_time(&self.ui_live_path).ok();
+                self.ui_has_unsaved_changes = false;
                 self.push_history(summary);
             }
             Err(err) => {
@@ -844,6 +845,10 @@ impl CodexShellApp {
                 self.push_history(format!("UI定義保存に失敗しました: {err}"));
             }
         }
+    }
+
+    fn mark_ui_definition_dirty(&mut self) {
+        self.ui_has_unsaved_changes = true;
     }
 
     fn reload_ui_definition_if_changed(&mut self, ctx: &egui::Context) {
@@ -880,6 +885,7 @@ impl CodexShellApp {
             Ok(definition) => {
                 self.ui_definition = definition;
                 self.ui_last_modified = Some(modified);
+                self.ui_has_unsaved_changes = false;
                 if self.ui_selected_object_id.is_empty()
                     || self
                         .ui_definition
@@ -1257,10 +1263,10 @@ impl CodexShellApp {
         }
 
         if position_changed {
-            self.save_live_ui_definition("UIオブジェクト位置を更新しました");
+            self.mark_ui_definition_dirty();
         }
         if state_changed {
-            self.save_live_ui_definition("UIオブジェクト状態を更新しました");
+            // ランタイム同期で変わる checked は即保存しない。
         }
         ctx.memory_mut(|memory| {
             let areas = memory.areas_mut();
@@ -1280,6 +1286,22 @@ impl CodexShellApp {
         ui.label(
             RichText::new("オブジェクトをドラッグすると位置を変更できます").color(Color32::BLACK),
         );
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            let unsaved_text = if self.ui_has_unsaved_changes {
+                "未保存の変更があります"
+            } else {
+                "保存済み"
+            };
+            ui.label(RichText::new(unsaved_text).color(Color32::BLACK));
+            if ui
+                .add_enabled(self.ui_has_unsaved_changes, egui::Button::new("保存"))
+                .clicked()
+            {
+                self.save_live_ui_definition("UI編集内容を保存しました");
+                self.update_status("UI編集内容を保存しました");
+            }
+        });
         ui.add_space(6.0);
 
         if self.ui_definition.objects.is_empty() {
@@ -1372,7 +1394,7 @@ impl CodexShellApp {
                 .changed();
 
             if changed {
-                self.save_live_ui_definition("UI編集で定義を更新しました");
+                self.mark_ui_definition_dirty();
             }
         } else {
             ui.label(RichText::new("選択オブジェクトが見つかりません").color(Color32::BLACK));
@@ -1673,7 +1695,7 @@ fn asset_base_candidates() -> Vec<PathBuf> {
 
 fn ui_runtime_base_dir() -> PathBuf {
     for candidate in asset_base_candidates() {
-        if candidate.join(UI_INIT_RELATIVE_PATH).is_file() {
+        if candidate.join(UI_LIVE_RELATIVE_PATH).is_file() {
             return candidate;
         }
     }
@@ -1683,115 +1705,18 @@ fn ui_runtime_base_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
-fn ui_init_file_path() -> PathBuf {
-    ui_runtime_base_dir().join(UI_INIT_RELATIVE_PATH)
-}
-
 fn ui_live_file_path() -> PathBuf {
     ui_runtime_base_dir().join(UI_LIVE_RELATIVE_PATH)
 }
 
 fn ensure_live_ui_file() -> Result<PathBuf> {
-    let init_path = ui_init_file_path();
     let live_path = ui_live_file_path();
 
-    if !init_path.is_file() {
-        return Err(anyhow!(
-            "初期UI定義が見つかりません: {}",
-            init_path.display()
-        ));
+    if !live_path.is_file() {
+        return Err(anyhow!("live UI定義が見つかりません: {}", live_path.display()));
     }
-
-    if !live_path.exists() {
-        if let Some(parent) = live_path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("live UIディレクトリ作成に失敗: {}", parent.display()))?;
-        }
-        fs::copy(&init_path, &live_path).with_context(|| {
-            format!(
-                "初期UI定義コピーに失敗: {} -> {}",
-                init_path.display(),
-                live_path.display()
-            )
-        })?;
-    }
-
-    merge_init_ui_into_live(&init_path, &live_path)?;
 
     Ok(live_path)
-}
-
-fn merge_init_ui_into_live(init_path: &Path, live_path: &Path) -> Result<()> {
-    let init_body = fs::read_to_string(init_path)
-        .with_context(|| format!("初期UI定義読み込みに失敗: {}", init_path.display()))?;
-    let live_body = fs::read_to_string(live_path)
-        .with_context(|| format!("live UI定義読み込みに失敗: {}", live_path.display()))?;
-
-    let init_json: Value = serde_json::from_str(&init_body)
-        .with_context(|| format!("初期UI定義解析に失敗: {}", init_path.display()))?;
-    let mut live_json: Value = serde_json::from_str(&live_body)
-        .with_context(|| format!("live UI定義解析に失敗: {}", live_path.display()))?;
-    let original_live_json = live_json.clone();
-
-    merge_json_defaults(&mut live_json, &init_json);
-
-    if live_json != original_live_json {
-        let merged_body =
-            serde_json::to_string_pretty(&live_json).context("UI定義マージ結果シリアライズに失敗")?;
-        fs::write(live_path, format!("{merged_body}\n"))
-            .with_context(|| format!("UI定義マージ保存に失敗: {}", live_path.display()))?;
-    }
-
-    Ok(())
-}
-
-fn merge_json_defaults(target: &mut Value, source: &Value) {
-    match (target, source) {
-        (Value::Object(target_object), Value::Object(source_object)) => {
-            for (key, source_value) in source_object {
-                if let Some(target_value) = target_object.get_mut(key) {
-                    merge_json_defaults(target_value, source_value);
-                } else {
-                    target_object.insert(key.clone(), source_value.clone());
-                }
-            }
-        }
-        (Value::Array(target_array), Value::Array(source_array))
-            if is_object_array_with_id(target_array) && is_object_array_with_id(source_array) =>
-        {
-            merge_object_array_by_id(target_array, source_array);
-        }
-        _ => {}
-    }
-}
-
-fn merge_object_array_by_id(target_array: &mut Vec<Value>, source_array: &[Value]) {
-    let mut target_index = HashMap::new();
-    for (index, target_value) in target_array.iter().enumerate() {
-        if let Some(id) = ui_object_id(target_value) {
-            target_index.insert(id.to_string(), index);
-        }
-    }
-
-    for source_value in source_array {
-        if let Some(id) = ui_object_id(source_value) {
-            if let Some(&index) = target_index.get(id) {
-                if let Some(target_value) = target_array.get_mut(index) {
-                    merge_json_defaults(target_value, source_value);
-                }
-            } else {
-                target_array.push(source_value.clone());
-            }
-        }
-    }
-}
-
-fn is_object_array_with_id(values: &[Value]) -> bool {
-    values.iter().all(|value| ui_object_id(value).is_some())
-}
-
-fn ui_object_id(value: &Value) -> Option<&str> {
-    value.as_object()?.get("id")?.as_str()
 }
 
 fn load_ui_definition(path: &Path) -> Result<UiDefinition> {
