@@ -3,6 +3,7 @@ use directories::ProjectDirs;
 use eframe::egui::{self, Color32, RichText, TextEdit};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
@@ -1715,7 +1716,82 @@ fn ensure_live_ui_file() -> Result<PathBuf> {
         })?;
     }
 
+    merge_init_ui_into_live(&init_path, &live_path)?;
+
     Ok(live_path)
+}
+
+fn merge_init_ui_into_live(init_path: &Path, live_path: &Path) -> Result<()> {
+    let init_body = fs::read_to_string(init_path)
+        .with_context(|| format!("初期UI定義読み込みに失敗: {}", init_path.display()))?;
+    let live_body = fs::read_to_string(live_path)
+        .with_context(|| format!("live UI定義読み込みに失敗: {}", live_path.display()))?;
+
+    let init_json: Value = serde_json::from_str(&init_body)
+        .with_context(|| format!("初期UI定義解析に失敗: {}", init_path.display()))?;
+    let mut live_json: Value = serde_json::from_str(&live_body)
+        .with_context(|| format!("live UI定義解析に失敗: {}", live_path.display()))?;
+    let original_live_json = live_json.clone();
+
+    merge_json_defaults(&mut live_json, &init_json);
+
+    if live_json != original_live_json {
+        let merged_body =
+            serde_json::to_string_pretty(&live_json).context("UI定義マージ結果シリアライズに失敗")?;
+        fs::write(live_path, format!("{merged_body}\n"))
+            .with_context(|| format!("UI定義マージ保存に失敗: {}", live_path.display()))?;
+    }
+
+    Ok(())
+}
+
+fn merge_json_defaults(target: &mut Value, source: &Value) {
+    match (target, source) {
+        (Value::Object(target_object), Value::Object(source_object)) => {
+            for (key, source_value) in source_object {
+                if let Some(target_value) = target_object.get_mut(key) {
+                    merge_json_defaults(target_value, source_value);
+                } else {
+                    target_object.insert(key.clone(), source_value.clone());
+                }
+            }
+        }
+        (Value::Array(target_array), Value::Array(source_array))
+            if is_object_array_with_id(target_array) && is_object_array_with_id(source_array) =>
+        {
+            merge_object_array_by_id(target_array, source_array);
+        }
+        _ => {}
+    }
+}
+
+fn merge_object_array_by_id(target_array: &mut Vec<Value>, source_array: &[Value]) {
+    let mut target_index = HashMap::new();
+    for (index, target_value) in target_array.iter().enumerate() {
+        if let Some(id) = ui_object_id(target_value) {
+            target_index.insert(id.to_string(), index);
+        }
+    }
+
+    for source_value in source_array {
+        if let Some(id) = ui_object_id(source_value) {
+            if let Some(&index) = target_index.get(id) {
+                if let Some(target_value) = target_array.get_mut(index) {
+                    merge_json_defaults(target_value, source_value);
+                }
+            } else {
+                target_array.push(source_value.clone());
+            }
+        }
+    }
+}
+
+fn is_object_array_with_id(values: &[Value]) -> bool {
+    values.iter().all(|value| ui_object_id(value).is_some())
+}
+
+fn ui_object_id(value: &Value) -> Option<&str> {
+    value.as_object()?.get("id")?.as_str()
 }
 
 fn load_ui_definition(path: &Path) -> Result<UiDefinition> {
