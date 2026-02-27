@@ -18,6 +18,7 @@ struct UiEditorPanelEvents {
 pub(crate) fn render_ui_editor_viewport(
     ctx: &egui::Context,
     ui_definition: &mut UiDefinition,
+    ui_selected_screen_id: &mut String,
     ui_selected_object_id: &mut String,
     ui_has_unsaved_changes: bool,
 ) -> UiEditorEvents {
@@ -46,6 +47,7 @@ pub(crate) fn render_ui_editor_viewport(
                     inner_events = render_ui_editor_contents(
                         ui,
                         ui_definition,
+                        ui_selected_screen_id,
                         ui_selected_object_id,
                         ui_has_unsaved_changes,
                     );
@@ -57,6 +59,7 @@ pub(crate) fn render_ui_editor_viewport(
                 inner_events = render_ui_editor_contents(
                     ui,
                     ui_definition,
+                    ui_selected_screen_id,
                     ui_selected_object_id,
                     ui_has_unsaved_changes,
                 );
@@ -75,6 +78,7 @@ pub(crate) fn render_ui_editor_viewport(
 fn render_ui_editor_contents(
     ui: &mut egui::Ui,
     ui_definition: &mut UiDefinition,
+    ui_selected_screen_id: &mut String,
     ui_selected_object_id: &mut String,
     ui_has_unsaved_changes: bool,
 ) -> UiEditorPanelEvents {
@@ -98,17 +102,57 @@ fn render_ui_editor_contents(
     });
     ui.add_space(6.0);
 
-    if ui_definition.objects.is_empty() {
+    let screen_ids = ui_definition.screen_ids();
+    if screen_ids.is_empty() {
+        ui.label(RichText::new("画面がありません").color(Color32::BLACK));
+        return events;
+    }
+    if ui_selected_screen_id.is_empty()
+        || ui_definition.screen(ui_selected_screen_id.as_str()).is_none()
+    {
+        *ui_selected_screen_id = screen_ids[0].clone();
+        ui_selected_object_id.clear();
+    }
+
+    egui::ComboBox::from_label("対象画面")
+        .selected_text(ui_selected_screen_id.clone())
+        .show_ui(ui, |ui| {
+            for screen_id in &screen_ids {
+                if ui
+                    .selectable_label(ui_selected_screen_id == screen_id, screen_id)
+                    .clicked()
+                {
+                    *ui_selected_screen_id = screen_id.clone();
+                    ui_selected_object_id.clear();
+                }
+            }
+        });
+    ui.add_space(6.0);
+
+    let screen_objects = match ui_definition.screen_objects(ui_selected_screen_id.as_str()) {
+        Some(objects) => objects,
+        None => {
+            ui.label(RichText::new("選択画面が見つかりません").color(Color32::BLACK));
+            return events;
+        }
+    };
+
+    if screen_objects.is_empty() {
         ui.label(RichText::new("オブジェクトがありません").color(Color32::BLACK));
         return events;
     }
-    if ui_selected_object_id.is_empty() {
-        *ui_selected_object_id = ui_definition.objects[0].id.clone();
+    if ui_selected_object_id.is_empty()
+        || ui_definition
+            .object_index_in_screen(ui_selected_screen_id, ui_selected_object_id)
+            .is_none()
+    {
+        *ui_selected_object_id = screen_objects[0].id.clone();
     }
-    ui.label(RichText::new(format!("総オブジェクト数: {}", ui_definition.objects.len())).color(Color32::BLACK));
+    ui.label(
+        RichText::new(format!("総オブジェクト数: {}", screen_objects.len())).color(Color32::BLACK),
+    );
 
-    let mut ordered_objects: Vec<(usize, String, i32)> = ui_definition
-        .objects
+    let mut ordered_objects: Vec<(usize, String, i32)> = screen_objects
         .iter()
         .enumerate()
         .map(|(index, object)| (index, object.id.clone(), object.z_index))
@@ -127,8 +171,13 @@ fn render_ui_editor_contents(
             }
         });
 
-    if let Some(index) = ui_definition.object_index(ui_selected_object_id) {
-        let object = &mut ui_definition.objects[index];
+    if let Some(index) =
+        ui_definition.object_index_in_screen(ui_selected_screen_id, ui_selected_object_id)
+    {
+        let screen_objects = ui_definition
+            .screen_objects_mut(ui_selected_screen_id.as_str())
+            .expect("selected screen should exist");
+        let object = &mut screen_objects[index];
         let mut changed = false;
 
         ui.label(RichText::new(format!("種別: {}", object.object_type)).color(Color32::BLACK));
