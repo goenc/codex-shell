@@ -324,6 +324,7 @@ struct AppConfig {
     build_command: String,
     codex_command: String,
     pipe_name: String,
+    input_prefix: String,
     show_size_overlay: bool,
 }
 
@@ -336,6 +337,7 @@ impl Default for AppConfig {
             build_command: DEFAULT_BUILD_COMMAND.to_string(),
             codex_command: DEFAULT_CODEX_COMMAND.to_string(),
             pipe_name: DEFAULT_PIPE_NAME.to_string(),
+            input_prefix: String::new(),
             show_size_overlay: true,
         }
     }
@@ -508,13 +510,32 @@ fn default_settings_screen() -> UiScreen {
             640.0,
             24.0,
         ),
+        create_label_object(
+            "lbl_settings_input_prefix",
+            "入力先頭付加",
+            100,
+            24.0,
+            192.0,
+            120.0,
+            24.0,
+            "left",
+        ),
+        create_input_object(
+            "input_settings_input_prefix",
+            "config.input_prefix",
+            110,
+            156.0,
+            192.0,
+            640.0,
+            24.0,
+        ),
         create_checkbox_object(
             "chk_settings_show_size_overlay",
             "サイズ表示を表示",
             "config.show_size_overlay",
             110,
             24.0,
-            200.0,
+            232.0,
             280.0,
             28.0,
         ),
@@ -524,7 +545,7 @@ fn default_settings_screen() -> UiScreen {
             "config.save",
             120,
             24.0,
-            252.0,
+            284.0,
             120.0,
             28.0,
         ),
@@ -534,7 +555,7 @@ fn default_settings_screen() -> UiScreen {
             "config.restart_listener",
             120,
             152.0,
-            252.0,
+            284.0,
             180.0,
             28.0,
         ),
@@ -544,7 +565,7 @@ fn default_settings_screen() -> UiScreen {
             "nav.back_main",
             120,
             340.0,
-            252.0,
+            284.0,
             120.0,
             28.0,
         ),
@@ -554,7 +575,7 @@ fn default_settings_screen() -> UiScreen {
             "ui.edit.toggle",
             130,
             468.0,
-            252.0,
+            284.0,
             120.0,
             28.0,
         ),
@@ -1112,7 +1133,14 @@ impl CodexShellApp {
     }
 
     fn send_input_command_by_button(&mut self) {
-        let command = self.input_command.trim().to_string();
+        let input_body = self.input_command.trim().to_string();
+        let command = if input_body.is_empty() {
+            String::new()
+        } else if self.config.input_prefix.trim().is_empty() {
+            input_body
+        } else {
+            format!("{}{}", self.config.input_prefix, input_body)
+        };
         self.input_command.clear();
         self.send_command(command, "入力", BUTTON_COMMAND_DELAY_MS);
         self.pending_input_focus = true;
@@ -1670,6 +1698,17 @@ impl CodexShellApp {
                                     ui.add_sized(
                                         [object_size.x, object_size.y],
                                         TextEdit::singleline(&mut self.config.pipe_name),
+                                    )
+                                });
+                                if response.inner.changed() {
+                                    state_changed = true;
+                                }
+                            }
+                            "config.input_prefix" => {
+                                let response = ui.add_enabled_ui(enabled, |ui| {
+                                    ui.add_sized(
+                                        [object_size.x, object_size.y],
+                                        TextEdit::singleline(&mut self.config.input_prefix),
                                     )
                                 });
                                 if response.inner.changed() {
