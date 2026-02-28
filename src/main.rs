@@ -556,6 +556,16 @@ fn default_settings_screen() -> UiScreen {
             640.0,
             24.0,
         ),
+        create_button_object(
+            "btn_settings_startup_exe_1_browse",
+            "参照",
+            "config.startup_exe_1.browse",
+            120,
+            804.0,
+            224.0,
+            72.0,
+            24.0,
+        ),
         create_label_object(
             "lbl_settings_startup_exe_2",
             "自動起動EXE2",
@@ -573,6 +583,16 @@ fn default_settings_screen() -> UiScreen {
             156.0,
             252.0,
             640.0,
+            24.0,
+        ),
+        create_button_object(
+            "btn_settings_startup_exe_2_browse",
+            "参照",
+            "config.startup_exe_2.browse",
+            120,
+            804.0,
+            252.0,
+            72.0,
             24.0,
         ),
         create_label_object(
@@ -594,6 +614,16 @@ fn default_settings_screen() -> UiScreen {
             640.0,
             24.0,
         ),
+        create_button_object(
+            "btn_settings_startup_exe_3_browse",
+            "参照",
+            "config.startup_exe_3.browse",
+            120,
+            804.0,
+            280.0,
+            72.0,
+            24.0,
+        ),
         create_label_object(
             "lbl_settings_startup_exe_4",
             "自動起動EXE4",
@@ -611,6 +641,16 @@ fn default_settings_screen() -> UiScreen {
             156.0,
             308.0,
             640.0,
+            24.0,
+        ),
+        create_button_object(
+            "btn_settings_startup_exe_4_browse",
+            "参照",
+            "config.startup_exe_4.browse",
+            120,
+            804.0,
+            308.0,
+            72.0,
             24.0,
         ),
         create_checkbox_object(
@@ -1286,6 +1326,29 @@ impl CodexShellApp {
         }
     }
 
+    fn browse_startup_executable(&mut self, slot: usize) {
+        match select_executable_file_path() {
+            Ok(Some(path)) => {
+                match slot {
+                    1 => self.config.startup_exe_1 = path.clone(),
+                    2 => self.config.startup_exe_2 = path.clone(),
+                    3 => self.config.startup_exe_3 = path.clone(),
+                    4 => self.config.startup_exe_4 = path.clone(),
+                    _ => return,
+                }
+                self.update_status(format!("自動起動EXE{slot} を設定しました"));
+                self.push_history(format!("自動起動EXE{slot} を参照設定しました: {path}"));
+            }
+            Ok(None) => {
+                self.update_status(format!("自動起動EXE{slot} の参照をキャンセルしました"));
+            }
+            Err(err) => {
+                self.update_status(format!("自動起動EXE{slot} 参照に失敗: {err}"));
+                self.push_history(format!("自動起動EXE{slot} 参照に失敗しました: {err}"));
+            }
+        }
+    }
+
     fn toggle_voice_input(&mut self) {
         self.pending_input_focus = true;
         match send_voice_input_hotkey() {
@@ -1586,6 +1649,10 @@ impl CodexShellApp {
                 self.save_config();
                 self.start_listener();
             }
+            "config.startup_exe_1.browse" => self.browse_startup_executable(1),
+            "config.startup_exe_2.browse" => self.browse_startup_executable(2),
+            "config.startup_exe_3.browse" => self.browse_startup_executable(3),
+            "config.startup_exe_4.browse" => self.browse_startup_executable(4),
             "reasoning.medium" => self.selected_reasoning_effort = "medium".to_string(),
             "reasoning.high" => self.selected_reasoning_effort = "high".to_string(),
             "reasoning.xhigh" => self.selected_reasoning_effort = "xhigh".to_string(),
@@ -2758,6 +2825,41 @@ fn send_named_pipe_line(pipe_name: &str, command: &str) -> Result<()> {
             .map(|e| e.to_string())
             .unwrap_or_else(|| "unknown error".to_string())
     ))
+}
+
+fn select_executable_file_path() -> Result<Option<String>> {
+    let script = r#"
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.OpenFileDialog
+$dialog.Filter = 'Executable Files (*.exe)|*.exe|All Files (*.*)|*.*'
+$dialog.CheckFileExists = $true
+$dialog.Multiselect = $false
+if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+    Write-Output $dialog.FileName
+}
+"#;
+    let output = Command::new("powershell.exe")
+        .arg("-NoProfile")
+        .arg("-ExecutionPolicy")
+        .arg("Bypass")
+        .arg("-STA")
+        .arg("-Command")
+        .arg(script)
+        .output()
+        .context("実行ファイル参照ダイアログ起動に失敗")?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "実行ファイル参照ダイアログ実行に失敗: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let selected = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if selected.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(selected))
+    }
 }
 
 fn spawn_send_worker(send_rx: Receiver<SendRequest>, result_tx: Sender<SendResult>) {
