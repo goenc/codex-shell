@@ -325,6 +325,10 @@ struct AppConfig {
     codex_command: String,
     pipe_name: String,
     input_prefix: String,
+    startup_exe_1: String,
+    startup_exe_2: String,
+    startup_exe_3: String,
+    startup_exe_4: String,
     show_size_overlay: bool,
 }
 
@@ -338,6 +342,10 @@ impl Default for AppConfig {
             codex_command: DEFAULT_CODEX_COMMAND.to_string(),
             pipe_name: DEFAULT_PIPE_NAME.to_string(),
             input_prefix: String::new(),
+            startup_exe_1: String::new(),
+            startup_exe_2: String::new(),
+            startup_exe_3: String::new(),
+            startup_exe_4: String::new(),
             show_size_overlay: true,
         }
     }
@@ -529,13 +537,89 @@ fn default_settings_screen() -> UiScreen {
             640.0,
             24.0,
         ),
+        create_label_object(
+            "lbl_settings_startup_exe_1",
+            "自動起動EXE1",
+            100,
+            24.0,
+            224.0,
+            120.0,
+            24.0,
+            "left",
+        ),
+        create_input_object(
+            "input_settings_startup_exe_1",
+            "config.startup_exe_1",
+            110,
+            156.0,
+            224.0,
+            640.0,
+            24.0,
+        ),
+        create_label_object(
+            "lbl_settings_startup_exe_2",
+            "自動起動EXE2",
+            100,
+            24.0,
+            252.0,
+            120.0,
+            24.0,
+            "left",
+        ),
+        create_input_object(
+            "input_settings_startup_exe_2",
+            "config.startup_exe_2",
+            110,
+            156.0,
+            252.0,
+            640.0,
+            24.0,
+        ),
+        create_label_object(
+            "lbl_settings_startup_exe_3",
+            "自動起動EXE3",
+            100,
+            24.0,
+            280.0,
+            120.0,
+            24.0,
+            "left",
+        ),
+        create_input_object(
+            "input_settings_startup_exe_3",
+            "config.startup_exe_3",
+            110,
+            156.0,
+            280.0,
+            640.0,
+            24.0,
+        ),
+        create_label_object(
+            "lbl_settings_startup_exe_4",
+            "自動起動EXE4",
+            100,
+            24.0,
+            308.0,
+            120.0,
+            24.0,
+            "left",
+        ),
+        create_input_object(
+            "input_settings_startup_exe_4",
+            "config.startup_exe_4",
+            110,
+            156.0,
+            308.0,
+            640.0,
+            24.0,
+        ),
         create_checkbox_object(
             "chk_settings_show_size_overlay",
             "サイズ表示を表示",
             "config.show_size_overlay",
             110,
             24.0,
-            232.0,
+            336.0,
             280.0,
             28.0,
         ),
@@ -545,7 +629,7 @@ fn default_settings_screen() -> UiScreen {
             "config.save",
             120,
             24.0,
-            284.0,
+            368.0,
             120.0,
             28.0,
         ),
@@ -555,7 +639,7 @@ fn default_settings_screen() -> UiScreen {
             "config.restart_listener",
             120,
             152.0,
-            284.0,
+            368.0,
             180.0,
             28.0,
         ),
@@ -565,7 +649,7 @@ fn default_settings_screen() -> UiScreen {
             "nav.back_main",
             120,
             340.0,
-            284.0,
+            368.0,
             120.0,
             28.0,
         ),
@@ -575,7 +659,7 @@ fn default_settings_screen() -> UiScreen {
             "ui.edit.toggle",
             130,
             468.0,
-            284.0,
+            368.0,
             120.0,
             28.0,
         ),
@@ -947,6 +1031,7 @@ struct CodexShellApp {
     resize_enabled: bool,
     voice_input_active: bool,
     pending_input_focus: bool,
+    build_confirm_open: bool,
 }
 
 impl CodexShellApp {
@@ -1003,6 +1088,7 @@ impl CodexShellApp {
             resize_enabled: false,
             voice_input_active: false,
             pending_input_focus: false,
+            build_confirm_open: false,
         };
 
         app.push_history(format!(
@@ -1012,6 +1098,7 @@ impl CodexShellApp {
         app.push_history(format!("UI定義を読み込みました: {}", app.ui_live_path.display()));
         app.save_config();
         app.start_listener();
+        app.launch_startup_executables();
         Ok(app)
     }
 
@@ -1147,11 +1234,56 @@ impl CodexShellApp {
     }
 
     fn send_build_command(&mut self) {
-        self.send_command(
-            self.config.build_command.clone(),
-            "ビルド",
-            BUTTON_COMMAND_DELAY_MS,
-        );
+        let build_input = self.input_command.trim().to_string();
+        if build_input.is_empty() {
+            self.cancel_build_when_empty();
+            return;
+        }
+        let command = if self.config.build_command.trim().is_empty() {
+            build_input
+        } else {
+            format!("{} {}", self.config.build_command.trim_end(), build_input)
+        };
+        self.input_command.clear();
+        self.send_command(command, "ビルド", BUTTON_COMMAND_DELAY_MS);
+        self.pending_input_focus = true;
+    }
+
+    fn cancel_build_when_empty(&mut self) {
+        self.update_status("入力欄が未入力のためビルドを送信しません");
+        self.push_history("ビルド送信を中止しました: 入力欄未入力");
+        self.build_confirm_open = false;
+    }
+
+    fn launch_startup_executables(&mut self) {
+        let startup_entries = [
+            ("自動起動EXE1", self.config.startup_exe_1.clone()),
+            ("自動起動EXE2", self.config.startup_exe_2.clone()),
+            ("自動起動EXE3", self.config.startup_exe_3.clone()),
+            ("自動起動EXE4", self.config.startup_exe_4.clone()),
+        ];
+        for (label, raw) in startup_entries {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let path = trimmed.trim_matches('"');
+            let mut command = Command::new(path);
+            let working_dir = self.config.working_dir.trim();
+            if !working_dir.is_empty() {
+                command.current_dir(working_dir);
+            }
+            match command.spawn() {
+                Ok(child) => {
+                    let pid = child.id();
+                    self.push_history(format!("{label} を自動起動しました PID={pid}: {path}"));
+                }
+                Err(err) => {
+                    self.update_status(format!("{label} 起動失敗: {err}"));
+                    self.push_history(format!("{label} の自動起動に失敗しました: {path} ({err})"));
+                }
+            }
+        }
     }
 
     fn toggle_voice_input(&mut self) {
@@ -1426,7 +1558,15 @@ impl CodexShellApp {
             "" => {}
             "mode.codex_start" => self.send_codex_command(),
             "mode.stop" => self.request_interrupt(),
-            "mode.build" => self.send_build_command(),
+            "mode.build" => {
+                if self.input_command.trim().is_empty() {
+                    self.cancel_build_when_empty();
+                    return;
+                }
+                self.build_confirm_open = true;
+                self.update_status("ビルド確認待ち");
+                self.push_history("ビルド確認ダイアログを表示しました");
+            }
             "input.send" => self.send_input_command_by_button(),
             "input.voice_toggle" => self.toggle_voice_input(),
             "ui.settings" => {
@@ -1498,6 +1638,51 @@ impl CodexShellApp {
     fn render_runtime_header(&mut self, _ctx: &egui::Context) {
     }
 
+    fn render_build_confirm_dialog(&mut self, ctx: &egui::Context) {
+        if !self.build_confirm_open {
+            return;
+        }
+        if self.input_command.trim().is_empty() {
+            self.cancel_build_when_empty();
+            return;
+        }
+
+        let mut open = true;
+        egui::Window::new("ビルド確認")
+            .collapsible(false)
+            .resizable(false)
+            .order(egui::Order::Tooltip)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+            .fixed_size(egui::vec2(360.0, 132.0))
+            .open(&mut open)
+            .show(ctx, |ui| {
+                ui.label(RichText::new("ビルドを実行しますか？").color(Color32::BLACK));
+                ui.add_space(10.0);
+                ui.horizontal(|ui| {
+                    if ui.button("はい").clicked() {
+                        if self.input_command.trim().is_empty() {
+                            self.cancel_build_when_empty();
+                        } else {
+                            self.build_confirm_open = false;
+                            self.push_history("ビルド確認: はい");
+                            self.send_build_command();
+                        }
+                    }
+                    if ui.button("いいえ").clicked() {
+                        self.build_confirm_open = false;
+                        self.update_status("ビルドをキャンセルしました");
+                        self.push_history("ビルド確認: いいえ");
+                    }
+                });
+            });
+
+        if !open && self.build_confirm_open {
+            self.build_confirm_open = false;
+            self.update_status("ビルドをキャンセルしました");
+            self.push_history("ビルド確認ダイアログを閉じました");
+        }
+    }
+
     fn set_primary_selected_object(&mut self, object_id: String) {
         self.ui_selected_object_id = object_id.clone();
         self.ui_selected_object_ids.clear();
@@ -1555,7 +1740,7 @@ impl CodexShellApp {
         let mut clicked_commands = Vec::new();
         let mut position_changed = false;
         let mut state_changed = self.sync_runtime_bound_states();
-        let controls_enabled = !self.ui_edit_mode;
+        let controls_enabled = !self.ui_edit_mode && !self.build_confirm_open;
         let object_layer_order = egui::Order::Foreground;
         let mut rendered_layers = Vec::new();
         let current_screen_id = self.ui_current_screen_id.clone();
@@ -1709,6 +1894,50 @@ impl CodexShellApp {
                                     ui.add_sized(
                                         [object_size.x, object_size.y],
                                         TextEdit::singleline(&mut self.config.input_prefix),
+                                    )
+                                });
+                                if response.inner.changed() {
+                                    state_changed = true;
+                                }
+                            }
+                            "config.startup_exe_1" => {
+                                let response = ui.add_enabled_ui(enabled, |ui| {
+                                    ui.add_sized(
+                                        [object_size.x, object_size.y],
+                                        TextEdit::singleline(&mut self.config.startup_exe_1),
+                                    )
+                                });
+                                if response.inner.changed() {
+                                    state_changed = true;
+                                }
+                            }
+                            "config.startup_exe_2" => {
+                                let response = ui.add_enabled_ui(enabled, |ui| {
+                                    ui.add_sized(
+                                        [object_size.x, object_size.y],
+                                        TextEdit::singleline(&mut self.config.startup_exe_2),
+                                    )
+                                });
+                                if response.inner.changed() {
+                                    state_changed = true;
+                                }
+                            }
+                            "config.startup_exe_3" => {
+                                let response = ui.add_enabled_ui(enabled, |ui| {
+                                    ui.add_sized(
+                                        [object_size.x, object_size.y],
+                                        TextEdit::singleline(&mut self.config.startup_exe_3),
+                                    )
+                                });
+                                if response.inner.changed() {
+                                    state_changed = true;
+                                }
+                            }
+                            "config.startup_exe_4" => {
+                                let response = ui.add_enabled_ui(enabled, |ui| {
+                                    ui.add_sized(
+                                        [object_size.x, object_size.y],
+                                        TextEdit::singleline(&mut self.config.startup_exe_4),
                                     )
                                 });
                                 if response.inner.changed() {
@@ -2152,6 +2381,7 @@ impl eframe::App for CodexShellApp {
         });
         self.render_runtime_header(ctx);
         self.render_runtime_ui_objects(ctx);
+        self.render_build_confirm_dialog(ctx);
 
         self.render_ui_editor(ctx);
         ctx.request_repaint_after(Duration::from_millis(UI_RELOAD_CHECK_INTERVAL_MS));
