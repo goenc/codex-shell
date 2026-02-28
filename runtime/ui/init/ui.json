@@ -3,7 +3,6 @@
   "assets": {
     "base_dir": "assets/ui",
     "images": {
-      "panel_main": "panels/main.png",
       "btn_hover": "buttons/hover.png",
       "icon_voice": "icons/voice.png",
       "btn_pressed": "buttons/pressed.png",
@@ -12,66 +11,6 @@
     }
   },
   "objects": [
-    {
-      "id": "panel_main",
-      "type": "panel",
-      "z_index": 0,
-      "position": {
-        "x": 0.0,
-        "y": 0.0
-      },
-      "size": {
-        "w": 908.0,
-        "h": 340.0
-      },
-      "visible": false,
-      "enabled": true,
-      "bind": {
-        "command": ""
-      },
-      "visual": {
-        "background": {
-          "image": "panel_main",
-          "fit": "stretch"
-        },
-        "icon": {
-          "image": "",
-          "anchor": "center",
-          "offset": {
-            "x": 0.0,
-            "y": 0.0
-          },
-          "size": {
-            "w": 0.0,
-            "h": 0.0
-          }
-        },
-        "text": {
-          "value": "",
-          "align": "left"
-        },
-        "states": {
-          "hover": {
-            "background": {
-              "image": "",
-              "fit": "stretch"
-            }
-          },
-          "pressed": {
-            "background": {
-              "image": "",
-              "fit": "stretch"
-            }
-          },
-          "disabled": {
-            "background": {
-              "image": "",
-              "fit": "stretch"
-            }
-          }
-        }
-      }
-    },
     {
       "id": "btn_codex_start",
       "type": "button",

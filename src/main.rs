@@ -594,6 +594,10 @@ fn create_label_object(
             text: UiText {
                 value: text.to_string(),
                 align: align.to_string(),
+                font_size: 16.0,
+                font_family: "noto_sans_jp".to_string(),
+                bold: false,
+                italic: false,
             },
             ..UiVisual::default()
         },
@@ -653,6 +657,10 @@ fn create_button_object(
             text: UiText {
                 value: text.to_string(),
                 align: "center".to_string(),
+                font_size: 16.0,
+                font_family: "noto_sans_jp".to_string(),
+                bold: false,
+                italic: false,
             },
             ..UiVisual::default()
         },
@@ -686,6 +694,10 @@ fn create_checkbox_object(
             text: UiText {
                 value: text.to_string(),
                 align: "left".to_string(),
+                font_size: 16.0,
+                font_family: "noto_sans_jp".to_string(),
+                bold: false,
+                italic: false,
             },
             ..UiVisual::default()
         },
@@ -826,6 +838,10 @@ impl Default for UiIcon {
 struct UiText {
     value: String,
     align: String,
+    font_size: f32,
+    font_family: String,
+    bold: bool,
+    italic: bool,
 }
 
 impl Default for UiText {
@@ -833,6 +849,10 @@ impl Default for UiText {
         Self {
             value: String::new(),
             align: "center".to_string(),
+            font_size: 16.0,
+            font_family: "noto_sans_jp".to_string(),
+            bold: false,
+            italic: false,
         }
     }
 }
@@ -885,10 +905,12 @@ struct CodexShellApp {
     ui_last_modified: Option<SystemTime>,
     ui_last_reload_check: Instant,
     ui_edit_mode: bool,
+    ui_edit_grid_visible: bool,
     ui_has_unsaved_changes: bool,
     ui_current_screen_id: String,
     ui_selected_screen_id: String,
     ui_selected_object_id: String,
+    ui_selected_object_ids: Vec<String>,
     selected_reasoning_effort: String,
     input_command: String,
     status_message: String,
@@ -900,6 +922,7 @@ struct CodexShellApp {
     listener_script_path: PathBuf,
     window_size: egui::Vec2,
     input_area_size: egui::Vec2,
+    ui_font_names: Vec<String>,
     resize_enabled: bool,
     voice_input_active: bool,
     pending_input_focus: bool,
@@ -907,7 +930,7 @@ struct CodexShellApp {
 
 impl CodexShellApp {
     fn try_new(cc: &eframe::CreationContext<'_>) -> Result<Self> {
-        let loaded_font = apply_required_font(&cc.egui_ctx)
+        let (loaded_font, ui_font_names) = apply_required_font(&cc.egui_ctx)
             .context("同梱フォント読み込みに失敗しました。assets/fonts を確認してください")?;
         apply_visual_fix(&cc.egui_ctx);
 
@@ -921,6 +944,11 @@ impl CodexShellApp {
             .and_then(|objects| objects.first())
             .map(|object| object.id.clone())
             .unwrap_or_default();
+        let ui_selected_object_ids = if ui_selected_object_id.is_empty() {
+            Vec::new()
+        } else {
+            vec![ui_selected_object_id.clone()]
+        };
         let listener_script_path = listener_script_path();
         let (send_tx, send_rx) = mpsc::channel::<SendRequest>();
         let (send_result_tx, send_result_rx) = mpsc::channel::<SendResult>();
@@ -933,10 +961,12 @@ impl CodexShellApp {
             ui_last_modified,
             ui_last_reload_check: Instant::now(),
             ui_edit_mode: false,
+            ui_edit_grid_visible: true,
             ui_has_unsaved_changes: false,
             ui_current_screen_id: UI_MAIN_SCREEN_ID.to_string(),
             ui_selected_screen_id: UI_MAIN_SCREEN_ID.to_string(),
             ui_selected_object_id,
+            ui_selected_object_ids,
             selected_reasoning_effort: "medium".to_string(),
             input_command: String::new(),
             status_message: "待機中".to_string(),
@@ -948,6 +978,7 @@ impl CodexShellApp {
             listener_script_path,
             window_size: egui::vec2(0.0, 0.0),
             input_area_size: egui::vec2(0.0, 0.0),
+            ui_font_names,
             resize_enabled: false,
             voice_input_active: false,
             pending_input_focus: false,
@@ -1251,6 +1282,8 @@ impl CodexShellApp {
                         .map(|object| object.id.clone())
                         .unwrap_or_default();
                 }
+                let selected_screen_id = self.ui_selected_screen_id.clone();
+                self.ensure_selected_objects_valid(selected_screen_id.as_str());
                 self.push_history("UI定義を再読み込みしました");
                 ctx.request_repaint();
             }
@@ -1416,6 +1449,12 @@ impl CodexShellApp {
                         .map(|object| object.id.clone())
                         .unwrap_or_default();
                 }
+                if self.ui_edit_mode {
+                    let selected_screen_id = self.ui_selected_screen_id.clone();
+                    self.ensure_selected_objects_valid(selected_screen_id.as_str());
+                } else {
+                    self.ui_selected_object_ids.clear();
+                }
             }
             other => {
                 self.update_status(format!("未対応のUIコマンドです: {other}"));
@@ -1425,6 +1464,59 @@ impl CodexShellApp {
     }
 
     fn render_runtime_header(&mut self, _ctx: &egui::Context) {
+    }
+
+    fn set_primary_selected_object(&mut self, object_id: String) {
+        self.ui_selected_object_id = object_id.clone();
+        self.ui_selected_object_ids.clear();
+        if !object_id.is_empty() {
+            self.ui_selected_object_ids.push(object_id);
+        }
+    }
+
+    fn ensure_selected_objects_valid(&mut self, screen_id: &str) {
+        let Some(objects) = self.ui_definition.screen_objects(screen_id) else {
+            self.ui_selected_object_id.clear();
+            self.ui_selected_object_ids.clear();
+            return;
+        };
+
+        self.ui_selected_object_ids
+            .retain(|selected_id| objects.iter().any(|object| object.id == *selected_id));
+
+        if self.ui_selected_object_id.is_empty()
+            || !objects
+                .iter()
+                .any(|object| object.id == self.ui_selected_object_id)
+        {
+            if let Some(first_selected_id) = self.ui_selected_object_ids.first() {
+                self.ui_selected_object_id = first_selected_id.clone();
+            } else {
+                self.ui_selected_object_id = objects
+                    .first()
+                    .map(|object| object.id.clone())
+                    .unwrap_or_default();
+            }
+        }
+
+        if self.ui_selected_object_id.is_empty() {
+            self.ui_selected_object_ids.clear();
+            return;
+        }
+
+        if let Some(primary_position) = self
+            .ui_selected_object_ids
+            .iter()
+            .position(|selected_id| selected_id == &self.ui_selected_object_id)
+        {
+            if primary_position != 0 {
+                let primary_id = self.ui_selected_object_ids.remove(primary_position);
+                self.ui_selected_object_ids.insert(0, primary_id);
+            }
+        } else {
+            self.ui_selected_object_ids
+                .insert(0, self.ui_selected_object_id.clone());
+        }
     }
 
     fn render_runtime_ui_objects(&mut self, ctx: &egui::Context) {
@@ -1442,6 +1534,10 @@ impl CodexShellApp {
         else {
             return;
         };
+        self.ensure_selected_objects_valid(current_screen_id.as_str());
+        if self.ui_edit_mode && self.ui_edit_grid_visible {
+            self.render_edit_grid(ctx);
+        }
         let mut ordered_indices: Vec<usize> = (0..screen_snapshot.len()).collect();
         ordered_indices.sort_by(|left, right| {
             screen_snapshot[*left]
@@ -1460,6 +1556,18 @@ impl CodexShellApp {
             let object_id = object.id.clone();
             let object_command = object.bind.command.trim().to_string();
             let object_size = egui::vec2(object.size.w.max(12.0), object.size.h.max(12.0));
+            let text_size = object.visual.text.font_size.max(1.0);
+            let requested_family = object.visual.text.font_family.trim();
+            let text_font = if !requested_family.is_empty()
+                && self.ui_font_names.iter().any(|name| name == requested_family)
+            {
+                egui::FontId::new(
+                    text_size,
+                    egui::FontFamily::Name(Arc::from(requested_family.to_string())),
+                )
+            } else {
+                egui::FontId::new(text_size, egui::FontFamily::Proportional)
+            };
             let area_interactable = true;
             let mut clicked = false;
             let mut checkbox_changed: Option<bool> = None;
@@ -1496,11 +1604,24 @@ impl CodexShellApp {
                     }
                     "label" => {
                         let text = self.resolve_object_text(&object);
-                        ui.add_sized(
-                            [object_size.x, object_size.y],
-                            egui::Label::new(RichText::new(text).color(Color32::BLACK))
-                                .selectable(false)
-                                .sense(egui::Sense::hover()),
+                        let main_align = match object.visual.text.align.trim() {
+                            "left" => egui::Align::Min,
+                            "right" => egui::Align::Max,
+                            _ => egui::Align::Center,
+                        };
+                        let mut rich = RichText::new(text).font(text_font.clone()).color(Color32::BLACK);
+                        if object.visual.text.bold {
+                            rich = rich.strong();
+                        }
+                        if object.visual.text.italic {
+                            rich = rich.italics();
+                        }
+                        ui.allocate_ui_with_layout(
+                            object_size,
+                            egui::Layout::left_to_right(egui::Align::Center).with_main_align(main_align),
+                            |ui| {
+                                ui.add(egui::Label::new(rich).selectable(false).sense(egui::Sense::hover()));
+                            },
                         );
                     }
                     "input" => {
@@ -1607,10 +1728,17 @@ impl CodexShellApp {
                         let mut checked = self
                             .runtime_checked_for_command(&object_command)
                             .unwrap_or(object.checked);
+                        let mut rich = RichText::new(text).font(text_font.clone());
+                        if object.visual.text.bold {
+                            rich = rich.strong();
+                        }
+                        if object.visual.text.italic {
+                            rich = rich.italics();
+                        }
                         let response = ui.add_enabled_ui(enabled, |ui| {
                             ui.add_sized(
                                 [object_size.x, object_size.y],
-                                egui::Checkbox::new(&mut checked, text),
+                                egui::Checkbox::new(&mut checked, rich),
                             )
                         });
                         if response.inner.changed() {
@@ -1624,10 +1752,17 @@ impl CodexShellApp {
                         let checked = self
                             .runtime_checked_for_command(&object_command)
                             .unwrap_or(object.checked);
+                        let mut rich = RichText::new(text).font(text_font.clone());
+                        if object.visual.text.bold {
+                            rich = rich.strong();
+                        }
+                        if object.visual.text.italic {
+                            rich = rich.italics();
+                        }
                         let response = ui.add_enabled_ui(enabled, |ui| {
                             ui.add_sized(
                                 [object_size.x, object_size.y],
-                                egui::RadioButton::new(checked, text),
+                                egui::RadioButton::new(checked, rich),
                             )
                         });
                         if response.inner.clicked() && !checked {
@@ -1638,8 +1773,15 @@ impl CodexShellApp {
                         let text = self.resolve_object_text(&object);
                         let enabled =
                             controls_enabled && object.enabled && self.is_bind_command_enabled(&object_command);
+                        let mut rich = RichText::new(text).font(text_font);
+                        if object.visual.text.bold {
+                            rich = rich.strong();
+                        }
+                        if object.visual.text.italic {
+                            rich = rich.italics();
+                        }
                         let response = ui.add_enabled_ui(enabled, |ui| {
-                            ui.add_sized([object_size.x, object_size.y], egui::Button::new(text))
+                            ui.add_sized([object_size.x, object_size.y], egui::Button::new(rich))
                         });
                         if response.inner.clicked() {
                             clicked = true;
@@ -1660,7 +1802,28 @@ impl CodexShellApp {
                     || pointer_clicked_on_area)
             {
                 self.ui_selected_screen_id = current_screen_id.clone();
-                self.ui_selected_object_id = object_id.clone();
+                let additive_select = ctx.input(|input| {
+                    input.modifiers.ctrl || input.modifiers.command || input.modifiers.shift
+                });
+                if additive_select {
+                    if self.ui_selected_object_ids.is_empty() && !self.ui_selected_object_id.is_empty()
+                    {
+                        self.ui_selected_object_ids
+                            .push(self.ui_selected_object_id.clone());
+                    }
+                    if !self
+                        .ui_selected_object_ids
+                        .iter()
+                        .any(|selected_id| selected_id == &object_id)
+                    {
+                        self.ui_selected_object_ids.push(object_id.clone());
+                    }
+                    if self.ui_selected_object_id.is_empty() {
+                        self.ui_selected_object_id = object_id.clone();
+                    }
+                } else {
+                    self.set_primary_selected_object(object_id.clone());
+                }
             }
 
             if let Some(next_checked) = checkbox_changed {
@@ -1710,34 +1873,63 @@ impl CodexShellApp {
                 }
             }
 
-            if self.ui_edit_mode && self.ui_selected_object_id == object_id {
+            if self.ui_edit_mode
+                && self
+                    .ui_selected_object_ids
+                    .iter()
+                    .any(|selected_id| selected_id == &object_id)
+            {
                 let highlight_rect = area_response.response.rect.expand(2.0);
                 let painter = ctx.layer_painter(egui::LayerId::new(
                     egui::Order::Tooltip,
                     egui::Id::new(("ui_selected_highlight", object_id.clone())),
                 ));
+                let is_primary = self.ui_selected_object_id == object_id;
+                let (fill_color, stroke_color) = if is_primary {
+                    (
+                        Color32::from_rgba_unmultiplied(255, 0, 0, 26),
+                        Color32::from_rgba_unmultiplied(255, 0, 0, 180),
+                    )
+                } else {
+                    (
+                        Color32::from_rgba_unmultiplied(180, 220, 255, 28),
+                        Color32::from_rgba_unmultiplied(115, 175, 235, 200),
+                    )
+                };
                 painter.rect(
                     highlight_rect,
                     egui::CornerRadius::same(2),
-                    Color32::from_rgba_unmultiplied(255, 0, 0, 26),
-                    egui::Stroke::new(2.0, Color32::from_rgba_unmultiplied(255, 0, 0, 180)),
+                    fill_color,
+                    egui::Stroke::new(2.0, stroke_color),
                     egui::StrokeKind::Outside,
                 );
             }
 
             if self.ui_edit_mode {
-                let Some(screen_objects) = self
-                    .ui_definition
-                    .screen_objects_mut(current_screen_id.as_str())
-                else {
-                    continue;
-                };
-                let target = &mut screen_objects[index];
                 let drag_delta = area_response.response.drag_delta();
-                if drag_delta != egui::Vec2::ZERO {
-                    target.position.x += drag_delta.x;
-                    target.position.y += drag_delta.y;
-                    position_changed = true;
+                if drag_delta != egui::Vec2::ZERO
+                    && self
+                        .ui_selected_object_ids
+                        .iter()
+                        .any(|selected_id| selected_id == &object_id)
+                {
+                    let selected_ids = self.ui_selected_object_ids.clone();
+                    let Some(screen_objects) = self
+                        .ui_definition
+                        .screen_objects_mut(current_screen_id.as_str())
+                    else {
+                        continue;
+                    };
+                    for target in screen_objects.iter_mut() {
+                        if selected_ids
+                            .iter()
+                            .any(|selected_id| selected_id == &target.id)
+                        {
+                            target.position.x += drag_delta.x;
+                            target.position.y += drag_delta.y;
+                            position_changed = true;
+                        }
+                    }
                 }
             }
 
@@ -1771,13 +1963,31 @@ impl CodexShellApp {
             return;
         }
 
+        let before_screen_id = self.ui_selected_screen_id.clone();
+        let before_object_id = self.ui_selected_object_id.clone();
         let events = ui_editor::render_ui_editor_viewport(
             ctx,
             &mut self.ui_definition,
             &mut self.ui_selected_screen_id,
             &mut self.ui_selected_object_id,
+            &mut self.ui_selected_object_ids,
+            &mut self.ui_edit_grid_visible,
+            &self.ui_font_names,
+            self.config.show_size_overlay,
+            self.window_size,
             self.ui_has_unsaved_changes,
         );
+        if self.ui_selected_screen_id != before_screen_id {
+            self.ui_current_screen_id = self.ui_selected_screen_id.clone();
+        }
+        if self.ui_selected_screen_id != before_screen_id
+            || self.ui_selected_object_id != before_object_id
+        {
+            self.set_primary_selected_object(self.ui_selected_object_id.clone());
+        } else {
+            let selected_screen_id = self.ui_selected_screen_id.clone();
+            self.ensure_selected_objects_valid(selected_screen_id.as_str());
+        }
         if events.changed {
             self.mark_ui_definition_dirty();
         }
@@ -1789,6 +1999,40 @@ impl CodexShellApp {
             self.ui_edit_mode = false;
             self.update_status("UI編集モードを無効化しました");
             self.push_history("UI編集ウィンドウを閉じました");
+        }
+    }
+
+    fn render_edit_grid(&self, ctx: &egui::Context) {
+        let grid_step_px = 10;
+        let major_step_px = 50;
+        let rect = ctx.content_rect();
+        let max_x = rect.right().max(0.0).floor() as i32;
+        let max_y = rect.bottom().max(0.0).floor() as i32;
+        let painter = ctx.layer_painter(egui::LayerId::new(
+            egui::Order::Tooltip,
+            egui::Id::new("ui_edit_grid"),
+        ));
+        let minor_color = Color32::from_rgba_unmultiplied(190, 160, 220, 70);
+        let major_color = Color32::from_rgba_unmultiplied(170, 130, 210, 120);
+
+        let mut x = 0;
+        while x <= max_x {
+            let is_major = x % major_step_px == 0;
+            painter.line_segment(
+                [egui::pos2(x as f32, 0.0), egui::pos2(x as f32, max_y as f32)],
+                egui::Stroke::new(if is_major { 1.6 } else { 1.0 }, if is_major { major_color } else { minor_color }),
+            );
+            x += grid_step_px;
+        }
+
+        let mut y = 0;
+        while y <= max_y {
+            let is_major = y % major_step_px == 0;
+            painter.line_segment(
+                [egui::pos2(0.0, y as f32), egui::pos2(max_x as f32, y as f32)],
+                egui::Stroke::new(if is_major { 1.6 } else { 1.0 }, if is_major { major_color } else { minor_color }),
+            );
+            y += grid_step_px;
         }
     }
 
@@ -1823,32 +2067,6 @@ impl eframe::App for CodexShellApp {
         });
         self.render_runtime_header(ctx);
         self.render_runtime_ui_objects(ctx);
-
-        if self.config.show_size_overlay {
-            egui::Area::new(egui::Id::new("size_overlay"))
-                .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-12.0, -12.0))
-                .interactable(false)
-                .show(ctx, |ui| {
-                    egui::Frame::default()
-                        .fill(Color32::from_white_alpha(232))
-                        .stroke(egui::Stroke::new(1.0, Color32::from_gray(140)))
-                        .inner_margin(egui::Margin::same(8))
-                        .show(ui, |ui| {
-                            let win_x = self.window_size.x.max(0.0).round() as i32;
-                            let win_y = self.window_size.y.max(0.0).round() as i32;
-                            let input_x = self.input_area_size.x.max(0.0).round() as i32;
-                            let input_y = self.input_area_size.y.max(0.0).round() as i32;
-                            ui.label(
-                                RichText::new(format!("ウィンサイズ x={win_x} y={win_y}"))
-                                    .color(Color32::BLACK),
-                            );
-                            ui.label(
-                                RichText::new(format!("入力サイズ x={input_x} y={input_y}"))
-                                    .color(Color32::BLACK),
-                            );
-                        });
-                });
-        }
 
         self.render_ui_editor(ctx);
         ctx.request_repaint_after(Duration::from_millis(UI_RELOAD_CHECK_INTERVAL_MS));
@@ -2038,30 +2256,80 @@ fn required_asset_path(relative_path: &str) -> Result<PathBuf> {
     ))
 }
 
-fn apply_required_font(ctx: &egui::Context) -> Result<PathBuf> {
+fn apply_required_font(ctx: &egui::Context) -> Result<(PathBuf, Vec<String>)> {
     let font_path = required_asset_path(FONT_RELATIVE_PATH)?;
     let _ofl_path = required_asset_path(FONT_OFL_RELATIVE_PATH)?;
     let _source_path = required_asset_path(FONT_SOURCE_RELATIVE_PATH)?;
-
-    let font_bytes = fs::read(&font_path)
-        .with_context(|| format!("フォント読み込みに失敗: {}", font_path.display()))?;
+    let font_dir = font_path
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| anyhow!("フォントディレクトリ解決に失敗: {}", font_path.display()))?;
+    let mut loaded_fonts: Vec<(String, Vec<u8>)> = Vec::new();
+    for entry in fs::read_dir(&font_dir)
+        .with_context(|| format!("フォントディレクトリ読み込みに失敗: {}", font_dir.display()))?
+    {
+        let entry = match entry {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(ext) = path.extension().and_then(|value| value.to_str()) else {
+            continue;
+        };
+        if !matches!(ext.to_ascii_lowercase().as_str(), "ttf" | "otf" | "ttc") {
+            continue;
+        }
+        let Some(stem) = path.file_stem().and_then(|value| value.to_str()) else {
+            continue;
+        };
+        let key = stem.replace(' ', "_");
+        let Ok(bytes) = fs::read(&path) else {
+            continue;
+        };
+        loaded_fonts.push((key, bytes));
+    }
+    if !loaded_fonts.iter().any(|(name, _)| name == "noto_sans_jp") {
+        let font_bytes = fs::read(&font_path)
+            .with_context(|| format!("フォント読み込みに失敗: {}", font_path.display()))?;
+        loaded_fonts.insert(0, ("noto_sans_jp".to_string(), font_bytes));
+    }
+    loaded_fonts.sort_by(|left, right| left.0.cmp(&right.0));
     let mut fonts = egui::FontDefinitions::default();
     fonts.font_data.clear();
     fonts.families.clear();
-    fonts.font_data.insert(
-        "noto_sans_jp".to_string(),
-        Arc::new(egui::FontData::from_owned(font_bytes)),
-    );
-    fonts.families.insert(
-        egui::FontFamily::Proportional,
-        vec!["noto_sans_jp".to_string()],
-    );
-    fonts.families.insert(
-        egui::FontFamily::Monospace,
-        vec!["noto_sans_jp".to_string()],
-    );
+    let mut font_names = Vec::new();
+    for (font_name, font_bytes) in loaded_fonts {
+        if !fonts.font_data.contains_key(&font_name) {
+            fonts.font_data.insert(
+                font_name.clone(),
+                Arc::new(egui::FontData::from_owned(font_bytes)),
+            );
+            font_names.push(font_name);
+        }
+    }
+    if font_names.is_empty() {
+        return Err(anyhow!(
+            "フォントが見つかりません: {}",
+            font_dir.to_string_lossy()
+        ));
+    }
+    fonts
+        .families
+        .insert(egui::FontFamily::Proportional, font_names.clone());
+    fonts
+        .families
+        .insert(egui::FontFamily::Monospace, font_names.clone());
+    for font_name in &font_names {
+        fonts.families.insert(
+            egui::FontFamily::Name(Arc::from(font_name.clone())),
+            vec![font_name.clone()],
+        );
+    }
     ctx.set_fonts(fonts);
-    Ok(font_path)
+    Ok((font_path, font_names))
 }
 
 fn apply_visual_fix(ctx: &egui::Context) {
