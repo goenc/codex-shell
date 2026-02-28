@@ -252,66 +252,6 @@
       }
     },
     {
-      "id": "input_command",
-      "type": "input",
-      "z_index": 50,
-      "position": {
-        "x": 24.0,
-        "y": 92.0
-      },
-      "size": {
-        "w": 780.0,
-        "h": 220.0
-      },
-      "visible": true,
-      "enabled": true,
-      "bind": {
-        "command": ""
-      },
-      "visual": {
-        "background": {
-          "image": "",
-          "fit": "stretch"
-        },
-        "icon": {
-          "image": "",
-          "anchor": "left",
-          "offset": {
-            "x": 0.0,
-            "y": 0.0
-          },
-          "size": {
-            "w": 0.0,
-            "h": 0.0
-          }
-        },
-        "text": {
-          "value": "",
-          "align": "left"
-        },
-        "states": {
-          "hover": {
-            "background": {
-              "image": "",
-              "fit": "stretch"
-            }
-          },
-          "pressed": {
-            "background": {
-              "image": "",
-              "fit": "stretch"
-            }
-          },
-          "disabled": {
-            "background": {
-              "image": "",
-              "fit": "stretch"
-            }
-          }
-        }
-      }
-    },
-    {
       "id": "btn_voice_input",
       "type": "button",
       "z_index": 60,
@@ -963,6 +903,66 @@
         },
         "text": {
           "value": "編集モード中のため操作は無効",
+          "align": "left"
+        },
+        "states": {
+          "hover": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "input_command",
+      "type": "input",
+      "z_index": 50,
+      "position": {
+        "x": 24.0,
+        "y": 92.0
+      },
+      "size": {
+        "w": 780.0,
+        "h": 220.0
+      },
+      "visible": true,
+      "enabled": true,
+      "bind": {
+        "command": ""
+      },
+      "visual": {
+        "background": {
+          "image": "",
+          "fit": "stretch"
+        },
+        "icon": {
+          "image": "",
+          "anchor": "left",
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
+        },
+        "text": {
+          "value": "",
           "align": "left"
         },
         "states": {
