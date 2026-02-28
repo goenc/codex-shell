@@ -12,7 +12,15 @@ use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use windows::Win32::Foundation::GetLastError;
+use windows::core::PWSTR;
+use windows::Win32::Foundation::{CloseHandle, GetLastError, HANDLE};
+use windows::Win32::System::Diagnostics::ToolHelp::{
+    CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW, TH32CS_SNAPPROCESS,
+};
+use windows::Win32::System::Threading::{
+    OpenProcess, PROCESS_NAME_FORMAT, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE,
+    QueryFullProcessImageNameW, TerminateProcess,
+};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, SendInput,
     VIRTUAL_KEY, VK_CONTROL, VK_MENU, VK_RIGHT,
@@ -37,6 +45,9 @@ const UI_LIVE_RELATIVE_PATH: &str = "runtime/ui/live/ui.json";
 const UI_RELOAD_CHECK_INTERVAL_MS: u64 = 250;
 const UI_MAIN_SCREEN_ID: &str = "main";
 const UI_SETTINGS_SCREEN_ID: &str = "settings";
+const PROJECT_DECLARATION_PREFIX: &str = "プロジェクト宣言_";
+const PROJECT_DECLARATION_SUFFIX: &str = ".md";
+const PROJECT_DECLARATION_NONE_LABEL: &str = "プロジェクト指定なし";
 const UI_BASE_OUTER_MARGIN: f32 = 16.0;
 const UI_BASE_COMPONENT_GAP: f32 = 8.0;
 const PANEL_HORIZONTAL_PADDING: f32 = 8.0;
@@ -1028,6 +1039,12 @@ enum SendResult {
     Failed { source: String, error: String },
 }
 
+#[derive(Clone, Debug)]
+struct ProjectDeclarationEntry {
+    name: String,
+    path: Option<PathBuf>,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum CodexRuntimeState {
     Calculating,
@@ -1072,6 +1089,11 @@ struct CodexShellApp {
     voice_input_active: bool,
     pending_input_focus: bool,
     build_confirm_open: bool,
+    project_runtime_active: bool,
+    active_project_declaration_path: Option<PathBuf>,
+    project_declarations: Vec<ProjectDeclarationEntry>,
+    project_selected_index: Option<usize>,
+    project_selector_open: bool,
 }
 
 impl CodexShellApp {
@@ -1129,6 +1151,11 @@ impl CodexShellApp {
             voice_input_active: false,
             pending_input_focus: false,
             build_confirm_open: false,
+            project_runtime_active: false,
+            active_project_declaration_path: None,
+            project_declarations: Vec::new(),
+            project_selected_index: None,
+            project_selector_open: false,
         };
 
         app.push_history(format!(
@@ -1200,6 +1227,31 @@ impl CodexShellApp {
 
     fn set_codex_runtime_state(&mut self, state: CodexRuntimeState) {
         self.codex_runtime_state = state;
+        if state != CodexRuntimeState::Calculating {
+            self.project_selector_open = false;
+            self.project_runtime_active = false;
+            self.active_project_declaration_path = None;
+        }
+    }
+
+    fn runtime_background_color(&self) -> Color32 {
+        if self.codex_runtime_state != CodexRuntimeState::Calculating {
+            return Color32::from_rgb(224, 224, 224);
+        }
+        if self.project_runtime_active {
+            Color32::from_rgb(225, 244, 225)
+        } else {
+            Color32::from_rgb(255, 248, 228)
+        }
+    }
+
+    fn apply_runtime_background(&self, ctx: &egui::Context) {
+        let panel_bg = self.runtime_background_color();
+        ctx.style_mut_of(egui::Theme::Light, |style| {
+            style.visuals.panel_fill = panel_bg;
+            style.visuals.faint_bg_color = panel_bg;
+            style.visuals.extreme_bg_color = panel_bg;
+        });
     }
 
     fn stop_listener_process(&mut self) {
@@ -1302,12 +1354,36 @@ impl CodexShellApp {
             ("自動起動EXE3", self.config.startup_exe_3.clone()),
             ("自動起動EXE4", self.config.startup_exe_4.clone()),
         ];
+        let mut seen_paths = HashSet::new();
         for (label, raw) in startup_entries {
             let trimmed = raw.trim();
             if trimmed.is_empty() {
                 continue;
             }
             let path = trimmed.trim_matches('"');
+            let normalized = normalize_path_for_dedup(Path::new(path));
+            if !seen_paths.insert(normalized) {
+                self.push_history(format!(
+                    "{label} は同一パスが既に登録済みのため起動をスキップしました: {path}"
+                ));
+                continue;
+            }
+            match terminate_running_executable(path) {
+                Ok(killed) => {
+                    if killed > 0 {
+                        self.push_history(format!(
+                            "{label} の既存プロセスを停止しました 件数={killed}: {path}"
+                        ));
+                    }
+                }
+                Err(err) => {
+                    self.update_status(format!("{label} 停止失敗: {err}"));
+                    self.push_history(format!(
+                        "{label} の既存プロセス停止に失敗したため自動起動を中止しました: {path} ({err})"
+                    ));
+                    continue;
+                }
+            }
             let mut command = Command::new(path);
             let working_dir = self.config.working_dir.trim();
             if !working_dir.is_empty() {
@@ -1322,6 +1398,152 @@ impl CodexShellApp {
                     self.update_status(format!("{label} 起動失敗: {err}"));
                     self.push_history(format!("{label} の自動起動に失敗しました: {path} ({err})"));
                 }
+            }
+        }
+    }
+
+    fn refresh_project_declarations(&mut self) {
+        let base = self.config.working_dir.trim();
+        if base.is_empty() {
+            self.project_declarations.clear();
+            self.project_selected_index = None;
+            return;
+        }
+        let Ok(files) = find_project_declaration_files(Path::new(base)) else {
+            self.project_declarations.clear();
+            self.project_selected_index = None;
+            return;
+        };
+        let selected_path = self
+            .project_selected_index
+            .and_then(|index| self.project_declarations.get(index))
+            .map(|entry| entry.path.clone());
+        let mut entries = Vec::new();
+        for path in files {
+            let name = read_project_name_from_declaration(&path).unwrap_or_else(|| {
+                path.file_stem()
+                    .and_then(|v| v.to_str())
+                    .unwrap_or("Unnamed Project")
+                    .to_string()
+            });
+            entries.push(ProjectDeclarationEntry {
+                name,
+                path: Some(path),
+            });
+        }
+        entries.sort_by(|left, right| {
+            left.name
+                .cmp(&right.name)
+                .then(left.path.cmp(&right.path))
+        });
+        entries.push(ProjectDeclarationEntry {
+            name: PROJECT_DECLARATION_NONE_LABEL.to_string(),
+            path: None,
+        });
+        self.project_declarations = entries;
+        self.project_selected_index = match selected_path {
+            Some(path) => self
+                .project_declarations
+                .iter()
+                .position(|entry| entry.path == path)
+                .or_else(|| (!self.project_declarations.is_empty()).then_some(0)),
+            None => (!self.project_declarations.is_empty()).then_some(0),
+        };
+    }
+
+    fn start_selected_project_declaration(&mut self) {
+        let Some(index) = self.project_selected_index else {
+            self.update_status("開始対象プロジェクトがありません");
+            return;
+        };
+        let Some(entry) = self.project_declarations.get(index).cloned() else {
+            self.update_status("開始対象プロジェクトが見つかりません");
+            return;
+        };
+        let Some(path) = entry.path else {
+            self.project_selector_open = false;
+            self.active_project_declaration_path = None;
+            self.update_status("プロジェクト指定なしを選択しました");
+            self.push_history("プロジェクト指定なしで開始しました");
+            return;
+        };
+        if !path.is_file() {
+            self.update_status(format!(
+                "プロジェクト宣言ファイルが見つかりません: {}",
+                path.display()
+            ));
+            return;
+        }
+        self.send_command(
+            path.to_string_lossy().into_owned(),
+            "プロジェクト開始",
+            BUTTON_COMMAND_DELAY_MS,
+        );
+        self.project_selector_open = false;
+        self.active_project_declaration_path = Some(path.clone());
+        self.push_history(format!(
+            "プロジェクト開始を送信しました: {} ({})",
+            entry.name,
+            path.display()
+        ));
+    }
+
+    fn launch_active_project_debug_executable(&mut self) {
+        let Some(declaration_path) = self.active_project_declaration_path.clone() else {
+            self.update_status("開始済みプロジェクトがないためデバッグEXEを起動できません");
+            self.push_history("デバッグEXE起動を中止しました: 開始済みプロジェクトなし");
+            return;
+        };
+        let exe_path = match resolve_project_debug_executable_path(&declaration_path) {
+            Ok(path) => path,
+            Err(err) => {
+                self.update_status(format!("デバッグEXE解決に失敗: {err}"));
+                self.push_history(format!(
+                    "デバッグEXE解決に失敗しました: {} ({err})",
+                    declaration_path.display()
+                ));
+                return;
+            }
+        };
+        let exe_text = exe_path.to_string_lossy().into_owned();
+        match terminate_running_executable(&exe_text) {
+            Ok(killed) => {
+                if killed > 0 {
+                    self.push_history(format!(
+                        "デバッグEXEの既存プロセスを停止しました 件数={killed}: {}",
+                        exe_path.display()
+                    ));
+                }
+            }
+            Err(err) => {
+                self.update_status(format!("デバッグEXE停止失敗: {err}"));
+                self.push_history(format!(
+                    "デバッグEXEの既存プロセス停止に失敗したため起動を中止しました: {} ({err})",
+                    exe_path.display()
+                ));
+                return;
+            }
+        }
+        let project_dir = declaration_path
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| exe_path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf());
+        let launch_target = resolve_project_debug_launch_target(&exe_path);
+        match launch_target_with_shell(&launch_target, &project_dir) {
+            Ok(()) => {
+                self.update_status("デバッグEXEを起動しました");
+                self.push_history(format!(
+                    "デバッグEXEをシェル起動しました: {} (target: {})",
+                    exe_path.display(),
+                    launch_target.display()
+                ));
+            }
+            Err(err) => {
+                self.update_status(format!("デバッグEXE起動失敗: {err}"));
+                self.push_history(format!(
+                    "デバッグEXEの起動に失敗しました: {} ({err})",
+                    launch_target.display()
+                ));
             }
         }
     }
@@ -1407,8 +1629,16 @@ impl CodexShellApp {
                         self.set_codex_runtime_state(CodexRuntimeState::Stopped);
                     } else if source == "Codex" {
                         self.update_status("Codex起動コマンドを送信しました");
-                        self.push_history(format!("{source}: {command}"));
-                        self.set_codex_runtime_state(CodexRuntimeState::Calculating);
+                self.push_history(format!("{source}: {command}"));
+                self.set_codex_runtime_state(CodexRuntimeState::Calculating);
+                self.project_runtime_active = false;
+                self.active_project_declaration_path = None;
+                self.refresh_project_declarations();
+                self.project_selector_open = true;
+            } else if source == "プロジェクト開始" {
+                self.update_status("プロジェクト開始を送信しました");
+                self.push_history(format!("{source}: {command}"));
+                        self.project_runtime_active = true;
                     } else {
                         self.update_status(format!("{source}コマンド送信済み"));
                         self.push_history(format!("{source}: {command}"));
@@ -1419,6 +1649,8 @@ impl CodexShellApp {
                     self.push_history(format!("送信失敗 ({source}): {error}"));
                     if source == "Codex" {
                         self.set_codex_runtime_state(CodexRuntimeState::Stopped);
+                    } else if source == "プロジェクト開始" {
+                        self.project_runtime_active = false;
                     }
                 }
             }
@@ -1523,6 +1755,7 @@ impl CodexShellApp {
     fn is_bind_command_enabled(&self, command: &str) -> bool {
         match command.trim() {
             "mode.codex_start" => self.codex_runtime_state != CodexRuntimeState::Calculating,
+            "mode.project_debug_run" => self.active_project_declaration_path.is_some(),
             _ => true,
         }
     }
@@ -1630,6 +1863,7 @@ impl CodexShellApp {
                 self.update_status("ビルド確認待ち");
                 self.push_history("ビルド確認ダイアログを表示しました");
             }
+            "mode.project_debug_run" => self.launch_active_project_debug_executable(),
             "input.send" => self.send_input_command_by_button(),
             "input.voice_toggle" => self.toggle_voice_input(),
             "ui.settings" => {
@@ -1703,6 +1937,69 @@ impl CodexShellApp {
     }
 
     fn render_runtime_header(&mut self, _ctx: &egui::Context) {
+    }
+
+    fn render_project_selector_window(&mut self, ctx: &egui::Context) {
+        if self.ui_current_screen_id != UI_MAIN_SCREEN_ID || !self.project_selector_open {
+            return;
+        }
+
+        let mut open = true;
+        egui::Window::new("プロジェクト選択")
+            .collapsible(false)
+            .resizable(false)
+            .order(egui::Order::Tooltip)
+            .default_pos(egui::pos2(24.0, 56.0))
+            .fixed_size(egui::vec2(360.0, 250.0))
+            .open(&mut open)
+            .show(ctx, |ui| {
+                ui.label(RichText::new("プロジェクト宣言").color(Color32::BLACK));
+                ui.add_space(6.0);
+                egui::Frame::default()
+                    .stroke(egui::Stroke::new(1.0, Color32::BLACK))
+                    .inner_margin(egui::Margin::same(4))
+                    .show(ui, |ui| {
+                        ui.set_min_size(egui::vec2(332.0, 148.0));
+                        egui::ScrollArea::vertical().max_height(148.0).show(ui, |ui| {
+                            if self.project_declarations.is_empty() {
+                                ui.label(
+                                    RichText::new("プロジェクト宣言_*.md が見つかりません")
+                                        .color(Color32::BLACK),
+                                );
+                            } else {
+                                for (index, entry) in self.project_declarations.iter().enumerate() {
+                                    if ui
+                                        .selectable_label(
+                                            self.project_selected_index == Some(index),
+                                            entry.name.as_str(),
+                                        )
+                                        .clicked()
+                                    {
+                                        self.project_selected_index = Some(index);
+                                    }
+                                }
+                            }
+                        });
+                    });
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    if ui.button("更新").clicked() {
+                        self.refresh_project_declarations();
+                    }
+                    if ui
+                        .add_enabled(
+                            self.project_selected_index.is_some(),
+                            egui::Button::new("開始"),
+                        )
+                        .clicked()
+                    {
+                        self.start_selected_project_declaration();
+                    }
+                });
+            });
+        if !open {
+            self.project_selector_open = false;
+        }
     }
 
     fn render_build_confirm_dialog(&mut self, ctx: &egui::Context) {
@@ -2442,6 +2739,7 @@ impl eframe::App for CodexShellApp {
         self.drain_send_results();
         self.reload_ui_definition_if_changed(ctx);
         self.window_size = ctx.content_rect().size();
+        self.apply_runtime_background(ctx);
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.allocate_space(egui::Vec2::ZERO);
@@ -2449,6 +2747,7 @@ impl eframe::App for CodexShellApp {
         self.render_runtime_header(ctx);
         self.render_runtime_ui_objects(ctx);
         self.render_build_confirm_dialog(ctx);
+        self.render_project_selector_window(ctx);
 
         self.render_ui_editor(ctx);
         ctx.request_repaint_after(Duration::from_millis(UI_RELOAD_CHECK_INTERVAL_MS));
@@ -2495,6 +2794,142 @@ fn send_voice_input_hotkey() -> Result<()> {
             "SendInput失敗 sent={sent}/{} last_error={}",
             inputs.len(),
             err.0
+        ));
+    }
+    Ok(())
+}
+
+fn find_project_declaration_files(base_dir: &Path) -> Result<Vec<PathBuf>> {
+    if !base_dir.is_dir() {
+        return Ok(Vec::new());
+    }
+    let mut files = Vec::new();
+    let root_entries = fs::read_dir(base_dir)
+        .with_context(|| format!("起動フォルダ走査に失敗: {}", base_dir.display()))?;
+    for root_entry in root_entries.flatten() {
+        let dir_path = root_entry.path();
+        if !dir_path.is_dir() {
+            continue;
+        }
+        let Ok(entries) = fs::read_dir(&dir_path) else {
+            continue;
+        };
+        for entry in entries {
+            let Ok(entry) = entry else {
+                continue;
+            };
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+                continue;
+            };
+            if name.starts_with(PROJECT_DECLARATION_PREFIX)
+                && name.ends_with(PROJECT_DECLARATION_SUFFIX)
+            {
+                files.push(path);
+            }
+        }
+    }
+    files.sort();
+    Ok(files)
+}
+
+fn read_project_name_from_declaration(path: &Path) -> Option<String> {
+    let body = fs::read_to_string(path).ok()?;
+    let first_line = body.lines().next()?.trim();
+    let normalized = first_line.trim_start_matches('#').trim();
+    if normalized.is_empty() {
+        None
+    } else {
+        Some(normalized.to_string())
+    }
+}
+
+fn resolve_project_debug_executable_path(declaration_path: &Path) -> Result<PathBuf> {
+    let project_dir = declaration_path
+        .parent()
+        .ok_or_else(|| anyhow!("宣言ファイルの親フォルダを取得できません: {}", declaration_path.display()))?;
+    let debug_dir = project_dir.join("target").join("debug");
+    if !debug_dir.is_dir() {
+        return Err(anyhow!(
+            "debugフォルダが見つかりません: {}",
+            debug_dir.display()
+        ));
+    }
+    let mut candidates = Vec::new();
+    let entries = fs::read_dir(&debug_dir)
+        .with_context(|| format!("debugフォルダ読み込みに失敗: {}", debug_dir.display()))?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        if !path
+            .extension()
+            .and_then(|v| v.to_str())
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("exe"))
+        {
+            continue;
+        }
+        candidates.push(path);
+    }
+    if candidates.is_empty() {
+        return Err(anyhow!(
+            "debug実行ファイルが見つかりません: {}",
+            debug_dir.display()
+        ));
+    }
+    let folder_name = project_dir
+        .file_name()
+        .and_then(|v| v.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if let Some(preferred) = candidates.iter().find(|path| {
+        path.file_stem()
+            .and_then(|v| v.to_str())
+            .is_some_and(|stem| stem.eq_ignore_ascii_case(&folder_name))
+    }) {
+        return Ok(preferred.clone());
+    }
+    if candidates.len() == 1 {
+        return Ok(candidates[0].clone());
+    }
+    let list = candidates
+        .iter()
+        .filter_map(|path| path.file_name().and_then(|v| v.to_str()))
+        .collect::<Vec<_>>()
+        .join(", ");
+    Err(anyhow!(
+        "debug実行ファイルが複数あります。フォルダ名一致も見つかりません: {list}"
+    ))
+}
+
+fn resolve_project_debug_launch_target(exe_path: &Path) -> PathBuf {
+    let shortcut_candidate = exe_path.with_extension("lnk");
+    if shortcut_candidate.is_file() {
+        shortcut_candidate
+    } else {
+        exe_path.to_path_buf()
+    }
+}
+
+fn launch_target_with_shell(target: &Path, working_dir: &Path) -> Result<()> {
+    let status = Command::new("cmd")
+        .arg("/C")
+        .arg("start")
+        .arg("")
+        .arg("/D")
+        .arg(working_dir)
+        .arg(target)
+        .status()
+        .with_context(|| format!("シェル起動に失敗: {}", target.display()))?;
+    if !status.success() {
+        return Err(anyhow!(
+            "シェル起動が失敗しました status={}: {}",
+            status,
+            target.display()
         ));
     }
     Ok(())
@@ -2825,6 +3260,102 @@ fn send_named_pipe_line(pipe_name: &str, command: &str) -> Result<()> {
             .map(|e| e.to_string())
             .unwrap_or_else(|| "unknown error".to_string())
     ))
+}
+
+fn normalize_path_for_dedup(path: &Path) -> String {
+    let normalized = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    normalized
+        .to_string_lossy()
+        .replace('/', "\\")
+        .to_ascii_lowercase()
+}
+
+fn close_handle(handle: HANDLE) {
+    if !handle.is_invalid() {
+        unsafe {
+            let _ = CloseHandle(handle);
+        }
+    }
+}
+
+fn process_image_path(pid: u32) -> Option<PathBuf> {
+    let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }.ok()?;
+    let mut size = 32768u32;
+    let mut buffer = vec![0u16; size as usize];
+    let ok = unsafe {
+        QueryFullProcessImageNameW(
+            process,
+            PROCESS_NAME_FORMAT(0),
+            PWSTR(buffer.as_mut_ptr()),
+            &mut size,
+        )
+        .is_ok()
+    };
+    close_handle(process);
+    if !ok || size == 0 {
+        return None;
+    }
+    Some(PathBuf::from(String::from_utf16_lossy(
+        &buffer[..size as usize],
+    )))
+}
+
+fn find_process_ids_by_executable(path: &Path) -> Result<Vec<u32>> {
+    let target = normalize_path_for_dedup(path);
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) }
+        .context("プロセススナップショット取得に失敗")?;
+    let mut process_ids = Vec::new();
+    let mut entry = PROCESSENTRY32W {
+        dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
+        ..Default::default()
+    };
+    let mut has_entry = unsafe { Process32FirstW(snapshot, &mut entry).is_ok() };
+    while has_entry {
+        let pid = entry.th32ProcessID;
+        if let Some(image_path) = process_image_path(pid)
+            && normalize_path_for_dedup(&image_path) == target
+        {
+            process_ids.push(pid);
+        }
+        has_entry = unsafe { Process32NextW(snapshot, &mut entry).is_ok() };
+    }
+    close_handle(snapshot);
+    Ok(process_ids)
+}
+
+fn terminate_process_by_pid(pid: u32) -> Result<()> {
+    let process = unsafe { OpenProcess(PROCESS_TERMINATE, false, pid) }
+        .with_context(|| format!("プロセス終了のハンドル取得に失敗 pid={pid}"))?;
+    if unsafe { TerminateProcess(process, 1).is_err() } {
+        close_handle(process);
+        return Err(anyhow!("プロセス終了APIが失敗しました pid={pid}"));
+    }
+    close_handle(process);
+    Ok(())
+}
+
+fn terminate_running_executable(path: &str) -> Result<usize> {
+    let process_ids = find_process_ids_by_executable(Path::new(path))
+        .with_context(|| format!("実行中プロセス検索に失敗: {path}"))?;
+    for pid in &process_ids {
+        terminate_process_by_pid(*pid).with_context(|| format!("プロセス停止に失敗 pid={pid}"))?;
+    }
+    if !process_ids.is_empty() {
+        thread::sleep(Duration::from_millis(200));
+        let remaining = find_process_ids_by_executable(Path::new(path))
+            .with_context(|| format!("停止後の実行中プロセス再確認に失敗: {path}"))?;
+        if !remaining.is_empty() {
+            return Err(anyhow!(
+                "プロセス停止後も実行中のプロセスがあります: {}",
+                remaining
+                    .iter()
+                    .map(|pid| pid.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+    }
+    Ok(process_ids.len())
 }
 
 fn select_executable_file_path() -> Result<Option<String>> {
