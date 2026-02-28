@@ -1005,7 +1005,7 @@ impl CodexShellApp {
     }
 
     fn apply_window_resize_policy(&mut self, ctx: &egui::Context) {
-        let allow_resize = self.config.show_size_overlay;
+        let allow_resize = self.config.show_size_overlay && !self.is_main_window_resize_locked();
         if self.resize_enabled == allow_resize {
             return;
         }
@@ -1016,20 +1016,24 @@ impl CodexShellApp {
             ctx.send_viewport_cmd(egui::ViewportCommand::MaxInnerSize(egui::vec2(8192.0, 8192.0)));
             ctx.send_viewport_cmd(egui::ViewportCommand::Resizable(true));
         } else {
+            let lock_size = if self.config.show_size_overlay
+                && self.is_main_window_resize_locked()
+                && self.window_size.x > 1.0
+                && self.window_size.y > 1.0
+            {
+                self.window_size
+            } else {
+                egui::vec2(FIXED_WINDOW_WIDTH, FIXED_WINDOW_HEIGHT)
+            };
             ctx.send_viewport_cmd(egui::ViewportCommand::Resizable(false));
-            ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(egui::vec2(
-                FIXED_WINDOW_WIDTH,
-                FIXED_WINDOW_HEIGHT,
-            )));
-            ctx.send_viewport_cmd(egui::ViewportCommand::MaxInnerSize(egui::vec2(
-                FIXED_WINDOW_WIDTH,
-                FIXED_WINDOW_HEIGHT,
-            )));
-            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(
-                FIXED_WINDOW_WIDTH,
-                FIXED_WINDOW_HEIGHT,
-            )));
+            ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(lock_size));
+            ctx.send_viewport_cmd(egui::ViewportCommand::MaxInnerSize(lock_size));
+            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(lock_size));
         }
+    }
+
+    fn is_main_window_resize_locked(&self) -> bool {
+        self.ui_edit_mode && Self::is_modal_screen(self.ui_current_screen_id.as_str())
     }
 
     fn push_history(&mut self, message: impl Into<String>) {
@@ -1538,6 +1542,7 @@ impl CodexShellApp {
         if self.ui_edit_mode && self.ui_edit_grid_visible {
             self.render_edit_grid(ctx);
         }
+        self.render_modal_screen_tint(ctx, current_screen_id.as_str());
         let mut ordered_indices: Vec<usize> = (0..screen_snapshot.len()).collect();
         ordered_indices.sort_by(|left, right| {
             screen_snapshot[*left]
@@ -2036,6 +2041,47 @@ impl CodexShellApp {
         }
     }
 
+    fn render_modal_screen_tint(&self, ctx: &egui::Context, screen_id: &str) {
+        if !Self::is_modal_screen(screen_id) {
+            return;
+        }
+        let content_rect = ctx.content_rect();
+        let inset_x = (content_rect.width() * 0.05).max(0.0);
+        let inset_y = (content_rect.height() * 0.05).max(0.0);
+        let overlay_rect = content_rect.shrink2(egui::vec2(inset_x, inset_y));
+        let overlay_layer = egui::LayerId::new(
+            egui::Order::Middle,
+            egui::Id::new("runtime_modal_screen_tint"),
+        );
+        let painter = ctx.layer_painter(overlay_layer);
+        painter.rect(
+            overlay_rect,
+            egui::CornerRadius::ZERO,
+            Color32::from_rgba_unmultiplied(196, 170, 224, 42),
+            egui::Stroke::NONE,
+            egui::StrokeKind::Middle,
+        );
+    }
+
+    fn is_modal_screen(screen_id: &str) -> bool {
+        let normalized = screen_id.trim();
+        if normalized == UI_MAIN_SCREEN_ID {
+            return false;
+        }
+        !Self::is_custom_windows_screen(normalized)
+    }
+
+    fn is_custom_windows_screen(screen_id: &str) -> bool {
+        let normalized = screen_id.trim().to_ascii_lowercase();
+        if normalized.is_empty() {
+            return false;
+        }
+        let looks_like_window_screen = normalized.contains("window")
+            || normalized.starts_with("win_")
+            || normalized.ends_with("_win");
+        looks_like_window_screen && !normalized.contains("modal")
+    }
+
 }
 
 impl eframe::App for CodexShellApp {
@@ -2071,6 +2117,7 @@ impl eframe::App for CodexShellApp {
         self.render_ui_editor(ctx);
         ctx.request_repaint_after(Duration::from_millis(UI_RELOAD_CHECK_INTERVAL_MS));
     }
+
 }
 
 fn unix_timestamp() -> String {
