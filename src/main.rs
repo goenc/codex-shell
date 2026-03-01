@@ -1938,6 +1938,112 @@ impl CodexShellApp {
         }
     }
 
+    fn handle_mode_codex_start(&mut self) {
+        self.send_codex_command();
+    }
+
+    fn handle_mode_stop(&mut self) {
+        self.request_interrupt();
+    }
+
+    fn handle_mode_build(&mut self) {
+        if self.input_command.trim().is_empty() {
+            self.cancel_build_when_empty();
+            return;
+        }
+        self.build_confirm_open = true;
+        self.update_status("ビルド確認待ち");
+        self.push_history("ビルド確認ダイアログを表示しました");
+    }
+
+    fn handle_mode_project_debug_run(&mut self) {
+        self.launch_active_project_debug_executable();
+    }
+
+    fn handle_input_send(&mut self) {
+        self.send_input_command_by_button();
+    }
+
+    fn handle_input_voice_toggle(&mut self) {
+        self.toggle_voice_input();
+    }
+
+    fn handle_ui_settings(&mut self) {
+        self.ui_current_screen_id = UI_SETTINGS_SCREEN_ID.to_string();
+        if !self.ui_edit_mode {
+            self.ui_selected_screen_id = self.ui_current_screen_id.clone();
+        }
+    }
+
+    fn handle_nav_back_main(&mut self) {
+        self.ui_current_screen_id = UI_MAIN_SCREEN_ID.to_string();
+        if !self.ui_edit_mode {
+            self.ui_selected_screen_id = self.ui_current_screen_id.clone();
+        }
+    }
+
+    fn handle_config_save(&mut self) {
+        self.save_config();
+    }
+
+    fn handle_config_restart_listener(&mut self) {
+        self.save_config();
+        self.start_listener();
+    }
+
+    fn handle_browse_startup_exe(&mut self, slot: usize) {
+        self.browse_startup_executable(slot);
+    }
+
+    fn handle_reasoning_effort(&mut self, effort: &str) {
+        self.selected_reasoning_effort = effort.to_string();
+    }
+
+    fn handle_ui_edit_toggle(&mut self) {
+        self.ui_edit_mode = !self.ui_edit_mode;
+        self.update_status(if self.ui_edit_mode {
+            "UI編集モードを有効化しました"
+        } else {
+            "UI編集モードを無効化しました"
+        });
+        self.push_history(if self.ui_edit_mode {
+            "UI編集モードを有効化しました"
+        } else {
+            "UI編集モードを無効化しました"
+        });
+        if self.ui_edit_mode {
+            self.ui_selected_screen_id = self.ui_current_screen_id.clone();
+        }
+        if self.ui_edit_mode
+            && (self.ui_selected_object_id.is_empty()
+                || self
+                    .ui_definition
+                    .object_index_in_screen(
+                        self.ui_selected_screen_id.as_str(),
+                        &self.ui_selected_object_id,
+                    )
+                    .is_none())
+        {
+            self.ui_selected_object_id = self
+                .ui_definition
+                .screen_objects(self.ui_selected_screen_id.as_str())
+                .and_then(|objects| objects.first())
+                .map(|object| object.id.clone())
+                .unwrap_or_default();
+        }
+        if self.ui_edit_mode {
+            let selected_screen_id = self.ui_selected_screen_id.clone();
+            self.ensure_selected_objects_valid(selected_screen_id.as_str());
+        } else {
+            self.ui_selected_object_ids.clear();
+        }
+    }
+
+    fn handle_unknown_ui_command(&mut self, command: &str) {
+        self.update_status(format!("未対応のUIコマンドです: {command}"));
+        self.push_history(format!("未対応UIコマンド: {command}"));
+    }
+
     fn dispatch_ui_command(&mut self, command: &str) {
         let command = command.trim();
         #[cfg(debug_assertions)]
@@ -1947,87 +2053,25 @@ impl CodexShellApp {
 
         match command {
             "" => {}
-            MODE_CODEX_START => self.send_codex_command(),
-            MODE_STOP => self.request_interrupt(),
-            MODE_BUILD => {
-                if self.input_command.trim().is_empty() {
-                    self.cancel_build_when_empty();
-                    return;
-                }
-                self.build_confirm_open = true;
-                self.update_status("ビルド確認待ち");
-                self.push_history("ビルド確認ダイアログを表示しました");
-            }
-            MODE_PROJECT_DEBUG_RUN => self.launch_active_project_debug_executable(),
-            INPUT_SEND => self.send_input_command_by_button(),
-            INPUT_VOICE_TOGGLE => self.toggle_voice_input(),
-            UI_SETTINGS => {
-                self.ui_current_screen_id = UI_SETTINGS_SCREEN_ID.to_string();
-                if !self.ui_edit_mode {
-                    self.ui_selected_screen_id = self.ui_current_screen_id.clone();
-                }
-            }
-            NAV_BACK_MAIN => {
-                self.ui_current_screen_id = UI_MAIN_SCREEN_ID.to_string();
-                if !self.ui_edit_mode {
-                    self.ui_selected_screen_id = self.ui_current_screen_id.clone();
-                }
-            }
-            CONFIG_SAVE => self.save_config(),
-            CONFIG_RESTART_LISTENER => {
-                self.save_config();
-                self.start_listener();
-            }
-            CONFIG_STARTUP_EXE_1_BROWSE => self.browse_startup_executable(1),
-            CONFIG_STARTUP_EXE_2_BROWSE => self.browse_startup_executable(2),
-            CONFIG_STARTUP_EXE_3_BROWSE => self.browse_startup_executable(3),
-            CONFIG_STARTUP_EXE_4_BROWSE => self.browse_startup_executable(4),
-            REASONING_MEDIUM => self.selected_reasoning_effort = "medium".to_string(),
-            REASONING_HIGH => self.selected_reasoning_effort = "high".to_string(),
-            REASONING_XHIGH => self.selected_reasoning_effort = "xhigh".to_string(),
-            UI_EDIT_TOGGLE => {
-                self.ui_edit_mode = !self.ui_edit_mode;
-                self.update_status(if self.ui_edit_mode {
-                    "UI編集モードを有効化しました"
-                } else {
-                    "UI編集モードを無効化しました"
-                });
-                self.push_history(if self.ui_edit_mode {
-                    "UI編集モードを有効化しました"
-                } else {
-                    "UI編集モードを無効化しました"
-                });
-                if self.ui_edit_mode {
-                    self.ui_selected_screen_id = self.ui_current_screen_id.clone();
-                }
-                if self.ui_edit_mode
-                    && (self.ui_selected_object_id.is_empty()
-                        || self
-                            .ui_definition
-                            .object_index_in_screen(
-                                self.ui_selected_screen_id.as_str(),
-                                &self.ui_selected_object_id,
-                            )
-                            .is_none())
-                {
-                    self.ui_selected_object_id = self
-                        .ui_definition
-                        .screen_objects(self.ui_selected_screen_id.as_str())
-                        .and_then(|objects| objects.first())
-                        .map(|object| object.id.clone())
-                        .unwrap_or_default();
-                }
-                if self.ui_edit_mode {
-                    let selected_screen_id = self.ui_selected_screen_id.clone();
-                    self.ensure_selected_objects_valid(selected_screen_id.as_str());
-                } else {
-                    self.ui_selected_object_ids.clear();
-                }
-            }
-            other => {
-                self.update_status(format!("未対応のUIコマンドです: {other}"));
-                self.push_history(format!("未対応UIコマンド: {other}"));
-            }
+            MODE_CODEX_START => self.handle_mode_codex_start(),
+            MODE_STOP => self.handle_mode_stop(),
+            MODE_BUILD => self.handle_mode_build(),
+            MODE_PROJECT_DEBUG_RUN => self.handle_mode_project_debug_run(),
+            INPUT_SEND => self.handle_input_send(),
+            INPUT_VOICE_TOGGLE => self.handle_input_voice_toggle(),
+            UI_SETTINGS => self.handle_ui_settings(),
+            NAV_BACK_MAIN => self.handle_nav_back_main(),
+            CONFIG_SAVE => self.handle_config_save(),
+            CONFIG_RESTART_LISTENER => self.handle_config_restart_listener(),
+            CONFIG_STARTUP_EXE_1_BROWSE => self.handle_browse_startup_exe(1),
+            CONFIG_STARTUP_EXE_2_BROWSE => self.handle_browse_startup_exe(2),
+            CONFIG_STARTUP_EXE_3_BROWSE => self.handle_browse_startup_exe(3),
+            CONFIG_STARTUP_EXE_4_BROWSE => self.handle_browse_startup_exe(4),
+            REASONING_MEDIUM => self.handle_reasoning_effort("medium"),
+            REASONING_HIGH => self.handle_reasoning_effort("high"),
+            REASONING_XHIGH => self.handle_reasoning_effort("xhigh"),
+            UI_EDIT_TOGGLE => self.handle_ui_edit_toggle(),
+            other => self.handle_unknown_ui_command(other),
         }
     }
 
