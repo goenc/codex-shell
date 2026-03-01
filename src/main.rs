@@ -48,6 +48,8 @@ const UI_SETTINGS_SCREEN_ID: &str = "settings";
 const PROJECT_DECLARATION_PREFIX: &str = "プロジェクト宣言_";
 const PROJECT_DECLARATION_SUFFIX: &str = ".md";
 const PROJECT_DECLARATION_NONE_LABEL: &str = "プロジェクト指定なし";
+const PROJECT_TARGET_LABEL_ID: &str = "lbl_project_target";
+const PROJECT_TARGET_LABEL_COMMAND: &str = "project.target_state";
 const UI_BASE_OUTER_MARGIN: f32 = 16.0;
 const UI_BASE_COMPONENT_GAP: f32 = 8.0;
 const PANEL_HORIZONTAL_PADDING: f32 = 8.0;
@@ -468,6 +470,55 @@ impl Default for UiScreen {
     }
 }
 
+fn ensure_project_target_label(definition: &mut UiDefinition) {
+    let Some(objects) = definition.screen_objects_mut(UI_MAIN_SCREEN_ID) else {
+        return;
+    };
+    if objects
+        .iter()
+        .any(|object| object.id == PROJECT_TARGET_LABEL_ID)
+    {
+        return;
+    }
+
+    let start_rect = objects
+        .iter()
+        .find(|object| object.id == "btn_codex_start")
+        .map(|object| (object.position.y, object.size.h));
+    let input_rect = objects
+        .iter()
+        .find(|object| object.id == "input_command")
+        .map(|object| (object.position.x, object.position.y, object.size.w));
+
+    let height = 24.0;
+    let x = input_rect.map_or(24.0, |(x, _, _)| x);
+    let width = input_rect.map_or(780.0, |(_, _, width)| width.max(220.0));
+    let y = match (start_rect, input_rect) {
+        (Some((start_y, start_h)), Some((_, input_y, _))) => {
+            let start_bottom = start_y + start_h;
+            let mut candidate = start_bottom + 6.0;
+            if candidate + height > input_y {
+                candidate = ((start_bottom + input_y - height) / 2.0).max(start_bottom);
+            }
+            candidate
+        }
+        _ => 56.0,
+    };
+
+    let mut object = create_label_object(
+        PROJECT_TARGET_LABEL_ID,
+        "プロジェクト無し",
+        45,
+        x,
+        y,
+        width,
+        height,
+        "left",
+    );
+    object.bind.command = PROJECT_TARGET_LABEL_COMMAND.to_string();
+    objects.push(object);
+}
+
 fn default_settings_screen() -> UiScreen {
     let mut objects = vec![
         create_label_object("lbl_settings_title", "設定", 100, 24.0, 18.0, 240.0, 28.0, "left"),
@@ -823,6 +874,19 @@ fn create_button_object(
     }
 }
 
+fn project_name_from_declaration_path(path: &Path) -> String {
+    let stem = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    let trimmed = stem.trim_start_matches(PROJECT_DECLARATION_PREFIX).trim();
+    if trimmed.is_empty() {
+        stem.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
 fn create_checkbox_object(
     id: &str,
     text: &str,
@@ -1106,6 +1170,7 @@ impl CodexShellApp {
         let ui_live_path = ensure_live_ui_file()?;
         let mut ui_definition = load_ui_definition(&ui_live_path)?;
         ui_definition.normalize_screens();
+        ensure_project_target_label(&mut ui_definition);
         let ui_last_modified = ui_file_modified_time(&ui_live_path).ok();
         let ui_selected_object_id = ui_definition
             .screen_objects(UI_MAIN_SCREEN_ID)
@@ -1708,6 +1773,7 @@ impl CodexShellApp {
         match load_ui_definition(&self.ui_live_path) {
             Ok(mut definition) => {
                 definition.normalize_screens();
+                ensure_project_target_label(&mut definition);
                 self.ui_definition = definition;
                 self.ui_last_modified = Some(modified);
                 self.ui_has_unsaved_changes = false;
@@ -1815,6 +1881,12 @@ impl CodexShellApp {
         match object.bind.command.trim() {
             "status.message" => format!("状態: {}", self.status_message),
             "codex.state" => format!("Codex状態: {}", self.codex_runtime_state.label()),
+            PROJECT_TARGET_LABEL_COMMAND => self
+                .active_project_declaration_path
+                .as_ref()
+                .map(|path| project_name_from_declaration_path(path))
+                .filter(|name| !name.trim().is_empty())
+                .unwrap_or_else(|| "プロジェクト無し".to_string()),
             "ui.edit.locked_hint" => "編集モード中のため操作は無効".to_string(),
             "input.voice_toggle" => {
                 if self.voice_input_active {
@@ -1836,6 +1908,15 @@ impl CodexShellApp {
                     object.visual.text.value.clone()
                 }
             }
+        }
+    }
+
+    fn resolve_label_color(&self, object: &UiObject) -> Color32 {
+        match object.bind.command.trim() {
+            PROJECT_TARGET_LABEL_COMMAND if self.active_project_declaration_path.is_some() => {
+                Color32::from_rgb(255, 140, 0)
+            }
+            _ => Color32::BLACK,
         }
     }
 
@@ -2191,7 +2272,9 @@ impl CodexShellApp {
                             "right" => egui::Align::Max,
                             _ => egui::Align::Center,
                         };
-                        let mut rich = RichText::new(text).font(text_font.clone()).color(Color32::BLACK);
+                        let mut rich = RichText::new(text)
+                            .font(text_font.clone())
+                            .color(self.resolve_label_color(&object));
                         if object.visual.text.bold {
                             rich = rich.strong();
                         }
