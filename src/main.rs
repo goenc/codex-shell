@@ -29,6 +29,14 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 mod ui_editor;
 mod ui_command;
 
+use ui_command::{
+    CONFIG_RESTART_LISTENER, CONFIG_SAVE, CONFIG_STARTUP_EXE_1_BROWSE,
+    CONFIG_STARTUP_EXE_2_BROWSE, CONFIG_STARTUP_EXE_3_BROWSE, CONFIG_STARTUP_EXE_4_BROWSE,
+    INPUT_SEND, INPUT_VOICE_TOGGLE, MODE_BUILD, MODE_CODEX_START, MODE_PROJECT_DEBUG_RUN,
+    MODE_STOP, NAV_BACK_MAIN, REASONING_HIGH, REASONING_MEDIUM, REASONING_XHIGH, UI_EDIT_TOGGLE,
+    UI_SETTINGS, is_known_ui_command,
+};
+
 const DEFAULT_PIPE_NAME: &str = "codex_shell_pipe";
 const DEFAULT_BUILD_COMMAND: &str = "cargo build";
 const DEFAULT_CODEX_COMMAND: &str = "codex --ask-for-approval on-request --sandbox read-only";
@@ -1933,15 +1941,15 @@ impl CodexShellApp {
     fn dispatch_ui_command(&mut self, command: &str) {
         let command = command.trim();
         #[cfg(debug_assertions)]
-        if !command.is_empty() && !ui_command::is_known_ui_command(command) {
+        if !command.is_empty() && !is_known_ui_command(command) {
             self.push_history(format!("未知UIコマンドを検出しました: {command}"));
         }
 
         match command {
             "" => {}
-            ui_command::MODE_CODEX_START => self.send_codex_command(),
-            ui_command::MODE_STOP => self.request_interrupt(),
-            ui_command::MODE_BUILD => {
+            MODE_CODEX_START => self.send_codex_command(),
+            MODE_STOP => self.request_interrupt(),
+            MODE_BUILD => {
                 if self.input_command.trim().is_empty() {
                     self.cancel_build_when_empty();
                     return;
@@ -1950,34 +1958,34 @@ impl CodexShellApp {
                 self.update_status("ビルド確認待ち");
                 self.push_history("ビルド確認ダイアログを表示しました");
             }
-            ui_command::MODE_PROJECT_DEBUG_RUN => self.launch_active_project_debug_executable(),
-            ui_command::INPUT_SEND => self.send_input_command_by_button(),
-            ui_command::INPUT_VOICE_TOGGLE => self.toggle_voice_input(),
-            ui_command::UI_SETTINGS => {
+            MODE_PROJECT_DEBUG_RUN => self.launch_active_project_debug_executable(),
+            INPUT_SEND => self.send_input_command_by_button(),
+            INPUT_VOICE_TOGGLE => self.toggle_voice_input(),
+            UI_SETTINGS => {
                 self.ui_current_screen_id = UI_SETTINGS_SCREEN_ID.to_string();
                 if !self.ui_edit_mode {
                     self.ui_selected_screen_id = self.ui_current_screen_id.clone();
                 }
             }
-            ui_command::NAV_BACK_MAIN => {
+            NAV_BACK_MAIN => {
                 self.ui_current_screen_id = UI_MAIN_SCREEN_ID.to_string();
                 if !self.ui_edit_mode {
                     self.ui_selected_screen_id = self.ui_current_screen_id.clone();
                 }
             }
-            ui_command::CONFIG_SAVE => self.save_config(),
-            ui_command::CONFIG_RESTART_LISTENER => {
+            CONFIG_SAVE => self.save_config(),
+            CONFIG_RESTART_LISTENER => {
                 self.save_config();
                 self.start_listener();
             }
-            ui_command::CONFIG_STARTUP_EXE_1_BROWSE => self.browse_startup_executable(1),
-            ui_command::CONFIG_STARTUP_EXE_2_BROWSE => self.browse_startup_executable(2),
-            ui_command::CONFIG_STARTUP_EXE_3_BROWSE => self.browse_startup_executable(3),
-            ui_command::CONFIG_STARTUP_EXE_4_BROWSE => self.browse_startup_executable(4),
-            ui_command::REASONING_MEDIUM => self.selected_reasoning_effort = "medium".to_string(),
-            ui_command::REASONING_HIGH => self.selected_reasoning_effort = "high".to_string(),
-            ui_command::REASONING_XHIGH => self.selected_reasoning_effort = "xhigh".to_string(),
-            ui_command::UI_EDIT_TOGGLE => {
+            CONFIG_STARTUP_EXE_1_BROWSE => self.browse_startup_executable(1),
+            CONFIG_STARTUP_EXE_2_BROWSE => self.browse_startup_executable(2),
+            CONFIG_STARTUP_EXE_3_BROWSE => self.browse_startup_executable(3),
+            CONFIG_STARTUP_EXE_4_BROWSE => self.browse_startup_executable(4),
+            REASONING_MEDIUM => self.selected_reasoning_effort = "medium".to_string(),
+            REASONING_HIGH => self.selected_reasoning_effort = "high".to_string(),
+            REASONING_XHIGH => self.selected_reasoning_effort = "xhigh".to_string(),
+            UI_EDIT_TOGGLE => {
                 self.ui_edit_mode = !self.ui_edit_mode;
                 self.update_status(if self.ui_edit_mode {
                     "UI編集モードを有効化しました"
