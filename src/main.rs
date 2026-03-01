@@ -27,6 +27,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 
 mod ui_editor;
+mod ui_command;
 
 const DEFAULT_PIPE_NAME: &str = "codex_shell_pipe";
 const DEFAULT_BUILD_COMMAND: &str = "cargo build";
@@ -49,7 +50,6 @@ const PROJECT_DECLARATION_PREFIX: &str = "プロジェクト宣言_";
 const PROJECT_DECLARATION_SUFFIX: &str = ".md";
 const PROJECT_DECLARATION_NONE_LABEL: &str = "プロジェクト指定なし";
 const PROJECT_TARGET_LABEL_ID: &str = "lbl_project_target";
-const PROJECT_TARGET_LABEL_COMMAND: &str = "project.target_state";
 const UI_BASE_OUTER_MARGIN: f32 = 16.0;
 const UI_BASE_COMPONENT_GAP: f32 = 8.0;
 const PANEL_HORIZONTAL_PADDING: f32 = 8.0;
@@ -515,7 +515,7 @@ fn ensure_project_target_label(definition: &mut UiDefinition) {
         height,
         "left",
     );
-    object.bind.command = PROJECT_TARGET_LABEL_COMMAND.to_string();
+    object.bind.command = ui_command::PROJECT_TARGET_STATE.to_string();
     objects.push(object);
 }
 
@@ -534,7 +534,7 @@ fn default_settings_screen() -> UiScreen {
         ),
         create_input_object(
             "input_settings_working_dir",
-            "config.working_dir",
+            ui_command::CONFIG_WORKING_DIR,
             110,
             156.0,
             64.0,
@@ -544,7 +544,7 @@ fn default_settings_screen() -> UiScreen {
         create_label_object("lbl_settings_build", "ビルド", 100, 24.0, 96.0, 120.0, 24.0, "left"),
         create_input_object(
             "input_settings_build",
-            "config.build_command",
+            ui_command::CONFIG_BUILD_COMMAND,
             110,
             156.0,
             96.0,
@@ -554,7 +554,7 @@ fn default_settings_screen() -> UiScreen {
         create_label_object("lbl_settings_codex", "Codex", 100, 24.0, 128.0, 120.0, 24.0, "left"),
         create_input_object(
             "input_settings_codex",
-            "config.codex_command",
+            ui_command::CONFIG_CODEX_COMMAND,
             110,
             156.0,
             128.0,
@@ -573,7 +573,7 @@ fn default_settings_screen() -> UiScreen {
         ),
         create_input_object(
             "input_settings_pipe_name",
-            "config.pipe_name",
+            ui_command::CONFIG_PIPE_NAME,
             110,
             156.0,
             160.0,
@@ -592,7 +592,7 @@ fn default_settings_screen() -> UiScreen {
         ),
         create_input_object(
             "input_settings_input_prefix",
-            "config.input_prefix",
+            ui_command::CONFIG_INPUT_PREFIX,
             110,
             156.0,
             192.0,
@@ -611,7 +611,7 @@ fn default_settings_screen() -> UiScreen {
         ),
         create_input_object(
             "input_settings_startup_exe_1",
-            "config.startup_exe_1",
+            ui_command::CONFIG_STARTUP_EXE_1,
             110,
             156.0,
             224.0,
@@ -621,7 +621,7 @@ fn default_settings_screen() -> UiScreen {
         create_button_object(
             "btn_settings_startup_exe_1_browse",
             "参照",
-            "config.startup_exe_1.browse",
+            ui_command::CONFIG_STARTUP_EXE_1_BROWSE,
             120,
             804.0,
             224.0,
@@ -640,7 +640,7 @@ fn default_settings_screen() -> UiScreen {
         ),
         create_input_object(
             "input_settings_startup_exe_2",
-            "config.startup_exe_2",
+            ui_command::CONFIG_STARTUP_EXE_2,
             110,
             156.0,
             252.0,
@@ -650,7 +650,7 @@ fn default_settings_screen() -> UiScreen {
         create_button_object(
             "btn_settings_startup_exe_2_browse",
             "参照",
-            "config.startup_exe_2.browse",
+            ui_command::CONFIG_STARTUP_EXE_2_BROWSE,
             120,
             804.0,
             252.0,
@@ -669,7 +669,7 @@ fn default_settings_screen() -> UiScreen {
         ),
         create_input_object(
             "input_settings_startup_exe_3",
-            "config.startup_exe_3",
+            ui_command::CONFIG_STARTUP_EXE_3,
             110,
             156.0,
             280.0,
@@ -679,7 +679,7 @@ fn default_settings_screen() -> UiScreen {
         create_button_object(
             "btn_settings_startup_exe_3_browse",
             "参照",
-            "config.startup_exe_3.browse",
+            ui_command::CONFIG_STARTUP_EXE_3_BROWSE,
             120,
             804.0,
             280.0,
@@ -698,7 +698,7 @@ fn default_settings_screen() -> UiScreen {
         ),
         create_input_object(
             "input_settings_startup_exe_4",
-            "config.startup_exe_4",
+            ui_command::CONFIG_STARTUP_EXE_4,
             110,
             156.0,
             308.0,
@@ -708,7 +708,7 @@ fn default_settings_screen() -> UiScreen {
         create_button_object(
             "btn_settings_startup_exe_4_browse",
             "参照",
-            "config.startup_exe_4.browse",
+            ui_command::CONFIG_STARTUP_EXE_4_BROWSE,
             120,
             804.0,
             308.0,
@@ -718,7 +718,7 @@ fn default_settings_screen() -> UiScreen {
         create_checkbox_object(
             "chk_settings_show_size_overlay",
             "サイズ表示を表示",
-            "config.show_size_overlay",
+            ui_command::CONFIG_SHOW_SIZE_OVERLAY,
             110,
             24.0,
             336.0,
@@ -728,7 +728,7 @@ fn default_settings_screen() -> UiScreen {
         create_button_object(
             "btn_settings_save",
             "設定保存",
-            "config.save",
+            ui_command::CONFIG_SAVE,
             120,
             24.0,
             368.0,
@@ -738,7 +738,7 @@ fn default_settings_screen() -> UiScreen {
         create_button_object(
             "btn_settings_restart",
             "PowerShell再起動",
-            "config.restart_listener",
+            ui_command::CONFIG_RESTART_LISTENER,
             120,
             152.0,
             368.0,
@@ -748,7 +748,7 @@ fn default_settings_screen() -> UiScreen {
         create_button_object(
             "btn_settings_back",
             "閉じる",
-            "nav.back_main",
+            ui_command::NAV_BACK_MAIN,
             120,
             340.0,
             368.0,
@@ -758,7 +758,7 @@ fn default_settings_screen() -> UiScreen {
         create_checkbox_object(
             "chk_settings_ui_edit",
             "UI編集",
-            "ui.edit.toggle",
+            ui_command::UI_EDIT_TOGGLE,
             130,
             468.0,
             368.0,
@@ -1820,19 +1820,19 @@ impl CodexShellApp {
 
     fn is_bind_command_enabled(&self, command: &str) -> bool {
         match command.trim() {
-            "mode.codex_start" => self.codex_runtime_state != CodexRuntimeState::Calculating,
-            "mode.project_debug_run" => self.active_project_declaration_path.is_some(),
+            ui_command::MODE_CODEX_START => self.codex_runtime_state != CodexRuntimeState::Calculating,
+            ui_command::MODE_PROJECT_DEBUG_RUN => self.active_project_declaration_path.is_some(),
             _ => true,
         }
     }
 
     fn runtime_checked_for_command(&self, command: &str) -> Option<bool> {
         match command.trim() {
-            "ui.edit.toggle" => Some(self.ui_edit_mode),
-            "reasoning.medium" => Some(self.selected_reasoning_effort == "medium"),
-            "reasoning.high" => Some(self.selected_reasoning_effort == "high"),
-            "reasoning.xhigh" => Some(self.selected_reasoning_effort == "xhigh"),
-            "config.show_size_overlay" => Some(self.config.show_size_overlay),
+            ui_command::UI_EDIT_TOGGLE => Some(self.ui_edit_mode),
+            ui_command::REASONING_MEDIUM => Some(self.selected_reasoning_effort == "medium"),
+            ui_command::REASONING_HIGH => Some(self.selected_reasoning_effort == "high"),
+            ui_command::REASONING_XHIGH => Some(self.selected_reasoning_effort == "xhigh"),
+            ui_command::CONFIG_SHOW_SIZE_OVERLAY => Some(self.config.show_size_overlay),
             _ => None,
         }
     }
@@ -1849,11 +1849,11 @@ impl CodexShellApp {
         };
         for object in objects {
             let desired = match object.bind.command.trim() {
-                "ui.edit.toggle" => Some(ui_edit_mode),
-                "reasoning.medium" => Some(selected_reasoning_effort == "medium"),
-                "reasoning.high" => Some(selected_reasoning_effort == "high"),
-                "reasoning.xhigh" => Some(selected_reasoning_effort == "xhigh"),
-                "config.show_size_overlay" => Some(self.config.show_size_overlay),
+                ui_command::UI_EDIT_TOGGLE => Some(ui_edit_mode),
+                ui_command::REASONING_MEDIUM => Some(selected_reasoning_effort == "medium"),
+                ui_command::REASONING_HIGH => Some(selected_reasoning_effort == "high"),
+                ui_command::REASONING_XHIGH => Some(selected_reasoning_effort == "xhigh"),
+                ui_command::CONFIG_SHOW_SIZE_OVERLAY => Some(self.config.show_size_overlay),
                 _ => None,
             };
             if let Some(desired_checked) = desired && object.checked != desired_checked {
@@ -1879,16 +1879,16 @@ impl CodexShellApp {
 
     fn resolve_object_text(&self, object: &UiObject) -> String {
         match object.bind.command.trim() {
-            "status.message" => format!("状態: {}", self.status_message),
-            "codex.state" => format!("Codex状態: {}", self.codex_runtime_state.label()),
-            PROJECT_TARGET_LABEL_COMMAND => self
+            ui_command::STATUS_MESSAGE => format!("状態: {}", self.status_message),
+            ui_command::CODEX_STATE => format!("Codex状態: {}", self.codex_runtime_state.label()),
+            ui_command::PROJECT_TARGET_STATE => self
                 .active_project_declaration_path
                 .as_ref()
                 .map(|path| project_name_from_declaration_path(path))
                 .filter(|name| !name.trim().is_empty())
                 .unwrap_or_else(|| "プロジェクト無し".to_string()),
-            "ui.edit.locked_hint" => "編集モード中のため操作は無効".to_string(),
-            "input.voice_toggle" => {
+            ui_command::UI_EDIT_LOCKED_HINT => "編集モード中のため操作は無効".to_string(),
+            ui_command::INPUT_VOICE_TOGGLE => {
                 if self.voice_input_active {
                     "読み取り中".to_string()
                 } else if object.visual.text.value.trim().is_empty() {
@@ -1913,7 +1913,7 @@ impl CodexShellApp {
 
     fn resolve_label_color(&self, object: &UiObject) -> Color32 {
         match object.bind.command.trim() {
-            PROJECT_TARGET_LABEL_COMMAND if self.active_project_declaration_path.is_some() => {
+            ui_command::PROJECT_TARGET_STATE if self.active_project_declaration_path.is_some() => {
                 Color32::from_rgb(255, 140, 0)
             }
             _ => Color32::BLACK,
@@ -1925,17 +1925,23 @@ impl CodexShellApp {
             return false;
         }
         match object.bind.command.trim() {
-            "ui.edit.locked_hint" => self.ui_edit_mode,
+            ui_command::UI_EDIT_LOCKED_HINT => self.ui_edit_mode,
             _ => true,
         }
     }
 
     fn dispatch_ui_command(&mut self, command: &str) {
-        match command.trim() {
+        let command = command.trim();
+        #[cfg(debug_assertions)]
+        if !command.is_empty() && !ui_command::is_known_ui_command(command) {
+            self.push_history(format!("未知UIコマンドを検出しました: {command}"));
+        }
+
+        match command {
             "" => {}
-            "mode.codex_start" => self.send_codex_command(),
-            "mode.stop" => self.request_interrupt(),
-            "mode.build" => {
+            ui_command::MODE_CODEX_START => self.send_codex_command(),
+            ui_command::MODE_STOP => self.request_interrupt(),
+            ui_command::MODE_BUILD => {
                 if self.input_command.trim().is_empty() {
                     self.cancel_build_when_empty();
                     return;
@@ -1944,34 +1950,34 @@ impl CodexShellApp {
                 self.update_status("ビルド確認待ち");
                 self.push_history("ビルド確認ダイアログを表示しました");
             }
-            "mode.project_debug_run" => self.launch_active_project_debug_executable(),
-            "input.send" => self.send_input_command_by_button(),
-            "input.voice_toggle" => self.toggle_voice_input(),
-            "ui.settings" => {
+            ui_command::MODE_PROJECT_DEBUG_RUN => self.launch_active_project_debug_executable(),
+            ui_command::INPUT_SEND => self.send_input_command_by_button(),
+            ui_command::INPUT_VOICE_TOGGLE => self.toggle_voice_input(),
+            ui_command::UI_SETTINGS => {
                 self.ui_current_screen_id = UI_SETTINGS_SCREEN_ID.to_string();
                 if !self.ui_edit_mode {
                     self.ui_selected_screen_id = self.ui_current_screen_id.clone();
                 }
             }
-            "nav.back_main" => {
+            ui_command::NAV_BACK_MAIN => {
                 self.ui_current_screen_id = UI_MAIN_SCREEN_ID.to_string();
                 if !self.ui_edit_mode {
                     self.ui_selected_screen_id = self.ui_current_screen_id.clone();
                 }
             }
-            "config.save" => self.save_config(),
-            "config.restart_listener" => {
+            ui_command::CONFIG_SAVE => self.save_config(),
+            ui_command::CONFIG_RESTART_LISTENER => {
                 self.save_config();
                 self.start_listener();
             }
-            "config.startup_exe_1.browse" => self.browse_startup_executable(1),
-            "config.startup_exe_2.browse" => self.browse_startup_executable(2),
-            "config.startup_exe_3.browse" => self.browse_startup_executable(3),
-            "config.startup_exe_4.browse" => self.browse_startup_executable(4),
-            "reasoning.medium" => self.selected_reasoning_effort = "medium".to_string(),
-            "reasoning.high" => self.selected_reasoning_effort = "high".to_string(),
-            "reasoning.xhigh" => self.selected_reasoning_effort = "xhigh".to_string(),
-            "ui.edit.toggle" => {
+            ui_command::CONFIG_STARTUP_EXE_1_BROWSE => self.browse_startup_executable(1),
+            ui_command::CONFIG_STARTUP_EXE_2_BROWSE => self.browse_startup_executable(2),
+            ui_command::CONFIG_STARTUP_EXE_3_BROWSE => self.browse_startup_executable(3),
+            ui_command::CONFIG_STARTUP_EXE_4_BROWSE => self.browse_startup_executable(4),
+            ui_command::REASONING_MEDIUM => self.selected_reasoning_effort = "medium".to_string(),
+            ui_command::REASONING_HIGH => self.selected_reasoning_effort = "high".to_string(),
+            ui_command::REASONING_XHIGH => self.selected_reasoning_effort = "xhigh".to_string(),
+            ui_command::UI_EDIT_TOGGLE => {
                 self.ui_edit_mode = !self.ui_edit_mode;
                 self.update_status(if self.ui_edit_mode {
                     "UI編集モードを有効化しました"
@@ -2292,7 +2298,7 @@ impl CodexShellApp {
                     "input" => {
                         let enabled = controls_enabled && object.enabled;
                         match object_command.as_str() {
-                            "config.working_dir" => {
+                            ui_command::CONFIG_WORKING_DIR => {
                                 let response = ui.add_enabled_ui(enabled, |ui| {
                                     ui.add_sized(
                                         [object_size.x, object_size.y],
@@ -2303,7 +2309,7 @@ impl CodexShellApp {
                                     state_changed = true;
                                 }
                             }
-                            "config.build_command" => {
+                            ui_command::CONFIG_BUILD_COMMAND => {
                                 let response = ui.add_enabled_ui(enabled, |ui| {
                                     ui.add_sized(
                                         [object_size.x, object_size.y],
@@ -2314,7 +2320,7 @@ impl CodexShellApp {
                                     state_changed = true;
                                 }
                             }
-                            "config.codex_command" => {
+                            ui_command::CONFIG_CODEX_COMMAND => {
                                 let response = ui.add_enabled_ui(enabled, |ui| {
                                     ui.add_sized(
                                         [object_size.x, object_size.y],
@@ -2325,7 +2331,7 @@ impl CodexShellApp {
                                     state_changed = true;
                                 }
                             }
-                            "config.pipe_name" => {
+                            ui_command::CONFIG_PIPE_NAME => {
                                 let response = ui.add_enabled_ui(enabled, |ui| {
                                     ui.add_sized(
                                         [object_size.x, object_size.y],
@@ -2336,7 +2342,7 @@ impl CodexShellApp {
                                     state_changed = true;
                                 }
                             }
-                            "config.input_prefix" => {
+                            ui_command::CONFIG_INPUT_PREFIX => {
                                 let response = ui.add_enabled_ui(enabled, |ui| {
                                     ui.add_sized(
                                         [object_size.x, object_size.y],
@@ -2347,7 +2353,7 @@ impl CodexShellApp {
                                     state_changed = true;
                                 }
                             }
-                            "config.startup_exe_1" => {
+                            ui_command::CONFIG_STARTUP_EXE_1 => {
                                 let response = ui.add_enabled_ui(enabled, |ui| {
                                     ui.add_sized(
                                         [object_size.x, object_size.y],
@@ -2358,7 +2364,7 @@ impl CodexShellApp {
                                     state_changed = true;
                                 }
                             }
-                            "config.startup_exe_2" => {
+                            ui_command::CONFIG_STARTUP_EXE_2 => {
                                 let response = ui.add_enabled_ui(enabled, |ui| {
                                     ui.add_sized(
                                         [object_size.x, object_size.y],
@@ -2369,7 +2375,7 @@ impl CodexShellApp {
                                     state_changed = true;
                                 }
                             }
-                            "config.startup_exe_3" => {
+                            ui_command::CONFIG_STARTUP_EXE_3 => {
                                 let response = ui.add_enabled_ui(enabled, |ui| {
                                     ui.add_sized(
                                         [object_size.x, object_size.y],
@@ -2380,7 +2386,7 @@ impl CodexShellApp {
                                     state_changed = true;
                                 }
                             }
-                            "config.startup_exe_4" => {
+                            ui_command::CONFIG_STARTUP_EXE_4 => {
                                 let response = ui.add_enabled_ui(enabled, |ui| {
                                     ui.add_sized(
                                         [object_size.x, object_size.y],
@@ -2610,7 +2616,7 @@ impl CodexShellApp {
                 if target.checked != next_checked {
                     target.checked = next_checked;
                     state_changed = true;
-                    if object_command == "config.show_size_overlay" {
+                    if object_command == ui_command::CONFIG_SHOW_SIZE_OVERLAY {
                         self.config.show_size_overlay = next_checked;
                     } else if !object_command.is_empty() {
                         clicked_commands.push(object_command.clone());
