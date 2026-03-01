@@ -1168,6 +1168,17 @@ struct CodexShellApp {
     project_selector_open: bool,
 }
 
+struct RenderObjCtx<'a> {
+    ui: &'a mut egui::Ui,
+    object: &'a UiObject,
+    object_id: &'a str,
+    object_type: &'a str,
+    object_command: &'a str,
+    object_size: egui::Vec2,
+    text_font: &'a egui::FontId,
+    controls_enabled: bool,
+}
+
 impl CodexShellApp {
     fn try_new(cc: &eframe::CreationContext<'_>) -> Result<Self> {
         let (loaded_font, ui_font_names) = apply_required_font(&cc.egui_ctx)
@@ -2239,13 +2250,8 @@ impl CodexShellApp {
         }
     }
 
-    fn render_obj_container_or_group(
-        &self,
-        ui: &mut egui::Ui,
-        object: &UiObject,
-        object_size: egui::Vec2,
-    ) {
-        let fill = if object.visual.background.image.trim().is_empty() {
+    fn render_obj_container_or_group(&self, ctx: &mut RenderObjCtx<'_>) {
+        let fill = if ctx.object.visual.background.image.trim().is_empty() {
             Color32::from_gray(250)
         } else {
             Color32::from_gray(242)
@@ -2254,35 +2260,29 @@ impl CodexShellApp {
             .fill(fill)
             .stroke(egui::Stroke::new(1.0, Color32::BLACK))
             .inner_margin(egui::Margin::same(4))
-            .show(ui, |ui| {
-                ui.set_min_size(object_size);
+            .show(ctx.ui, |ui| {
+                ui.set_min_size(ctx.object_size);
             });
     }
 
-    fn render_obj_label(
-        &self,
-        ui: &mut egui::Ui,
-        object: &UiObject,
-        object_size: egui::Vec2,
-        text_font: &egui::FontId,
-    ) {
-        let text = self.resolve_object_text(object);
-        let main_align = match object.visual.text.align.trim() {
+    fn render_obj_label(&self, ctx: &mut RenderObjCtx<'_>) {
+        let text = self.resolve_object_text(ctx.object);
+        let main_align = match ctx.object.visual.text.align.trim() {
             "left" => egui::Align::Min,
             "right" => egui::Align::Max,
             _ => egui::Align::Center,
         };
         let mut rich = RichText::new(text)
-            .font(text_font.clone())
-            .color(self.resolve_label_color(object));
-        if object.visual.text.bold {
+            .font(ctx.text_font.clone())
+            .color(self.resolve_label_color(ctx.object));
+        if ctx.object.visual.text.bold {
             rich = rich.strong();
         }
-        if object.visual.text.italic {
+        if ctx.object.visual.text.italic {
             rich = rich.italics();
         }
-        ui.allocate_ui_with_layout(
-            object_size,
+        ctx.ui.allocate_ui_with_layout(
+            ctx.object_size,
             egui::Layout::left_to_right(egui::Align::Center).with_main_align(main_align),
             |ui| {
                 ui.add(egui::Label::new(rich).selectable(false).sense(egui::Sense::hover()));
@@ -2290,22 +2290,13 @@ impl CodexShellApp {
         );
     }
 
-    fn render_obj_input(
-        &mut self,
-        ui: &mut egui::Ui,
-        object: &UiObject,
-        object_id: &str,
-        object_command: &str,
-        object_size: egui::Vec2,
-        controls_enabled: bool,
-        state_changed: &mut bool,
-    ) {
-        let enabled = controls_enabled && object.enabled;
-        match object_command {
+    fn render_obj_input(&mut self, ctx: &mut RenderObjCtx<'_>, state_changed: &mut bool) {
+        let enabled = ctx.controls_enabled && ctx.object.enabled;
+        match ctx.object_command {
             ui_command::CONFIG_WORKING_DIR => {
-                let response = ui.add_enabled_ui(enabled, |ui| {
+                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
-                        [object_size.x, object_size.y],
+                        [ctx.object_size.x, ctx.object_size.y],
                         TextEdit::singleline(&mut self.config.working_dir),
                     )
                 });
@@ -2314,9 +2305,9 @@ impl CodexShellApp {
                 }
             }
             ui_command::CONFIG_BUILD_COMMAND => {
-                let response = ui.add_enabled_ui(enabled, |ui| {
+                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
-                        [object_size.x, object_size.y],
+                        [ctx.object_size.x, ctx.object_size.y],
                         TextEdit::singleline(&mut self.config.build_command),
                     )
                 });
@@ -2325,9 +2316,9 @@ impl CodexShellApp {
                 }
             }
             ui_command::CONFIG_CODEX_COMMAND => {
-                let response = ui.add_enabled_ui(enabled, |ui| {
+                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
-                        [object_size.x, object_size.y],
+                        [ctx.object_size.x, ctx.object_size.y],
                         TextEdit::singleline(&mut self.config.codex_command),
                     )
                 });
@@ -2336,9 +2327,9 @@ impl CodexShellApp {
                 }
             }
             ui_command::CONFIG_PIPE_NAME => {
-                let response = ui.add_enabled_ui(enabled, |ui| {
+                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
-                        [object_size.x, object_size.y],
+                        [ctx.object_size.x, ctx.object_size.y],
                         TextEdit::singleline(&mut self.config.pipe_name),
                     )
                 });
@@ -2347,9 +2338,9 @@ impl CodexShellApp {
                 }
             }
             ui_command::CONFIG_INPUT_PREFIX => {
-                let response = ui.add_enabled_ui(enabled, |ui| {
+                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
-                        [object_size.x, object_size.y],
+                        [ctx.object_size.x, ctx.object_size.y],
                         TextEdit::singleline(&mut self.config.input_prefix),
                     )
                 });
@@ -2358,9 +2349,9 @@ impl CodexShellApp {
                 }
             }
             ui_command::CONFIG_STARTUP_EXE_1 => {
-                let response = ui.add_enabled_ui(enabled, |ui| {
+                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
-                        [object_size.x, object_size.y],
+                        [ctx.object_size.x, ctx.object_size.y],
                         TextEdit::singleline(&mut self.config.startup_exe_1),
                     )
                 });
@@ -2369,9 +2360,9 @@ impl CodexShellApp {
                 }
             }
             ui_command::CONFIG_STARTUP_EXE_2 => {
-                let response = ui.add_enabled_ui(enabled, |ui| {
+                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
-                        [object_size.x, object_size.y],
+                        [ctx.object_size.x, ctx.object_size.y],
                         TextEdit::singleline(&mut self.config.startup_exe_2),
                     )
                 });
@@ -2380,9 +2371,9 @@ impl CodexShellApp {
                 }
             }
             ui_command::CONFIG_STARTUP_EXE_3 => {
-                let response = ui.add_enabled_ui(enabled, |ui| {
+                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
-                        [object_size.x, object_size.y],
+                        [ctx.object_size.x, ctx.object_size.y],
                         TextEdit::singleline(&mut self.config.startup_exe_3),
                     )
                 });
@@ -2391,9 +2382,9 @@ impl CodexShellApp {
                 }
             }
             ui_command::CONFIG_STARTUP_EXE_4 => {
-                let response = ui.add_enabled_ui(enabled, |ui| {
+                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
-                        [object_size.x, object_size.y],
+                        [ctx.object_size.x, ctx.object_size.y],
                         TextEdit::singleline(&mut self.config.startup_exe_4),
                     )
                 });
@@ -2403,17 +2394,17 @@ impl CodexShellApp {
             }
             _ => {
                 let input_font_id = egui::FontId::monospace(INPUT_FONT_SIZE);
-                let row_height = ui.fonts_mut(|fonts| fonts.row_height(&input_font_id));
-                let desired_rows = ((object_size.y - FIXED_INPUT_HEIGHT_PADDING).max(row_height)
+                let row_height = ctx.ui.fonts_mut(|fonts| fonts.row_height(&input_font_id));
+                let desired_rows = ((ctx.object_size.y - FIXED_INPUT_HEIGHT_PADDING).max(row_height)
                     / row_height)
                     .floor()
                     .max(1.0) as usize;
-                let frame_stroke = if object_id == "input_command" {
+                let frame_stroke = if ctx.object_id == "input_command" {
                     egui::Stroke::NONE
                 } else {
                     egui::Stroke::new(1.0, Color32::BLACK)
                 };
-                let frame_fill = if object_id == "input_command" {
+                let frame_fill = if ctx.object_id == "input_command" {
                     Color32::from_gray(242)
                 } else {
                     Color32::WHITE
@@ -2422,8 +2413,8 @@ impl CodexShellApp {
                     .fill(frame_fill)
                     .stroke(frame_stroke)
                     .inner_margin(egui::Margin::same(4))
-                    .show(ui, |ui| {
-                        let input_line_count = if object_id == "input_command" {
+                    .show(ctx.ui, |ui| {
+                        let input_line_count = if ctx.object_id == "input_command" {
                             self.input_command.chars().filter(|ch| *ch == '\n').count() + 1
                         } else {
                             1
@@ -2434,7 +2425,7 @@ impl CodexShellApp {
                             .interactive(enabled)
                             .desired_width(f32::INFINITY)
                             .desired_rows(desired_rows);
-                        if object_id == "input_command" {
+                        if ctx.object_id == "input_command" {
                             let ime_commit_this_frame = ui.input(|input| {
                                 input.events.iter().any(|event| {
                                     matches!(event, egui::Event::Ime(egui::ImeEvent::Commit(_)))
@@ -2449,7 +2440,7 @@ impl CodexShellApp {
                                 ))
                             };
                             editor = editor.frame(false).return_key(input_return_key);
-                            let visible_height = (object_size.y - 8.0).max(1.0);
+                            let visible_height = (ctx.object_size.y - 8.0).max(1.0);
                             let editor_height = ((input_line_count.max(desired_rows) as f32)
                                 * row_height
                                 + FIXED_INPUT_HEIGHT_PADDING)
@@ -2460,7 +2451,7 @@ impl CodexShellApp {
                                 .max_height(visible_height)
                                 .show(ui, |ui| {
                                     ui.add_sized(
-                                        [(object_size.x - 8.0).max(1.0), editor_height],
+                                        [(ctx.object_size.x - 8.0).max(1.0), editor_height],
                                         editor,
                                     )
                                 })
@@ -2468,8 +2459,8 @@ impl CodexShellApp {
                         }
                         ui.add_sized(
                             [
-                                (object_size.x - 8.0).max(1.0),
-                                (object_size.y - 8.0).max(1.0),
+                                (ctx.object_size.x - 8.0).max(1.0),
+                                (ctx.object_size.y - 8.0).max(1.0),
                             ],
                             editor,
                         )
@@ -2483,13 +2474,8 @@ impl CodexShellApp {
         }
     }
 
-    fn render_obj_image(
-        &self,
-        ui: &mut egui::Ui,
-        object: &UiObject,
-        object_size: egui::Vec2,
-    ) {
-        let image_key = object.visual.background.image.trim();
+    fn render_obj_image(&self, ctx: &mut RenderObjCtx<'_>) {
+        let image_key = ctx.object.visual.background.image.trim();
         let text = if image_key.is_empty() {
             "image".to_string()
         } else {
@@ -2499,36 +2485,30 @@ impl CodexShellApp {
             .fill(Color32::from_gray(245))
             .stroke(egui::Stroke::new(1.0, Color32::BLACK))
             .inner_margin(egui::Margin::same(4))
-            .show(ui, |ui| {
-                ui.set_min_size(object_size);
+            .show(ctx.ui, |ui| {
+                ui.set_min_size(ctx.object_size);
                 ui.label(RichText::new(text).color(Color32::BLACK));
             });
     }
 
-    fn render_obj_checkbox(
-        &self,
-        ui: &mut egui::Ui,
-        object: &UiObject,
-        object_command: &str,
-        object_size: egui::Vec2,
-        text_font: &egui::FontId,
-        controls_enabled: bool,
-    ) -> Option<bool> {
-        let text = self.resolve_object_text(object);
-        let enabled = controls_enabled && object.enabled && self.is_bind_command_enabled(object_command);
+    fn render_obj_checkbox(&self, ctx: &mut RenderObjCtx<'_>) -> Option<bool> {
+        let text = self.resolve_object_text(ctx.object);
+        let enabled = ctx.controls_enabled
+            && ctx.object.enabled
+            && self.is_bind_command_enabled(ctx.object_command);
         let mut checked = self
-            .runtime_checked_for_command(object_command)
-            .unwrap_or(object.checked);
-        let mut rich = RichText::new(text).font(text_font.clone());
-        if object.visual.text.bold {
+            .runtime_checked_for_command(ctx.object_command)
+            .unwrap_or(ctx.object.checked);
+        let mut rich = RichText::new(text).font(ctx.text_font.clone());
+        if ctx.object.visual.text.bold {
             rich = rich.strong();
         }
-        if object.visual.text.italic {
+        if ctx.object.visual.text.italic {
             rich = rich.italics();
         }
-        let response = ui.add_enabled_ui(enabled, |ui| {
+        let response = ctx.ui.add_enabled_ui(enabled, |ui| {
             ui.add_sized(
-                [object_size.x, object_size.y],
+                [ctx.object_size.x, ctx.object_size.y],
                 egui::Checkbox::new(&mut checked, rich),
             )
         });
@@ -2539,117 +2519,69 @@ impl CodexShellApp {
         }
     }
 
-    fn render_obj_radio(
-        &self,
-        ui: &mut egui::Ui,
-        object: &UiObject,
-        object_command: &str,
-        object_size: egui::Vec2,
-        text_font: &egui::FontId,
-        controls_enabled: bool,
-    ) -> bool {
-        let text = self.resolve_object_text(object);
-        let enabled = controls_enabled && object.enabled && self.is_bind_command_enabled(object_command);
+    fn render_obj_radio(&self, ctx: &mut RenderObjCtx<'_>) -> bool {
+        let text = self.resolve_object_text(ctx.object);
+        let enabled = ctx.controls_enabled
+            && ctx.object.enabled
+            && self.is_bind_command_enabled(ctx.object_command);
         let checked = self
-            .runtime_checked_for_command(object_command)
-            .unwrap_or(object.checked);
-        let mut rich = RichText::new(text).font(text_font.clone());
-        if object.visual.text.bold {
+            .runtime_checked_for_command(ctx.object_command)
+            .unwrap_or(ctx.object.checked);
+        let mut rich = RichText::new(text).font(ctx.text_font.clone());
+        if ctx.object.visual.text.bold {
             rich = rich.strong();
         }
-        if object.visual.text.italic {
+        if ctx.object.visual.text.italic {
             rich = rich.italics();
         }
-        let response = ui.add_enabled_ui(enabled, |ui| {
+        let response = ctx.ui.add_enabled_ui(enabled, |ui| {
             ui.add_sized(
-                [object_size.x, object_size.y],
+                [ctx.object_size.x, ctx.object_size.y],
                 egui::RadioButton::new(checked, rich),
             )
         });
         response.inner.clicked() && !checked
     }
 
-    fn render_obj_button(
-        &self,
-        ui: &mut egui::Ui,
-        object: &UiObject,
-        object_command: &str,
-        object_size: egui::Vec2,
-        text_font: &egui::FontId,
-        controls_enabled: bool,
-    ) -> bool {
-        let text = self.resolve_object_text(object);
-        let enabled = controls_enabled && object.enabled && self.is_bind_command_enabled(object_command);
-        let mut rich = RichText::new(text).font(text_font.clone());
-        if object.visual.text.bold {
+    fn render_obj_button(&self, ctx: &mut RenderObjCtx<'_>) -> bool {
+        let text = self.resolve_object_text(ctx.object);
+        let enabled = ctx.controls_enabled
+            && ctx.object.enabled
+            && self.is_bind_command_enabled(ctx.object_command);
+        let mut rich = RichText::new(text).font(ctx.text_font.clone());
+        if ctx.object.visual.text.bold {
             rich = rich.strong();
         }
-        if object.visual.text.italic {
+        if ctx.object.visual.text.italic {
             rich = rich.italics();
         }
-        let response = ui.add_enabled_ui(enabled, |ui| {
-            ui.add_sized([object_size.x, object_size.y], egui::Button::new(rich))
+        let response = ctx.ui.add_enabled_ui(enabled, |ui| {
+            ui.add_sized([ctx.object_size.x, ctx.object_size.y], egui::Button::new(rich))
         });
         response.inner.clicked()
     }
 
     fn render_obj_by_type(
         &mut self,
-        ui: &mut egui::Ui,
-        object: &UiObject,
-        object_id: &str,
-        object_type: &str,
-        object_command: &str,
-        object_size: egui::Vec2,
-        text_font: &egui::FontId,
-        controls_enabled: bool,
+        ctx: &mut RenderObjCtx<'_>,
         state_changed: &mut bool,
         clicked: &mut bool,
         checkbox_changed: &mut Option<bool>,
         radio_selected: &mut bool,
     ) {
-        match object_type {
-            "panel" => self.render_obj_container_or_group(ui, object, object_size),
-            "label" => self.render_obj_label(ui, object, object_size, text_font),
-            "input" => self.render_obj_input(
-                ui,
-                object,
-                object_id,
-                object_command,
-                object_size,
-                controls_enabled,
-                state_changed,
-            ),
-            "image" => self.render_obj_image(ui, object, object_size),
+        match ctx.object_type {
+            "panel" => self.render_obj_container_or_group(ctx),
+            "label" => self.render_obj_label(ctx),
+            "input" => self.render_obj_input(ctx, state_changed),
+            "image" => self.render_obj_image(ctx),
             "checkbox" => {
-                *checkbox_changed = self.render_obj_checkbox(
-                    ui,
-                    object,
-                    object_command,
-                    object_size,
-                    text_font,
-                    controls_enabled,
-                );
+                *checkbox_changed = self.render_obj_checkbox(ctx);
             }
             "radio" | "radio_button" => {
-                *radio_selected = self.render_obj_radio(
-                    ui,
-                    object,
-                    object_command,
-                    object_size,
-                    text_font,
-                    controls_enabled,
-                );
+                *radio_selected = self.render_obj_radio(ctx);
             }
             _ => {
-                *clicked = self.render_obj_button(
-                    ui,
-                    object,
-                    object_command,
-                    object_size,
-                    text_font,
-                    controls_enabled,
-                );
+                *clicked = self.render_obj_button(ctx);
             }
         }
     }
@@ -2724,15 +2656,18 @@ impl CodexShellApp {
                     egui::Sense::hover()
                 })
                 .show(ctx, |ui| {
-                    self.render_obj_by_type(
+                    let mut render_ctx = RenderObjCtx {
                         ui,
-                        &object,
-                        object_id.as_str(),
-                        object_type.as_str(),
-                        object_command.as_str(),
+                        object: &object,
+                        object_id: object_id.as_str(),
+                        object_type: object_type.as_str(),
+                        object_command: object_command.as_str(),
                         object_size,
-                        &text_font,
+                        text_font: &text_font,
                         controls_enabled,
+                    };
+                    self.render_obj_by_type(
+                        &mut render_ctx,
                         &mut state_changed,
                         &mut clicked,
                         &mut checkbox_changed,
