@@ -2421,7 +2421,25 @@ impl CodexShellApp {
                                             .desired_width(f32::INFINITY)
                                             .desired_rows(desired_rows);
                                         if object_id == "input_command" {
-                                            editor = editor.frame(false);
+                                            let ime_commit_this_frame = ui.input(|input| {
+                                                input.events.iter().any(|event| {
+                                                    matches!(
+                                                        event,
+                                                        egui::Event::Ime(egui::ImeEvent::Commit(_))
+                                                    )
+                                                })
+                                            });
+                                            let input_return_key = if ime_commit_this_frame {
+                                                None
+                                            } else {
+                                                Some(egui::KeyboardShortcut::new(
+                                                    egui::Modifiers::NONE,
+                                                    egui::Key::Enter,
+                                                ))
+                                            };
+                                            editor = editor
+                                                .frame(false)
+                                                .return_key(input_return_key);
                                         }
                                         ui.add_sized(
                                             [
