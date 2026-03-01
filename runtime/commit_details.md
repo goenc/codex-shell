@@ -10,3 +10,15 @@ code_changes: 文字列定義の集中管理と参照置換のみを行いロジ
 ・cargo build が成功しました
 ・デバッグ実行ファイル起動後に named pipe へ最低1件の送信が成功しました
 verification: デバッグビルド成功と最小動作確認成功を確認しました
+日時: 2026-03-01 23:17:39 JST
+対象: codex-shell main.rs
+summary: 第2周リファクタとして3コミットでdispatchの分岐責務整理とruntime UI描画のobject_type分割を段階実行しました
+変更:
+・コミット1でdispatch_ui_commandの分岐をui_command定数参照へ統一し既存ログ方針で未知コマンド事前ログを維持しました
+・コミット2でrender_runtime_ui_objectsからpanel label input image checkbox radio buttonの描画処理を個別関数へ抽出しました
+・コミット3でdispatch_ui_commandの各分岐処理をhandle系関数へ抽出しmatch本体を薄くしました
+code_changes: 文字列値とプロトコルとui.jsonスキーマを変更せず関数抽出と参照置換のみを実施しました
+確認:
+・各コミット時点でcargo build成功を確認しました
+・各コミット後にデバッグ実行ファイルの起動とnamed pipe送信1件成功を確認しました
+verification: 3コミットすべてでビルド成功と最小動作確認成功を確認しました
