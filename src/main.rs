@@ -2195,6 +2195,360 @@ impl CodexShellApp {
         }
     }
 
+    fn render_runtime_object_panel(
+        &self,
+        ui: &mut egui::Ui,
+        object: &UiObject,
+        object_size: egui::Vec2,
+    ) {
+        let fill = if object.visual.background.image.trim().is_empty() {
+            Color32::from_gray(250)
+        } else {
+            Color32::from_gray(242)
+        };
+        egui::Frame::default()
+            .fill(fill)
+            .stroke(egui::Stroke::new(1.0, Color32::BLACK))
+            .inner_margin(egui::Margin::same(4))
+            .show(ui, |ui| {
+                ui.set_min_size(object_size);
+            });
+    }
+
+    fn render_runtime_object_label(
+        &self,
+        ui: &mut egui::Ui,
+        object: &UiObject,
+        object_size: egui::Vec2,
+        text_font: &egui::FontId,
+    ) {
+        let text = self.resolve_object_text(object);
+        let main_align = match object.visual.text.align.trim() {
+            "left" => egui::Align::Min,
+            "right" => egui::Align::Max,
+            _ => egui::Align::Center,
+        };
+        let mut rich = RichText::new(text)
+            .font(text_font.clone())
+            .color(self.resolve_label_color(object));
+        if object.visual.text.bold {
+            rich = rich.strong();
+        }
+        if object.visual.text.italic {
+            rich = rich.italics();
+        }
+        ui.allocate_ui_with_layout(
+            object_size,
+            egui::Layout::left_to_right(egui::Align::Center).with_main_align(main_align),
+            |ui| {
+                ui.add(egui::Label::new(rich).selectable(false).sense(egui::Sense::hover()));
+            },
+        );
+    }
+
+    fn render_runtime_object_input(
+        &mut self,
+        ui: &mut egui::Ui,
+        object: &UiObject,
+        object_id: &str,
+        object_command: &str,
+        object_size: egui::Vec2,
+        controls_enabled: bool,
+        state_changed: &mut bool,
+    ) {
+        let enabled = controls_enabled && object.enabled;
+        match object_command {
+            ui_command::CONFIG_WORKING_DIR => {
+                let response = ui.add_enabled_ui(enabled, |ui| {
+                    ui.add_sized(
+                        [object_size.x, object_size.y],
+                        TextEdit::singleline(&mut self.config.working_dir),
+                    )
+                });
+                if response.inner.changed() {
+                    *state_changed = true;
+                }
+            }
+            ui_command::CONFIG_BUILD_COMMAND => {
+                let response = ui.add_enabled_ui(enabled, |ui| {
+                    ui.add_sized(
+                        [object_size.x, object_size.y],
+                        TextEdit::singleline(&mut self.config.build_command),
+                    )
+                });
+                if response.inner.changed() {
+                    *state_changed = true;
+                }
+            }
+            ui_command::CONFIG_CODEX_COMMAND => {
+                let response = ui.add_enabled_ui(enabled, |ui| {
+                    ui.add_sized(
+                        [object_size.x, object_size.y],
+                        TextEdit::singleline(&mut self.config.codex_command),
+                    )
+                });
+                if response.inner.changed() {
+                    *state_changed = true;
+                }
+            }
+            ui_command::CONFIG_PIPE_NAME => {
+                let response = ui.add_enabled_ui(enabled, |ui| {
+                    ui.add_sized(
+                        [object_size.x, object_size.y],
+                        TextEdit::singleline(&mut self.config.pipe_name),
+                    )
+                });
+                if response.inner.changed() {
+                    *state_changed = true;
+                }
+            }
+            ui_command::CONFIG_INPUT_PREFIX => {
+                let response = ui.add_enabled_ui(enabled, |ui| {
+                    ui.add_sized(
+                        [object_size.x, object_size.y],
+                        TextEdit::singleline(&mut self.config.input_prefix),
+                    )
+                });
+                if response.inner.changed() {
+                    *state_changed = true;
+                }
+            }
+            ui_command::CONFIG_STARTUP_EXE_1 => {
+                let response = ui.add_enabled_ui(enabled, |ui| {
+                    ui.add_sized(
+                        [object_size.x, object_size.y],
+                        TextEdit::singleline(&mut self.config.startup_exe_1),
+                    )
+                });
+                if response.inner.changed() {
+                    *state_changed = true;
+                }
+            }
+            ui_command::CONFIG_STARTUP_EXE_2 => {
+                let response = ui.add_enabled_ui(enabled, |ui| {
+                    ui.add_sized(
+                        [object_size.x, object_size.y],
+                        TextEdit::singleline(&mut self.config.startup_exe_2),
+                    )
+                });
+                if response.inner.changed() {
+                    *state_changed = true;
+                }
+            }
+            ui_command::CONFIG_STARTUP_EXE_3 => {
+                let response = ui.add_enabled_ui(enabled, |ui| {
+                    ui.add_sized(
+                        [object_size.x, object_size.y],
+                        TextEdit::singleline(&mut self.config.startup_exe_3),
+                    )
+                });
+                if response.inner.changed() {
+                    *state_changed = true;
+                }
+            }
+            ui_command::CONFIG_STARTUP_EXE_4 => {
+                let response = ui.add_enabled_ui(enabled, |ui| {
+                    ui.add_sized(
+                        [object_size.x, object_size.y],
+                        TextEdit::singleline(&mut self.config.startup_exe_4),
+                    )
+                });
+                if response.inner.changed() {
+                    *state_changed = true;
+                }
+            }
+            _ => {
+                let input_font_id = egui::FontId::monospace(INPUT_FONT_SIZE);
+                let row_height = ui.fonts_mut(|fonts| fonts.row_height(&input_font_id));
+                let desired_rows = ((object_size.y - FIXED_INPUT_HEIGHT_PADDING).max(row_height)
+                    / row_height)
+                    .floor()
+                    .max(1.0) as usize;
+                let frame_stroke = if object_id == "input_command" {
+                    egui::Stroke::NONE
+                } else {
+                    egui::Stroke::new(1.0, Color32::BLACK)
+                };
+                let frame_fill = if object_id == "input_command" {
+                    Color32::from_gray(242)
+                } else {
+                    Color32::WHITE
+                };
+                let input_response = egui::Frame::default()
+                    .fill(frame_fill)
+                    .stroke(frame_stroke)
+                    .inner_margin(egui::Margin::same(4))
+                    .show(ui, |ui| {
+                        let input_line_count = if object_id == "input_command" {
+                            self.input_command.chars().filter(|ch| *ch == '\n').count() + 1
+                        } else {
+                            1
+                        };
+                        let mut editor = TextEdit::multiline(&mut self.input_command)
+                            .id_source(INPUT_COMMAND_ID_SALT)
+                            .font(input_font_id)
+                            .interactive(enabled)
+                            .desired_width(f32::INFINITY)
+                            .desired_rows(desired_rows);
+                        if object_id == "input_command" {
+                            let ime_commit_this_frame = ui.input(|input| {
+                                input.events.iter().any(|event| {
+                                    matches!(event, egui::Event::Ime(egui::ImeEvent::Commit(_)))
+                                })
+                            });
+                            let input_return_key = if ime_commit_this_frame {
+                                None
+                            } else {
+                                Some(egui::KeyboardShortcut::new(
+                                    egui::Modifiers::NONE,
+                                    egui::Key::Enter,
+                                ))
+                            };
+                            editor = editor.frame(false).return_key(input_return_key);
+                            let visible_height = (object_size.y - 8.0).max(1.0);
+                            let editor_height = ((input_line_count.max(desired_rows) as f32)
+                                * row_height
+                                + FIXED_INPUT_HEIGHT_PADDING)
+                                .max(visible_height);
+                            return egui::ScrollArea::vertical()
+                                .id_salt("input_command_vertical_scroll")
+                                .auto_shrink([false, false])
+                                .max_height(visible_height)
+                                .show(ui, |ui| {
+                                    ui.add_sized(
+                                        [(object_size.x - 8.0).max(1.0), editor_height],
+                                        editor,
+                                    )
+                                })
+                                .inner;
+                        }
+                        ui.add_sized(
+                            [
+                                (object_size.x - 8.0).max(1.0),
+                                (object_size.y - 8.0).max(1.0),
+                            ],
+                            editor,
+                        )
+                    });
+                if enabled && self.pending_input_focus {
+                    input_response.inner.request_focus();
+                    self.pending_input_focus = false;
+                }
+                self.input_area_size = input_response.response.rect.size();
+            }
+        }
+    }
+
+    fn render_runtime_object_image(
+        &self,
+        ui: &mut egui::Ui,
+        object: &UiObject,
+        object_size: egui::Vec2,
+    ) {
+        let image_key = object.visual.background.image.trim();
+        let text = if image_key.is_empty() {
+            "image".to_string()
+        } else {
+            format!("image: {image_key}")
+        };
+        egui::Frame::default()
+            .fill(Color32::from_gray(245))
+            .stroke(egui::Stroke::new(1.0, Color32::BLACK))
+            .inner_margin(egui::Margin::same(4))
+            .show(ui, |ui| {
+                ui.set_min_size(object_size);
+                ui.label(RichText::new(text).color(Color32::BLACK));
+            });
+    }
+
+    fn render_runtime_object_checkbox(
+        &self,
+        ui: &mut egui::Ui,
+        object: &UiObject,
+        object_command: &str,
+        object_size: egui::Vec2,
+        text_font: &egui::FontId,
+        controls_enabled: bool,
+    ) -> Option<bool> {
+        let text = self.resolve_object_text(object);
+        let enabled = controls_enabled && object.enabled && self.is_bind_command_enabled(object_command);
+        let mut checked = self
+            .runtime_checked_for_command(object_command)
+            .unwrap_or(object.checked);
+        let mut rich = RichText::new(text).font(text_font.clone());
+        if object.visual.text.bold {
+            rich = rich.strong();
+        }
+        if object.visual.text.italic {
+            rich = rich.italics();
+        }
+        let response = ui.add_enabled_ui(enabled, |ui| {
+            ui.add_sized(
+                [object_size.x, object_size.y],
+                egui::Checkbox::new(&mut checked, rich),
+            )
+        });
+        if response.inner.changed() {
+            Some(checked)
+        } else {
+            None
+        }
+    }
+
+    fn render_runtime_object_radio(
+        &self,
+        ui: &mut egui::Ui,
+        object: &UiObject,
+        object_command: &str,
+        object_size: egui::Vec2,
+        text_font: &egui::FontId,
+        controls_enabled: bool,
+    ) -> bool {
+        let text = self.resolve_object_text(object);
+        let enabled = controls_enabled && object.enabled && self.is_bind_command_enabled(object_command);
+        let checked = self
+            .runtime_checked_for_command(object_command)
+            .unwrap_or(object.checked);
+        let mut rich = RichText::new(text).font(text_font.clone());
+        if object.visual.text.bold {
+            rich = rich.strong();
+        }
+        if object.visual.text.italic {
+            rich = rich.italics();
+        }
+        let response = ui.add_enabled_ui(enabled, |ui| {
+            ui.add_sized(
+                [object_size.x, object_size.y],
+                egui::RadioButton::new(checked, rich),
+            )
+        });
+        response.inner.clicked() && !checked
+    }
+
+    fn render_runtime_object_button(
+        &self,
+        ui: &mut egui::Ui,
+        object: &UiObject,
+        object_command: &str,
+        object_size: egui::Vec2,
+        text_font: &egui::FontId,
+        controls_enabled: bool,
+    ) -> bool {
+        let text = self.resolve_object_text(object);
+        let enabled = controls_enabled && object.enabled && self.is_bind_command_enabled(object_command);
+        let mut rich = RichText::new(text).font(text_font.clone());
+        if object.visual.text.bold {
+            rich = rich.strong();
+        }
+        if object.visual.text.italic {
+            rich = rich.italics();
+        }
+        let response = ui.add_enabled_ui(enabled, |ui| {
+            ui.add_sized([object_size.x, object_size.y], egui::Button::new(rich))
+        });
+        response.inner.clicked()
+    }
+
     fn render_runtime_ui_objects(&mut self, ctx: &egui::Context) {
         let mut clicked_commands = Vec::new();
         let mut position_changed = false;
@@ -2265,314 +2619,47 @@ impl CodexShellApp {
                     egui::Sense::hover()
                 })
                 .show(ctx, |ui| match object_type.as_str() {
-                    "panel" => {
-                        let fill = if object.visual.background.image.trim().is_empty() {
-                            Color32::from_gray(250)
-                        } else {
-                            Color32::from_gray(242)
-                        };
-                        egui::Frame::default()
-                            .fill(fill)
-                            .stroke(egui::Stroke::new(1.0, Color32::BLACK))
-                            .inner_margin(egui::Margin::same(4))
-                            .show(ui, |ui| {
-                                ui.set_min_size(object_size);
-                            });
-                    }
-                    "label" => {
-                        let text = self.resolve_object_text(&object);
-                        let main_align = match object.visual.text.align.trim() {
-                            "left" => egui::Align::Min,
-                            "right" => egui::Align::Max,
-                            _ => egui::Align::Center,
-                        };
-                        let mut rich = RichText::new(text)
-                            .font(text_font.clone())
-                            .color(self.resolve_label_color(&object));
-                        if object.visual.text.bold {
-                            rich = rich.strong();
-                        }
-                        if object.visual.text.italic {
-                            rich = rich.italics();
-                        }
-                        ui.allocate_ui_with_layout(
+                    "panel" => self.render_runtime_object_panel(ui, &object, object_size),
+                    "label" => self.render_runtime_object_label(ui, &object, object_size, &text_font),
+                    "input" => self.render_runtime_object_input(
+                        ui,
+                        &object,
+                        object_id.as_str(),
+                        object_command.as_str(),
+                        object_size,
+                        controls_enabled,
+                        &mut state_changed,
+                    ),
+                    "image" => self.render_runtime_object_image(ui, &object, object_size),
+                    "checkbox" => {
+                        checkbox_changed = self.render_runtime_object_checkbox(
+                            ui,
+                            &object,
+                            object_command.as_str(),
                             object_size,
-                            egui::Layout::left_to_right(egui::Align::Center).with_main_align(main_align),
-                            |ui| {
-                                ui.add(egui::Label::new(rich).selectable(false).sense(egui::Sense::hover()));
-                            },
+                            &text_font,
+                            controls_enabled,
                         );
                     }
-                    "input" => {
-                        let enabled = controls_enabled && object.enabled;
-                        match object_command.as_str() {
-                            ui_command::CONFIG_WORKING_DIR => {
-                                let response = ui.add_enabled_ui(enabled, |ui| {
-                                    ui.add_sized(
-                                        [object_size.x, object_size.y],
-                                        TextEdit::singleline(&mut self.config.working_dir),
-                                    )
-                                });
-                                if response.inner.changed() {
-                                    state_changed = true;
-                                }
-                            }
-                            ui_command::CONFIG_BUILD_COMMAND => {
-                                let response = ui.add_enabled_ui(enabled, |ui| {
-                                    ui.add_sized(
-                                        [object_size.x, object_size.y],
-                                        TextEdit::singleline(&mut self.config.build_command),
-                                    )
-                                });
-                                if response.inner.changed() {
-                                    state_changed = true;
-                                }
-                            }
-                            ui_command::CONFIG_CODEX_COMMAND => {
-                                let response = ui.add_enabled_ui(enabled, |ui| {
-                                    ui.add_sized(
-                                        [object_size.x, object_size.y],
-                                        TextEdit::singleline(&mut self.config.codex_command),
-                                    )
-                                });
-                                if response.inner.changed() {
-                                    state_changed = true;
-                                }
-                            }
-                            ui_command::CONFIG_PIPE_NAME => {
-                                let response = ui.add_enabled_ui(enabled, |ui| {
-                                    ui.add_sized(
-                                        [object_size.x, object_size.y],
-                                        TextEdit::singleline(&mut self.config.pipe_name),
-                                    )
-                                });
-                                if response.inner.changed() {
-                                    state_changed = true;
-                                }
-                            }
-                            ui_command::CONFIG_INPUT_PREFIX => {
-                                let response = ui.add_enabled_ui(enabled, |ui| {
-                                    ui.add_sized(
-                                        [object_size.x, object_size.y],
-                                        TextEdit::singleline(&mut self.config.input_prefix),
-                                    )
-                                });
-                                if response.inner.changed() {
-                                    state_changed = true;
-                                }
-                            }
-                            ui_command::CONFIG_STARTUP_EXE_1 => {
-                                let response = ui.add_enabled_ui(enabled, |ui| {
-                                    ui.add_sized(
-                                        [object_size.x, object_size.y],
-                                        TextEdit::singleline(&mut self.config.startup_exe_1),
-                                    )
-                                });
-                                if response.inner.changed() {
-                                    state_changed = true;
-                                }
-                            }
-                            ui_command::CONFIG_STARTUP_EXE_2 => {
-                                let response = ui.add_enabled_ui(enabled, |ui| {
-                                    ui.add_sized(
-                                        [object_size.x, object_size.y],
-                                        TextEdit::singleline(&mut self.config.startup_exe_2),
-                                    )
-                                });
-                                if response.inner.changed() {
-                                    state_changed = true;
-                                }
-                            }
-                            ui_command::CONFIG_STARTUP_EXE_3 => {
-                                let response = ui.add_enabled_ui(enabled, |ui| {
-                                    ui.add_sized(
-                                        [object_size.x, object_size.y],
-                                        TextEdit::singleline(&mut self.config.startup_exe_3),
-                                    )
-                                });
-                                if response.inner.changed() {
-                                    state_changed = true;
-                                }
-                            }
-                            ui_command::CONFIG_STARTUP_EXE_4 => {
-                                let response = ui.add_enabled_ui(enabled, |ui| {
-                                    ui.add_sized(
-                                        [object_size.x, object_size.y],
-                                        TextEdit::singleline(&mut self.config.startup_exe_4),
-                                    )
-                                });
-                                if response.inner.changed() {
-                                    state_changed = true;
-                                }
-                            }
-                            _ => {
-                                let input_font_id = egui::FontId::monospace(INPUT_FONT_SIZE);
-                                let row_height = ui.fonts_mut(|fonts| fonts.row_height(&input_font_id));
-                                let desired_rows = ((object_size.y - FIXED_INPUT_HEIGHT_PADDING)
-                                    .max(row_height)
-                                    / row_height)
-                                    .floor()
-                                    .max(1.0) as usize;
-                                let frame_stroke = if object_id == "input_command" {
-                                    egui::Stroke::NONE
-                                } else {
-                                    egui::Stroke::new(1.0, Color32::BLACK)
-                                };
-                                let frame_fill = if object_id == "input_command" {
-                                    Color32::from_gray(242)
-                                } else {
-                                    Color32::WHITE
-                                };
-                                let input_response = egui::Frame::default()
-                                    .fill(frame_fill)
-                                    .stroke(frame_stroke)
-                                    .inner_margin(egui::Margin::same(4))
-                                    .show(ui, |ui| {
-                                        let input_line_count = if object_id == "input_command" {
-                                            self.input_command.chars().filter(|ch| *ch == '\n').count() + 1
-                                        } else {
-                                            1
-                                        };
-                                        let mut editor = TextEdit::multiline(&mut self.input_command)
-                                            .id_source(INPUT_COMMAND_ID_SALT)
-                                            .font(input_font_id)
-                                            .interactive(enabled)
-                                            .desired_width(f32::INFINITY)
-                                            .desired_rows(desired_rows);
-                                        if object_id == "input_command" {
-                                            let ime_commit_this_frame = ui.input(|input| {
-                                                input.events.iter().any(|event| {
-                                                    matches!(
-                                                        event,
-                                                        egui::Event::Ime(egui::ImeEvent::Commit(_))
-                                                    )
-                                                })
-                                            });
-                                            let input_return_key = if ime_commit_this_frame {
-                                                None
-                                            } else {
-                                                Some(egui::KeyboardShortcut::new(
-                                                    egui::Modifiers::NONE,
-                                                    egui::Key::Enter,
-                                                ))
-                                            };
-                                            editor = editor
-                                                .frame(false)
-                                                .return_key(input_return_key);
-                                            let visible_height = (object_size.y - 8.0).max(1.0);
-                                            let editor_height = ((input_line_count.max(desired_rows) as f32)
-                                                * row_height
-                                                + FIXED_INPUT_HEIGHT_PADDING)
-                                                .max(visible_height);
-                                            return egui::ScrollArea::vertical()
-                                                .id_salt("input_command_vertical_scroll")
-                                                .auto_shrink([false, false])
-                                                .max_height(visible_height)
-                                                .show(ui, |ui| {
-                                                    ui.add_sized(
-                                                        [(object_size.x - 8.0).max(1.0), editor_height],
-                                                        editor,
-                                                    )
-                                                })
-                                                .inner;
-                                        }
-                                        ui.add_sized(
-                                            [
-                                                (object_size.x - 8.0).max(1.0),
-                                                (object_size.y - 8.0).max(1.0),
-                                            ],
-                                            editor,
-                                        )
-                                    });
-                                if enabled && self.pending_input_focus {
-                                    input_response.inner.request_focus();
-                                    self.pending_input_focus = false;
-                                }
-                                self.input_area_size = input_response.response.rect.size();
-                            }
-                        }
-                    }
-                    "image" => {
-                        let image_key = object.visual.background.image.trim();
-                        let text = if image_key.is_empty() {
-                            "image".to_string()
-                        } else {
-                            format!("image: {image_key}")
-                        };
-                        egui::Frame::default()
-                            .fill(Color32::from_gray(245))
-                            .stroke(egui::Stroke::new(1.0, Color32::BLACK))
-                            .inner_margin(egui::Margin::same(4))
-                            .show(ui, |ui| {
-                                ui.set_min_size(object_size);
-                                ui.label(RichText::new(text).color(Color32::BLACK));
-                            });
-                    }
-                    "checkbox" => {
-                        let text = self.resolve_object_text(&object);
-                        let enabled =
-                            controls_enabled && object.enabled && self.is_bind_command_enabled(&object_command);
-                        let mut checked = self
-                            .runtime_checked_for_command(&object_command)
-                            .unwrap_or(object.checked);
-                        let mut rich = RichText::new(text).font(text_font.clone());
-                        if object.visual.text.bold {
-                            rich = rich.strong();
-                        }
-                        if object.visual.text.italic {
-                            rich = rich.italics();
-                        }
-                        let response = ui.add_enabled_ui(enabled, |ui| {
-                            ui.add_sized(
-                                [object_size.x, object_size.y],
-                                egui::Checkbox::new(&mut checked, rich),
-                            )
-                        });
-                        if response.inner.changed() {
-                            checkbox_changed = Some(checked);
-                        }
-                    }
                     "radio" | "radio_button" => {
-                        let text = self.resolve_object_text(&object);
-                        let enabled =
-                            controls_enabled && object.enabled && self.is_bind_command_enabled(&object_command);
-                        let checked = self
-                            .runtime_checked_for_command(&object_command)
-                            .unwrap_or(object.checked);
-                        let mut rich = RichText::new(text).font(text_font.clone());
-                        if object.visual.text.bold {
-                            rich = rich.strong();
-                        }
-                        if object.visual.text.italic {
-                            rich = rich.italics();
-                        }
-                        let response = ui.add_enabled_ui(enabled, |ui| {
-                            ui.add_sized(
-                                [object_size.x, object_size.y],
-                                egui::RadioButton::new(checked, rich),
-                            )
-                        });
-                        if response.inner.clicked() && !checked {
-                            radio_selected = true;
-                        }
+                        radio_selected = self.render_runtime_object_radio(
+                            ui,
+                            &object,
+                            object_command.as_str(),
+                            object_size,
+                            &text_font,
+                            controls_enabled,
+                        );
                     }
                     _ => {
-                        let text = self.resolve_object_text(&object);
-                        let enabled =
-                            controls_enabled && object.enabled && self.is_bind_command_enabled(&object_command);
-                        let mut rich = RichText::new(text).font(text_font);
-                        if object.visual.text.bold {
-                            rich = rich.strong();
-                        }
-                        if object.visual.text.italic {
-                            rich = rich.italics();
-                        }
-                        let response = ui.add_enabled_ui(enabled, |ui| {
-                            ui.add_sized([object_size.x, object_size.y], egui::Button::new(rich))
-                        });
-                        if response.inner.clicked() {
-                            clicked = true;
-                        }
+                        clicked = self.render_runtime_object_button(
+                            ui,
+                            &object,
+                            object_command.as_str(),
+                            object_size,
+                            &text_font,
+                            controls_enabled,
+                        );
                     }
                 });
 
