@@ -2399,22 +2399,36 @@ impl CodexShellApp {
                                     / row_height)
                                     .floor()
                                     .max(1.0) as usize;
+                                let frame_stroke = if object_id == "input_command" {
+                                    egui::Stroke::NONE
+                                } else {
+                                    egui::Stroke::new(1.0, Color32::BLACK)
+                                };
+                                let frame_fill = if object_id == "input_command" {
+                                    Color32::from_gray(242)
+                                } else {
+                                    Color32::WHITE
+                                };
                                 let input_response = egui::Frame::default()
-                                    .fill(Color32::WHITE)
-                                    .stroke(egui::Stroke::new(1.0, Color32::BLACK))
+                                    .fill(frame_fill)
+                                    .stroke(frame_stroke)
                                     .inner_margin(egui::Margin::same(4))
                                     .show(ui, |ui| {
+                                        let mut editor = TextEdit::multiline(&mut self.input_command)
+                                            .id_source(INPUT_COMMAND_ID_SALT)
+                                            .font(input_font_id)
+                                            .interactive(enabled)
+                                            .desired_width(f32::INFINITY)
+                                            .desired_rows(desired_rows);
+                                        if object_id == "input_command" {
+                                            editor = editor.frame(false);
+                                        }
                                         ui.add_sized(
                                             [
                                                 (object_size.x - 8.0).max(1.0),
                                                 (object_size.y - 8.0).max(1.0),
                                             ],
-                                            TextEdit::multiline(&mut self.input_command)
-                                                .id_source(INPUT_COMMAND_ID_SALT)
-                                                .font(input_font_id)
-                                                .interactive(enabled)
-                                                .desired_width(f32::INFINITY)
-                                                .desired_rows(desired_rows),
+                                            editor,
                                         )
                                     });
                                 if enabled && self.pending_input_focus {
