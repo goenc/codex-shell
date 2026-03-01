@@ -2239,7 +2239,7 @@ impl CodexShellApp {
         }
     }
 
-    fn render_runtime_object_panel(
+    fn render_obj_container_or_group(
         &self,
         ui: &mut egui::Ui,
         object: &UiObject,
@@ -2259,7 +2259,7 @@ impl CodexShellApp {
             });
     }
 
-    fn render_runtime_object_label(
+    fn render_obj_label(
         &self,
         ui: &mut egui::Ui,
         object: &UiObject,
@@ -2290,7 +2290,7 @@ impl CodexShellApp {
         );
     }
 
-    fn render_runtime_object_input(
+    fn render_obj_input(
         &mut self,
         ui: &mut egui::Ui,
         object: &UiObject,
@@ -2483,7 +2483,7 @@ impl CodexShellApp {
         }
     }
 
-    fn render_runtime_object_image(
+    fn render_obj_image(
         &self,
         ui: &mut egui::Ui,
         object: &UiObject,
@@ -2505,7 +2505,7 @@ impl CodexShellApp {
             });
     }
 
-    fn render_runtime_object_checkbox(
+    fn render_obj_checkbox(
         &self,
         ui: &mut egui::Ui,
         object: &UiObject,
@@ -2539,7 +2539,7 @@ impl CodexShellApp {
         }
     }
 
-    fn render_runtime_object_radio(
+    fn render_obj_radio(
         &self,
         ui: &mut egui::Ui,
         object: &UiObject,
@@ -2569,7 +2569,7 @@ impl CodexShellApp {
         response.inner.clicked() && !checked
     }
 
-    fn render_runtime_object_button(
+    fn render_obj_button(
         &self,
         ui: &mut egui::Ui,
         object: &UiObject,
@@ -2591,6 +2591,67 @@ impl CodexShellApp {
             ui.add_sized([object_size.x, object_size.y], egui::Button::new(rich))
         });
         response.inner.clicked()
+    }
+
+    fn render_obj_by_type(
+        &mut self,
+        ui: &mut egui::Ui,
+        object: &UiObject,
+        object_id: &str,
+        object_type: &str,
+        object_command: &str,
+        object_size: egui::Vec2,
+        text_font: &egui::FontId,
+        controls_enabled: bool,
+        state_changed: &mut bool,
+        clicked: &mut bool,
+        checkbox_changed: &mut Option<bool>,
+        radio_selected: &mut bool,
+    ) {
+        match object_type {
+            "panel" => self.render_obj_container_or_group(ui, object, object_size),
+            "label" => self.render_obj_label(ui, object, object_size, text_font),
+            "input" => self.render_obj_input(
+                ui,
+                object,
+                object_id,
+                object_command,
+                object_size,
+                controls_enabled,
+                state_changed,
+            ),
+            "image" => self.render_obj_image(ui, object, object_size),
+            "checkbox" => {
+                *checkbox_changed = self.render_obj_checkbox(
+                    ui,
+                    object,
+                    object_command,
+                    object_size,
+                    text_font,
+                    controls_enabled,
+                );
+            }
+            "radio" | "radio_button" => {
+                *radio_selected = self.render_obj_radio(
+                    ui,
+                    object,
+                    object_command,
+                    object_size,
+                    text_font,
+                    controls_enabled,
+                );
+            }
+            _ => {
+                *clicked = self.render_obj_button(
+                    ui,
+                    object,
+                    object_command,
+                    object_size,
+                    text_font,
+                    controls_enabled,
+                );
+            }
+        }
     }
 
     fn render_runtime_ui_objects(&mut self, ctx: &egui::Context) {
@@ -2662,49 +2723,21 @@ impl CodexShellApp {
                 } else {
                     egui::Sense::hover()
                 })
-                .show(ctx, |ui| match object_type.as_str() {
-                    "panel" => self.render_runtime_object_panel(ui, &object, object_size),
-                    "label" => self.render_runtime_object_label(ui, &object, object_size, &text_font),
-                    "input" => self.render_runtime_object_input(
+                .show(ctx, |ui| {
+                    self.render_obj_by_type(
                         ui,
                         &object,
                         object_id.as_str(),
+                        object_type.as_str(),
                         object_command.as_str(),
                         object_size,
+                        &text_font,
                         controls_enabled,
                         &mut state_changed,
-                    ),
-                    "image" => self.render_runtime_object_image(ui, &object, object_size),
-                    "checkbox" => {
-                        checkbox_changed = self.render_runtime_object_checkbox(
-                            ui,
-                            &object,
-                            object_command.as_str(),
-                            object_size,
-                            &text_font,
-                            controls_enabled,
-                        );
-                    }
-                    "radio" | "radio_button" => {
-                        radio_selected = self.render_runtime_object_radio(
-                            ui,
-                            &object,
-                            object_command.as_str(),
-                            object_size,
-                            &text_font,
-                            controls_enabled,
-                        );
-                    }
-                    _ => {
-                        clicked = self.render_runtime_object_button(
-                            ui,
-                            &object,
-                            object_command.as_str(),
-                            object_size,
-                            &text_font,
-                            controls_enabled,
-                        );
-                    }
+                        &mut clicked,
+                        &mut checkbox_changed,
+                        &mut radio_selected,
+                    );
                 });
 
             let pointer_clicked_on_area = ctx.input(|input| {
