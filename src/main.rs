@@ -2414,6 +2414,11 @@ impl CodexShellApp {
                                     .stroke(frame_stroke)
                                     .inner_margin(egui::Margin::same(4))
                                     .show(ui, |ui| {
+                                        let input_line_count = if object_id == "input_command" {
+                                            self.input_command.chars().filter(|ch| *ch == '\n').count() + 1
+                                        } else {
+                                            1
+                                        };
                                         let mut editor = TextEdit::multiline(&mut self.input_command)
                                             .id_source(INPUT_COMMAND_ID_SALT)
                                             .font(input_font_id)
@@ -2440,6 +2445,22 @@ impl CodexShellApp {
                                             editor = editor
                                                 .frame(false)
                                                 .return_key(input_return_key);
+                                            let visible_height = (object_size.y - 8.0).max(1.0);
+                                            let editor_height = ((input_line_count.max(desired_rows) as f32)
+                                                * row_height
+                                                + FIXED_INPUT_HEIGHT_PADDING)
+                                                .max(visible_height);
+                                            return egui::ScrollArea::vertical()
+                                                .id_salt("input_command_vertical_scroll")
+                                                .auto_shrink([false, false])
+                                                .max_height(visible_height)
+                                                .show(ui, |ui| {
+                                                    ui.add_sized(
+                                                        [(object_size.x - 8.0).max(1.0), editor_height],
+                                                        editor,
+                                                    )
+                                                })
+                                                .inner;
                                         }
                                         ui.add_sized(
                                             [
