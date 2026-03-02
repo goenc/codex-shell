@@ -1,0 +1,10 @@
+  1. メイン画面オブジェクトのクリック選択
+  2. 選択オブジェクトの赤枠ハイライト表示
+  3. 修飾キー付きの複数選択（Shift/Ctrl/Cmd）
+  4. 選択オブジェクトのドラッグ移動（複数同時移動含む）
+  5. UI編集ON中のメイン操作ロック（main コマンド無効化ガード）
+  6. UI編集ON状態のロック表示文言（UI編集: ON (主画面操作ロック)）
+  7. runtime/ui/live/ui.json 未配置時の自動生成フォールバック
+  8. UiDefinition / UiObject などのデータモデルを main.rs 側に新規実装
+  9. UI定義の整合補完処理（ensure_integrity で不足オブジェクト補充）
+  10. command.rs への #![allow(dead_code)] 追加（警告抑制）
