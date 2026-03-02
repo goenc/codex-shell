@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub const PROJECT_TARGET_STATE: &str = "project.target_state";
 pub const STATUS_MESSAGE: &str = "status.message";
 pub const CODEX_STATE: &str = "codex.state";
