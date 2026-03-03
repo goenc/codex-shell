@@ -184,7 +184,7 @@ impl CodexShellApp {
         let working_dir = self.config.working_dir.trim().to_string();
         let (main_pipe_name, build_pipe_name) = self.runtime_pipe_names();
 
-        match spawn_listener_process(&main_pipe_name, &working_dir, "相談用") {
+        match spawn_listener_process(&main_pipe_name, &working_dir, "相談") {
             Ok(child) => {
                 let pid = child.id();
                 self.powershell_child = Some(child);
@@ -201,7 +201,7 @@ impl CodexShellApp {
     }
 
     fn start_build_shell_process(&mut self, build_pipe_name: &str, working_dir: &str) {
-        match spawn_listener_process(build_pipe_name, working_dir, "ビルド用") {
+        match spawn_listener_process(build_pipe_name, working_dir, "実装") {
             Ok(child) => {
                 let pid = child.id();
                 self.build_powershell_child = Some(child);

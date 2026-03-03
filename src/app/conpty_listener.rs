@@ -41,7 +41,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<ListenerA
 
     let mut pipe_name: Option<String> = None;
     let mut working_dir: Option<String> = None;
-    let mut window_title = "相談用".to_string();
+    let mut window_title = "相談".to_string();
 
     while let Some(flag) = iter.next() {
         match flag.as_str() {
@@ -96,7 +96,7 @@ fn run_listener(args: ListenerArgs) -> Result<()> {
     }
 
     let mut command = Command::new("pwsh.exe");
-    command.arg("-NoLogo").arg("-NoExit");
+    command.arg("-NoLogo").arg("-NoProfile").arg("-NoExit");
     command.current_dir(&args.working_dir);
 
     let mut process = Process::spawn(command).context("ConPTY 起動に失敗")?;
@@ -106,6 +106,7 @@ fn run_listener(args: ListenerArgs) -> Result<()> {
     println!("Pipe listener started: {}", args.pipe_name);
     println!("Working directory: {}", args.working_dir);
 
+    let fixed_window_title = args.window_title.trim().to_string();
     let output_thread = thread::spawn(move || -> Result<()> {
         let mut stdout = io::stdout().lock();
         let mut buffer = [0u8; 4096];
@@ -117,6 +118,9 @@ fn run_listener(args: ListenerArgs) -> Result<()> {
                         .write_all(&buffer[..size])
                         .context("ConPTY出力書き込みに失敗")?;
                     stdout.flush().context("ConPTY出力flushに失敗")?;
+                    if !fixed_window_title.is_empty() {
+                        set_console_title(&fixed_window_title);
+                    }
                 }
                 Err(err)
                     if matches!(
