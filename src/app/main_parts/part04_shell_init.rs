@@ -217,28 +217,19 @@ impl CodexShellApp {
         }
     }
 
-    fn pipe_base_name(&self) -> String {
-        if self.config.pipe_name.trim().is_empty() {
-            DEFAULT_PIPE_NAME.to_string()
-        } else {
-            self.config.pipe_name.trim().to_string()
-        }
-    }
-
     fn runtime_pipe_names(&self) -> (String, String) {
-        let base = self.pipe_base_name();
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_millis())
             .unwrap_or(0);
-        let main_pipe_name = format!("{base}_main_{nonce}");
-        let build_pipe_name = format!("{base}_build_{nonce}");
+        let main_pipe_name = format!("{DEFAULT_PIPE_NAME}_main_{nonce}");
+        let build_pipe_name = format!("{DEFAULT_PIPE_NAME}_build_{nonce}");
         (main_pipe_name, build_pipe_name)
     }
 
     fn main_pipe_name(&self) -> String {
         if self.active_main_pipe_name.trim().is_empty() {
-            self.pipe_base_name()
+            DEFAULT_PIPE_NAME.to_string()
         } else {
             self.active_main_pipe_name.clone()
         }
@@ -246,7 +237,7 @@ impl CodexShellApp {
 
     fn build_pipe_name(&self) -> String {
         if self.active_build_pipe_name.trim().is_empty() {
-            format!("{}_build", self.pipe_base_name())
+            format!("{DEFAULT_PIPE_NAME}_build")
         } else {
             self.active_build_pipe_name.clone()
         }

@@ -4,7 +4,6 @@ struct AppConfig {
     working_dir: String,
     build_command: String,
     codex_command: String,
-    pipe_name: String,
     input_prefix: String,
     startup_exe_1: String,
     startup_exe_2: String,
@@ -21,7 +20,6 @@ impl Default for AppConfig {
                 .unwrap_or_else(|_| ".".to_string()),
             build_command: DEFAULT_BUILD_COMMAND.to_string(),
             codex_command: DEFAULT_CODEX_COMMAND.to_string(),
-            pipe_name: DEFAULT_PIPE_NAME.to_string(),
             input_prefix: String::new(),
             startup_exe_1: String::new(),
             startup_exe_2: String::new(),
@@ -85,7 +83,19 @@ impl UiDefinition {
         if self.screen(UI_SETTINGS_SCREEN_ID).is_none() {
             self.screens.push(default_settings_screen());
         }
+        self.remove_legacy_pipe_settings_objects();
         self.objects.clear();
+    }
+
+    fn remove_legacy_pipe_settings_objects(&mut self) {
+        let Some(settings_objects) = self.screen_objects_mut(UI_SETTINGS_SCREEN_ID) else {
+            return;
+        };
+        settings_objects.retain(|object| {
+            object.id != "lbl_settings_pipe_name"
+                && object.id != "input_settings_pipe_name"
+                && object.bind.command.trim() != "config.pipe_name"
+        });
     }
 
     fn screen_ids(&self) -> Vec<String> {
@@ -226,25 +236,6 @@ fn default_settings_screen() -> UiScreen {
             110,
             156.0,
             128.0,
-            640.0,
-            24.0,
-        ),
-        create_label_object(
-            "lbl_settings_pipe_name",
-            "パイプ名",
-            100,
-            24.0,
-            160.0,
-            120.0,
-            24.0,
-            "left",
-        ),
-        create_input_object(
-            "input_settings_pipe_name",
-            ui_tool::CONFIG_PIPE_NAME,
-            110,
-            156.0,
-            160.0,
             640.0,
             24.0,
         ),

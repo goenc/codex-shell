@@ -19,7 +19,6 @@ pub const REASONING_XHIGH: &str = "reasoning.xhigh";
 pub const CONFIG_WORKING_DIR: &str = "config.working_dir";
 pub const CONFIG_BUILD_COMMAND: &str = "config.build_command";
 pub const CONFIG_CODEX_COMMAND: &str = "config.codex_command";
-pub const CONFIG_PIPE_NAME: &str = "config.pipe_name";
 pub const CONFIG_INPUT_PREFIX: &str = "config.input_prefix";
 pub const CONFIG_STARTUP_EXE_1: &str = "config.startup_exe_1";
 pub const CONFIG_STARTUP_EXE_2: &str = "config.startup_exe_2";
@@ -53,7 +52,6 @@ pub const ALL_UI_COMMANDS: &[&str] = &[
     CONFIG_WORKING_DIR,
     CONFIG_BUILD_COMMAND,
     CONFIG_CODEX_COMMAND,
-    CONFIG_PIPE_NAME,
     CONFIG_INPUT_PREFIX,
     CONFIG_STARTUP_EXE_1,
     CONFIG_STARTUP_EXE_2,

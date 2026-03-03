@@ -240,17 +240,6 @@ impl CodexShellApp {
                     *state_changed = true;
                 }
             }
-            ui_tool::CONFIG_PIPE_NAME => {
-                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
-                    ui.add_sized(
-                        [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.pipe_name),
-                    )
-                });
-                if response.inner.changed() {
-                    *state_changed = true;
-                }
-            }
             ui_tool::CONFIG_INPUT_PREFIX => {
                 let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
