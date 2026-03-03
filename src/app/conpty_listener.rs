@@ -5,7 +5,10 @@ use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::Path;
 use std::process::Command;
 use std::thread;
-use windows::Win32::System::Console::SetConsoleTitleW;
+use std::time::Duration;
+use windows::Win32::Foundation::RECT;
+use windows::Win32::System::Console::{GetConsoleWindow, SetConsoleTitleW};
+use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, GetWindowRect, MoveWindow};
 use windows::core::PCWSTR;
 
 const MODE_FLAG: &str = "--conpty-listener";
@@ -14,6 +17,11 @@ const WORKING_DIR_FLAG: &str = "--working-directory";
 const WINDOW_TITLE_FLAG: &str = "--window-title";
 const INTERRUPT_COMMAND: &str = "__interrupt__";
 const LISTENER_EXIT_COMMAND: &str = "__listener_exit__";
+const WINDOW_WIDTH_PX: i32 = 750;
+const MAIN_WINDOW_TITLE: &str = "相談";
+const BUILD_WINDOW_TITLE: &str = "実装";
+const WINDOW_RECT_RETRY_COUNT: usize = 20;
+const WINDOW_RECT_RETRY_DELAY_MS: u64 = 50;
 
 struct ListenerArgs {
     pipe_name: String,
@@ -93,6 +101,10 @@ fn run_listener(args: ListenerArgs) -> Result<()> {
 
     if !args.window_title.trim().is_empty() {
         set_console_title(args.window_title.trim());
+    }
+    set_console_width_px(WINDOW_WIDTH_PX);
+    if args.window_title.trim() == BUILD_WINDOW_TITLE {
+        shift_build_window_right_of_main();
     }
 
     let mut command = Command::new("pwsh.exe");
@@ -208,5 +220,79 @@ fn set_console_title(title: &str) {
     title_wide.push(0);
     unsafe {
         let _ = SetConsoleTitleW(PCWSTR(title_wide.as_ptr()));
+    }
+}
+
+fn set_console_width_px(width_px: i32) {
+    if width_px <= 0 {
+        return;
+    }
+    unsafe {
+        let hwnd = GetConsoleWindow();
+        if hwnd.0.is_null() {
+            return;
+        }
+        let mut rect = Default::default();
+        if GetWindowRect(hwnd, &mut rect).is_err() {
+            return;
+        }
+        let current_height = rect.bottom - rect.top;
+        if current_height <= 0 {
+            return;
+        }
+        let _ = MoveWindow(hwnd, rect.left, rect.top, width_px, current_height, true);
+    }
+}
+
+fn shift_build_window_right_of_main() {
+    let Some(main_rect) = wait_window_rect_by_title(MAIN_WINDOW_TITLE) else {
+        return;
+    };
+    unsafe {
+        let hwnd = GetConsoleWindow();
+        if hwnd.0.is_null() {
+            return;
+        }
+        let mut rect = RECT::default();
+        if GetWindowRect(hwnd, &mut rect).is_err() {
+            return;
+        }
+        let current_width = rect.right - rect.left;
+        let current_height = rect.bottom - rect.top;
+        if current_width <= 0 || current_height <= 0 {
+            return;
+        }
+        let main_width = main_rect.right - main_rect.left;
+        if main_width <= 0 {
+            return;
+        }
+        let target_x = main_rect.left + main_width;
+        let _ = MoveWindow(hwnd, target_x, rect.top, current_width, current_height, true);
+    }
+}
+
+fn wait_window_rect_by_title(title: &str) -> Option<RECT> {
+    for _ in 0..WINDOW_RECT_RETRY_COUNT {
+        if let Some(rect) = window_rect_by_title(title) {
+            return Some(rect);
+        }
+        thread::sleep(Duration::from_millis(WINDOW_RECT_RETRY_DELAY_MS));
+    }
+    window_rect_by_title(title)
+}
+
+fn window_rect_by_title(title: &str) -> Option<RECT> {
+    let mut title_wide = title.encode_utf16().collect::<Vec<_>>();
+    title_wide.push(0);
+    unsafe {
+        let hwnd = FindWindowW(PCWSTR::null(), PCWSTR(title_wide.as_ptr())).ok()?;
+        if hwnd.0.is_null() {
+            return None;
+        }
+        let mut rect = RECT::default();
+        if GetWindowRect(hwnd, &mut rect).is_err() {
+            return None;
+        }
+        Some(rect)
     }
 }
