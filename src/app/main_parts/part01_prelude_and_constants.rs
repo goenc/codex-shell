@@ -71,6 +71,7 @@ $ErrorActionPreference = "Continue"
 [Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 try { chcp 65001 > $null } catch {}
+try { $Host.UI.RawUI.WindowTitle = "相談用" } catch {}
 
 if (-not ("PipeConsoleBridge" -as [type])) {
 Add-Type -TypeDefinition @"
