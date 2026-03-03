@@ -4,28 +4,14 @@ use eframe::egui::{self, Color32, RichText, TextEdit};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::fs::{self, OpenOptions};
-use std::io::{self, Write};
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use windows::core::PWSTR;
-use windows::Win32::Foundation::{CloseHandle, GetLastError, HANDLE};
-use windows::Win32::System::Diagnostics::ToolHelp::{
-    CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW, TH32CS_SNAPPROCESS,
-};
-use windows::Win32::System::Threading::{
-    OpenProcess, PROCESS_NAME_FORMAT, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE,
-    QueryFullProcessImageNameW, TerminateProcess,
-};
-use windows::Win32::UI::Input::KeyboardAndMouse::{
-    INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, SendInput,
-    VIRTUAL_KEY, VK_CONTROL, VK_MENU, VK_RIGHT,
-};
 
+mod app;
 mod tools;
 
 use tools::ui_edit::api as ui_tool;
@@ -3012,41 +2998,8 @@ fn unix_timestamp() -> String {
     }
 }
 
-fn keyboard_input(vk: VIRTUAL_KEY, flags: KEYBD_EVENT_FLAGS) -> INPUT {
-    INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: vk,
-                wScan: 0,
-                dwFlags: flags,
-                time: 0,
-                dwExtraInfo: 0,
-            },
-        },
-    }
-}
-
 fn send_voice_input_hotkey() -> Result<()> {
-    let inputs = [
-        keyboard_input(VK_CONTROL, KEYBD_EVENT_FLAGS(0)),
-        keyboard_input(VK_MENU, KEYBD_EVENT_FLAGS(0)),
-        keyboard_input(VK_RIGHT, KEYBD_EVENT_FLAGS(0)),
-        keyboard_input(VK_RIGHT, KEYEVENTF_KEYUP),
-        keyboard_input(VK_MENU, KEYEVENTF_KEYUP),
-        keyboard_input(VK_CONTROL, KEYEVENTF_KEYUP),
-    ];
-
-    let sent = unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32) };
-    if sent != inputs.len() as u32 {
-        let err = unsafe { GetLastError() };
-        return Err(anyhow!(
-            "SendInput失敗 sent={sent}/{} last_error={}",
-            inputs.len(),
-            err.0
-        ));
-    }
-    Ok(())
+    app::process_ops::send_voice_input_hotkey()
 }
 
 fn find_project_declaration_files(base_dir: &Path) -> Result<Vec<PathBuf>> {
@@ -3483,199 +3436,20 @@ fn spawn_listener_process(config: &AppConfig, script_path: &Path) -> Result<Chil
     Ok(child)
 }
 
-fn send_named_pipe_line(pipe_name: &str, command: &str) -> Result<()> {
-    let pipe_path = format!(r"\\.\pipe\{}", pipe_name.trim());
-    let mut last_error: Option<io::Error> = None;
-
-    for _ in 0..CONNECT_RETRY_COUNT {
-        match OpenOptions::new().write(true).open(&pipe_path) {
-            Ok(mut pipe) => {
-                pipe.write_all(command.as_bytes())
-                    .context("パイプ書き込みに失敗")?;
-                pipe.write_all(b"\n").context("改行送信に失敗")?;
-                pipe.flush().context("パイプflushに失敗")?;
-                return Ok(());
-            }
-            Err(err) => {
-                last_error = Some(err);
-                thread::sleep(Duration::from_millis(CONNECT_RETRY_DELAY_MS));
-            }
-        }
-    }
-
-    Err(anyhow!(
-        "パイプ接続に失敗: {} ({})",
-        pipe_path,
-        last_error
-            .map(|e| e.to_string())
-            .unwrap_or_else(|| "unknown error".to_string())
-    ))
-}
-
 fn normalize_path_for_dedup(path: &Path) -> String {
-    let normalized = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-    normalized
-        .to_string_lossy()
-        .replace('/', "\\")
-        .to_ascii_lowercase()
-}
-
-fn close_handle(handle: HANDLE) {
-    if !handle.is_invalid() {
-        unsafe {
-            let _ = CloseHandle(handle);
-        }
-    }
-}
-
-fn process_image_path(pid: u32) -> Option<PathBuf> {
-    let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }.ok()?;
-    let mut size = 32768u32;
-    let mut buffer = vec![0u16; size as usize];
-    let ok = unsafe {
-        QueryFullProcessImageNameW(
-            process,
-            PROCESS_NAME_FORMAT(0),
-            PWSTR(buffer.as_mut_ptr()),
-            &mut size,
-        )
-        .is_ok()
-    };
-    close_handle(process);
-    if !ok || size == 0 {
-        return None;
-    }
-    Some(PathBuf::from(String::from_utf16_lossy(
-        &buffer[..size as usize],
-    )))
-}
-
-fn find_process_ids_by_executable(path: &Path) -> Result<Vec<u32>> {
-    let target = normalize_path_for_dedup(path);
-    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) }
-        .context("プロセススナップショット取得に失敗")?;
-    let mut process_ids = Vec::new();
-    let mut entry = PROCESSENTRY32W {
-        dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
-        ..Default::default()
-    };
-    let mut has_entry = unsafe { Process32FirstW(snapshot, &mut entry).is_ok() };
-    while has_entry {
-        let pid = entry.th32ProcessID;
-        if let Some(image_path) = process_image_path(pid)
-            && normalize_path_for_dedup(&image_path) == target
-        {
-            process_ids.push(pid);
-        }
-        has_entry = unsafe { Process32NextW(snapshot, &mut entry).is_ok() };
-    }
-    close_handle(snapshot);
-    Ok(process_ids)
-}
-
-fn terminate_process_by_pid(pid: u32) -> Result<()> {
-    let process = unsafe { OpenProcess(PROCESS_TERMINATE, false, pid) }
-        .with_context(|| format!("プロセス終了のハンドル取得に失敗 pid={pid}"))?;
-    if unsafe { TerminateProcess(process, 1).is_err() } {
-        close_handle(process);
-        return Err(anyhow!("プロセス終了APIが失敗しました pid={pid}"));
-    }
-    close_handle(process);
-    Ok(())
+    app::process_ops::normalize_path_for_dedup(path)
 }
 
 fn terminate_running_executable(path: &str) -> Result<usize> {
-    let process_ids = find_process_ids_by_executable(Path::new(path))
-        .with_context(|| format!("実行中プロセス検索に失敗: {path}"))?;
-    for pid in &process_ids {
-        terminate_process_by_pid(*pid).with_context(|| format!("プロセス停止に失敗 pid={pid}"))?;
-    }
-    if !process_ids.is_empty() {
-        thread::sleep(Duration::from_millis(200));
-        let remaining = find_process_ids_by_executable(Path::new(path))
-            .with_context(|| format!("停止後の実行中プロセス再確認に失敗: {path}"))?;
-        if !remaining.is_empty() {
-            return Err(anyhow!(
-                "プロセス停止後も実行中のプロセスがあります: {}",
-                remaining
-                    .iter()
-                    .map(|pid| pid.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ));
-        }
-    }
-    Ok(process_ids.len())
+    app::process_ops::terminate_running_executable(path)
 }
 
 fn select_executable_file_path() -> Result<Option<String>> {
-    let script = r#"
-Add-Type -AssemblyName System.Windows.Forms
-$dialog = New-Object System.Windows.Forms.OpenFileDialog
-$dialog.Filter = 'Executable Files (*.exe)|*.exe|All Files (*.*)|*.*'
-$dialog.CheckFileExists = $true
-$dialog.Multiselect = $false
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-    Write-Output $dialog.FileName
-}
-"#;
-    let output = Command::new("powershell.exe")
-        .arg("-NoProfile")
-        .arg("-ExecutionPolicy")
-        .arg("Bypass")
-        .arg("-STA")
-        .arg("-Command")
-        .arg(script)
-        .output()
-        .context("実行ファイル参照ダイアログ起動に失敗")?;
-    if !output.status.success() {
-        return Err(anyhow!(
-            "実行ファイル参照ダイアログ実行に失敗: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-    let selected = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if selected.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(selected))
-    }
+    app::process_ops::select_executable_file_path()
 }
 
 fn spawn_send_worker(send_rx: Receiver<SendRequest>, result_tx: Sender<SendResult>) {
-    thread::spawn(move || {
-        while let Ok(request) = send_rx.recv() {
-            let delay_ms = request.delay_ms;
-            let pipe_name = request.pipe_name;
-            let source = request.source;
-            let command = request.command;
-            if delay_ms > 0 {
-                thread::sleep(Duration::from_millis(delay_ms));
-            }
-            match send_named_pipe_line(&pipe_name, &command) {
-                Ok(()) => {
-                    if result_tx
-                        .send(SendResult::Sent { source, command })
-                        .is_err()
-                    {
-                        break;
-                    }
-                }
-                Err(err) => {
-                    if result_tx
-                        .send(SendResult::Failed {
-                            source,
-                            error: err.to_string(),
-                        })
-                        .is_err()
-                    {
-                        break;
-                    }
-                }
-            }
-        }
-    });
+    app::pipe_ops::spawn_send_worker(send_rx, result_tx);
 }
 
 fn update_reasoning_effort(selected: &str) -> Result<(), String> {
