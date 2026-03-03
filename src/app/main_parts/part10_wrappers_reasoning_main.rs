@@ -14,6 +14,10 @@ fn spawn_send_worker(send_rx: Receiver<SendRequest>, result_tx: Sender<SendResul
     app::pipe_ops::spawn_send_worker(send_rx, result_tx);
 }
 
+fn maybe_run_conpty_listener_mode() -> Result<bool> {
+    app::conpty_listener::maybe_run_from_args()
+}
+
 fn update_reasoning_effort(selected: &str) -> Result<(), String> {
     if !matches!(selected, "medium" | "high" | "xhigh") {
         return Err(format!("不正な思考深度です: {selected}"));
@@ -102,6 +106,10 @@ fn update_reasoning_effort(selected: &str) -> Result<(), String> {
 }
 
 fn main() -> Result<()> {
+    if maybe_run_conpty_listener_mode()? {
+        return Ok(());
+    }
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([FIXED_WINDOW_WIDTH, FIXED_WINDOW_HEIGHT])

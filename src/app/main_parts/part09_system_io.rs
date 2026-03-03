@@ -182,6 +182,7 @@ fn config_file_path() -> PathBuf {
     config_base_dir().join("config.json")
 }
 
+#[allow(dead_code)]
 fn listener_script_path() -> PathBuf {
     config_base_dir().join(LISTENER_FILE_NAME)
 }
@@ -403,6 +404,7 @@ fn apply_visual_fix(ctx: &egui::Context) {
     });
 }
 
+#[allow(dead_code)]
 fn write_listener_script(path: &Path) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).with_context(|| {
@@ -422,22 +424,33 @@ fn write_listener_script(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn spawn_listener_process(config: &AppConfig, script_path: &Path) -> Result<Child> {
-    let child = Command::new("powershell.exe")
-        .arg("-NoExit")
-        .arg("-ExecutionPolicy")
-        .arg("Bypass")
-        .arg("-File")
-        .arg(script_path)
-        .arg("-PipeName")
-        .arg(config.pipe_name.trim())
-        .arg("-WorkingDirectory")
-        .arg(config.working_dir.trim())
+fn spawn_listener_process(
+    pipe_name: &str,
+    working_dir: &str,
+    window_title: &str,
+) -> Result<Child> {
+    let current_exe =
+        std::env::current_exe().context("自身の実行ファイルパス取得に失敗しました")?;
+    let mut command = Command::new(&current_exe);
+    command
+        .arg("--conpty-listener")
+        .arg("--pipe-name")
+        .arg(pipe_name.trim())
+        .arg("--working-directory")
+        .arg(working_dir.trim())
+        .arg("--window-title")
+        .arg(window_title);
+    #[cfg(windows)]
+    {
+        command.creation_flags(CREATE_NEW_CONSOLE_FLAG);
+    }
+    let child = command
         .spawn()
         .with_context(|| {
             format!(
-                "PowerShell起動に失敗: script={}",
-                script_path.to_string_lossy()
+                "ConPTY待ち受け起動に失敗: exe={} pipe={}",
+                current_exe.display(),
+                pipe_name.trim()
             )
         })?;
     Ok(child)

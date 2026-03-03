@@ -364,8 +364,12 @@ struct CodexShellApp {
     codex_runtime_state: CodexRuntimeState,
     history: Vec<String>,
     powershell_child: Option<Child>,
+    build_powershell_child: Option<Child>,
+    active_main_pipe_name: String,
+    active_build_pipe_name: String,
     send_tx: Sender<SendRequest>,
     send_result_rx: Receiver<SendResult>,
+    #[allow(dead_code)]
     listener_script_path: PathBuf,
     window_size: egui::Vec2,
     input_area_size: egui::Vec2,

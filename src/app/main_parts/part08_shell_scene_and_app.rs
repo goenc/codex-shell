@@ -395,6 +395,7 @@ impl eframe::App for CodexShellApp {
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         self.stop_listener_process();
+        self.stop_build_shell_process();
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {

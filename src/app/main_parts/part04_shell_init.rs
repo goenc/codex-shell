@@ -44,6 +44,9 @@ impl CodexShellApp {
             codex_runtime_state: CodexRuntimeState::Stopped,
             history: Vec::new(),
             powershell_child: None,
+            build_powershell_child: None,
+            active_main_pipe_name: String::new(),
+            active_build_pipe_name: String::new(),
             send_tx,
             send_result_rx,
             listener_script_path,
@@ -162,33 +165,105 @@ impl CodexShellApp {
             let _ = child.kill();
             let _ = child.wait();
         }
+        self.active_main_pipe_name.clear();
         self.set_codex_runtime_state(CodexRuntimeState::Stopped);
+    }
+
+    fn stop_build_shell_process(&mut self) {
+        if let Some(mut child) = self.build_powershell_child.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+        self.active_build_pipe_name.clear();
     }
 
     fn start_listener(&mut self) {
         self.stop_listener_process();
+        self.stop_build_shell_process();
 
-        if let Err(err) = write_listener_script(&self.listener_script_path) {
-            self.update_status(format!("待ち受けスクリプト準備失敗: {err}"));
-            self.push_history(format!("待ち受けスクリプト準備失敗: {err}"));
-            return;
-        }
+        let working_dir = self.config.working_dir.trim().to_string();
+        let (main_pipe_name, build_pipe_name) = self.runtime_pipe_names();
 
-        match spawn_listener_process(&self.config, &self.listener_script_path) {
+        match spawn_listener_process(&main_pipe_name, &working_dir, "相談用") {
             Ok(child) => {
                 let pid = child.id();
                 self.powershell_child = Some(child);
-                self.update_status(format!("PowerShell待ち受け起動中 PID={pid}"));
-                self.push_history(format!("PowerShell待ち受けを起動しました PID={pid}"));
+                self.active_main_pipe_name = main_pipe_name.clone();
+                self.update_status(format!("ConPTY待ち受け起動中 PID={pid}"));
+                self.push_history(format!("ConPTY待ち受けを起動しました PID={pid}"));
+                self.start_build_shell_process(&build_pipe_name, &working_dir);
             }
             Err(err) => {
-                self.update_status(format!("PowerShell起動失敗: {err}"));
-                self.push_history(format!("PowerShell起動に失敗しました: {err}"));
+                self.update_status(format!("ConPTY待ち受け起動失敗: {err}"));
+                self.push_history(format!("ConPTY待ち受け起動に失敗しました: {err}"));
             }
         }
     }
 
+    fn start_build_shell_process(&mut self, build_pipe_name: &str, working_dir: &str) {
+        match spawn_listener_process(build_pipe_name, working_dir, "ビルド用") {
+            Ok(child) => {
+                let pid = child.id();
+                self.build_powershell_child = Some(child);
+                self.active_build_pipe_name = build_pipe_name.to_string();
+                self.push_history(format!(
+                    "ビルド用ConPTY待ち受けを起動しました PID={pid} pipe={build_pipe_name}"
+                ));
+            }
+            Err(err) => {
+                self.update_status(format!("ビルド用ConPTY起動失敗: {err}"));
+                self.push_history(format!("ビルド用ConPTY待ち受けの起動に失敗しました: {err}"));
+            }
+        }
+    }
+
+    fn pipe_base_name(&self) -> String {
+        if self.config.pipe_name.trim().is_empty() {
+            DEFAULT_PIPE_NAME.to_string()
+        } else {
+            self.config.pipe_name.trim().to_string()
+        }
+    }
+
+    fn runtime_pipe_names(&self) -> (String, String) {
+        let base = self.pipe_base_name();
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_millis())
+            .unwrap_or(0);
+        let main_pipe_name = format!("{base}_main_{nonce}");
+        let build_pipe_name = format!("{base}_build_{nonce}");
+        (main_pipe_name, build_pipe_name)
+    }
+
+    fn main_pipe_name(&self) -> String {
+        if self.active_main_pipe_name.trim().is_empty() {
+            self.pipe_base_name()
+        } else {
+            self.active_main_pipe_name.clone()
+        }
+    }
+
+    fn build_pipe_name(&self) -> String {
+        if self.active_build_pipe_name.trim().is_empty() {
+            format!("{}_build", self.pipe_base_name())
+        } else {
+            self.active_build_pipe_name.clone()
+        }
+    }
+
     fn send_command(&mut self, command: String, source: &str, delay_ms: u64) {
+        let pipe_name = self.main_pipe_name();
+        self.send_command_to_pipe(command, source, delay_ms, pipe_name);
+    }
+
+    fn send_command_to_pipe(
+        &mut self,
+        command: String,
+        source: &str,
+        delay_ms: u64,
+        pipe_name: String,
+    ) {
         if command.trim().is_empty() {
             self.update_status("空コマンドは送信しません");
             return;
@@ -196,7 +271,7 @@ impl CodexShellApp {
 
         let request = SendRequest {
             source: source.to_string(),
-            pipe_name: self.config.pipe_name.trim().to_string(),
+            pipe_name,
             command,
             delay_ms,
         };
@@ -240,7 +315,8 @@ impl CodexShellApp {
             format!("{} {}", self.config.build_command.trim_end(), build_input)
         };
         self.input_command.clear();
-        self.send_command(command, "ビルド", BUTTON_COMMAND_DELAY_MS);
+        let build_pipe_name = self.build_pipe_name();
+        self.send_command_to_pipe(command, "ビルド", BUTTON_COMMAND_DELAY_MS, build_pipe_name);
         self.pending_input_focus = true;
     }
 

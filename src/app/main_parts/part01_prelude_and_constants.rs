@@ -5,6 +5,8 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::sync::Arc;
@@ -25,6 +27,8 @@ const DEFAULT_PIPE_NAME: &str = "codex_shell_pipe";
 const DEFAULT_BUILD_COMMAND: &str = "cargo build";
 const DEFAULT_CODEX_COMMAND: &str = "codex --ask-for-approval on-request --sandbox read-only";
 const LISTENER_FILE_NAME: &str = "ps_pipe_listener.ps1";
+#[cfg(windows)]
+const CREATE_NEW_CONSOLE_FLAG: u32 = 0x0000_0010;
 const CONNECT_RETRY_COUNT: usize = 20;
 const CONNECT_RETRY_DELAY_MS: u64 = 120;
 const MAX_HISTORY: usize = 200;
@@ -58,12 +62,14 @@ const FIXED_INPUT_HEIGHT_PADDING: f32 = 12.0;
 const INPUT_COMMAND_ID_SALT: &str = "input_command_text_edit";
 const VOICE_INPUT_HOTKEY_LABEL: &str = "Ctrl+Alt+Right";
 
+#[allow(dead_code)]
 const LISTENER_SCRIPT: &str = r#"
 param(
     [Parameter(Mandatory = $true)]
     [string]$PipeName,
     [Parameter(Mandatory = $true)]
     [string]$WorkingDirectory,
+    [string]$WindowTitle = "相談用",
     [string]$LogFilePath = ""
 )
 
@@ -71,7 +77,11 @@ $ErrorActionPreference = "Continue"
 [Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 try { chcp 65001 > $null } catch {}
-try { $Host.UI.RawUI.WindowTitle = "相談用" } catch {}
+try {
+    if (-not [string]::IsNullOrWhiteSpace($WindowTitle)) {
+        $Host.UI.RawUI.WindowTitle = $WindowTitle
+    }
+} catch {}
 
 if (-not ("PipeConsoleBridge" -as [type])) {
 Add-Type -TypeDefinition @"
@@ -136,6 +146,12 @@ public static class PipeConsoleBridge
         uint nLength,
         out uint lpNumberOfEventsWritten
     );
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern short VkKeyScanW(char ch);
+
+    [DllImport("user32.dll")]
+    private static extern uint MapVirtualKeyW(uint uCode, uint uMapType);
 
     private static IntPtr InputHandle()
     {
@@ -213,35 +229,72 @@ public static class PipeConsoleBridge
 
         if (string.Equals(line, "__interrupt__", StringComparison.Ordinal))
         {
-            LogBoundary("INTERRUPT", line);
             SendCtrlC();
             return;
         }
 
         if (string.Equals(line, "__listener_exit__", StringComparison.Ordinal))
         {
-            LogBoundary("LISTENER EXIT", line);
             InjectLine("exit");
             _running = false;
             return;
         }
 
-        LogBoundary("COMMAND START", line);
         InjectLine(line);
-        LogBoundary("COMMAND END", line);
     }
 
     private static void InjectLine(string line)
     {
         foreach (var ch in line)
         {
-            WriteChar(ch, 0, 0, 0);
+            WriteTypedChar(ch);
         }
         if (ENTER_INJECT_DELAY_MS > 0)
         {
             Thread.Sleep(ENTER_INJECT_DELAY_MS);
         }
         WriteChar('\r', VK_RETURN, SCAN_RETURN, 0);
+    }
+
+    private static void WriteTypedChar(char unicodeChar)
+    {
+        const ushort VK_PACKET = 0xE7;
+        const uint MAPVK_VK_TO_VSC = 0;
+        const uint SHIFT_PRESSED = 0x0010;
+        const uint LEFT_CTRL_PRESSED = 0x0008;
+        const uint LEFT_ALT_PRESSED = 0x0002;
+
+        short keyInfo = VkKeyScanW(unicodeChar);
+        ushort virtualKeyCode;
+        ushort virtualScanCode;
+        uint controlState = 0;
+
+        if (keyInfo == -1)
+        {
+            // レイアウト変換できない文字は Unicode パケットとして注入する。
+            virtualKeyCode = VK_PACKET;
+            virtualScanCode = 0;
+        }
+        else
+        {
+            virtualKeyCode = (ushort)(keyInfo & 0x00FF);
+            byte shiftFlags = (byte)((keyInfo >> 8) & 0x00FF);
+            if ((shiftFlags & 0x01) != 0)
+            {
+                controlState |= SHIFT_PRESSED;
+            }
+            if ((shiftFlags & 0x02) != 0)
+            {
+                controlState |= LEFT_CTRL_PRESSED;
+            }
+            if ((shiftFlags & 0x04) != 0)
+            {
+                controlState |= LEFT_ALT_PRESSED;
+            }
+            virtualScanCode = (ushort)MapVirtualKeyW(virtualKeyCode, MAPVK_VK_TO_VSC);
+        }
+
+        WriteChar(unicodeChar, virtualKeyCode, virtualScanCode, controlState);
     }
 
     private static void SendCtrlC()
@@ -286,28 +339,18 @@ public static class PipeConsoleBridge
         }
     }
 
-    private static void LogBoundary(string label, string line)
-    {
-        var stamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-        Log("==================== " + label + " " + stamp + " ====================");
-        if (!string.IsNullOrWhiteSpace(line))
-        {
-            Log(line);
-        }
-    }
-
     private static void Log(string message)
     {
-        Console.WriteLine(message);
-        if (!string.IsNullOrWhiteSpace(_logFilePath))
+        if (string.IsNullOrWhiteSpace(_logFilePath))
         {
-            try
-            {
-                File.AppendAllText(_logFilePath, message + Environment.NewLine, Utf8NoBom);
-            }
-            catch
-            {
-            }
+            return;
+        }
+        try
+        {
+            File.AppendAllText(_logFilePath, message + Environment.NewLine, Utf8NoBom);
+        }
+        catch
+        {
         }
     }
 }
