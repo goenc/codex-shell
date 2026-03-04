@@ -4,12 +4,16 @@ struct AppConfig {
     working_dir: String,
     build_command: String,
     codex_command: String,
+    codex_command_a: String,
+    codex_command_b: String,
     input_prefix: String,
     startup_exe_1: String,
     startup_exe_2: String,
     startup_exe_3: String,
     startup_exe_4: String,
     show_size_overlay: bool,
+    main_window_width: f32,
+    main_window_height: f32,
 }
 
 impl Default for AppConfig {
@@ -20,12 +24,16 @@ impl Default for AppConfig {
                 .unwrap_or_else(|_| ".".to_string()),
             build_command: DEFAULT_BUILD_COMMAND.to_string(),
             codex_command: DEFAULT_CODEX_COMMAND.to_string(),
+            codex_command_a: DEFAULT_CODEX_COMMAND.to_string(),
+            codex_command_b: DEFAULT_CODEX_COMMAND.to_string(),
             input_prefix: String::new(),
             startup_exe_1: String::new(),
             startup_exe_2: String::new(),
             startup_exe_3: String::new(),
             startup_exe_4: String::new(),
             show_size_overlay: true,
+            main_window_width: FIXED_WINDOW_WIDTH,
+            main_window_height: FIXED_WINDOW_HEIGHT,
         }
     }
 }
@@ -84,6 +92,8 @@ impl UiDefinition {
             self.screens.push(default_settings_screen());
         }
         self.remove_legacy_pipe_settings_objects();
+        self.ensure_settings_codex_command_fields();
+        ensure_project_target_move_button(self);
         self.objects.clear();
     }
 
@@ -96,6 +106,78 @@ impl UiDefinition {
                 && object.id != "input_settings_pipe_name"
                 && object.bind.command.trim() != "config.pipe_name"
         });
+    }
+
+    fn ensure_settings_codex_command_fields(&mut self) {
+        let Some(settings_objects) = self.screen_objects_mut(UI_SETTINGS_SCREEN_ID) else {
+            return;
+        };
+        let mut codex_label_rect: Option<(f32, f32, f32, f32)> = None;
+        let mut codex_input_rect: Option<(f32, f32, f32, f32, i32)> = None;
+
+        for object in settings_objects.iter_mut() {
+            if object.id == "lbl_settings_codex" {
+                object.visual.text.value = "起動AコマンドA".to_string();
+                codex_label_rect = Some((
+                    object.position.x,
+                    object.position.y,
+                    object.size.w,
+                    object.size.h,
+                ));
+            }
+            if object.id == "input_settings_codex" {
+                if object.bind.command.trim() == ui_tool::CONFIG_CODEX_COMMAND {
+                    object.bind.command = ui_tool::CONFIG_CODEX_COMMAND_A.to_string();
+                }
+                codex_input_rect = Some((
+                    object.position.x,
+                    object.position.y,
+                    object.size.w,
+                    object.size.h,
+                    object.z_index,
+                ));
+            }
+        }
+
+        let has_label_b = settings_objects
+            .iter()
+            .any(|object| object.id == "lbl_settings_codex_b");
+        let has_input_b = settings_objects
+            .iter()
+            .any(|object| object.id == "input_settings_codex_b");
+        if has_label_b && has_input_b {
+            return;
+        }
+
+        let (label_x, label_y, label_w, label_h) =
+            codex_label_rect.unwrap_or((24.0, 160.0, 120.0, 24.0));
+        let (input_x, input_y, input_w, input_h, input_z) =
+            codex_input_rect.unwrap_or((156.0, 160.0, 640.0, 24.0, 110));
+        let b_y = (label_y.max(input_y) + 32.0).round();
+
+        if !has_label_b {
+            settings_objects.push(create_label_object(
+                "lbl_settings_codex_b",
+                "起動AコマンドB",
+                100,
+                label_x,
+                b_y,
+                label_w,
+                label_h,
+                "left",
+            ));
+        }
+        if !has_input_b {
+            settings_objects.push(create_input_object(
+                "input_settings_codex_b",
+                ui_tool::CONFIG_CODEX_COMMAND_B,
+                input_z,
+                input_x,
+                b_y,
+                input_w,
+                input_h,
+            ));
+        }
     }
 
     fn screen_ids(&self) -> Vec<String> {
@@ -197,6 +279,53 @@ fn ensure_project_target_label(definition: &mut UiDefinition) {
     objects.push(object);
 }
 
+fn ensure_project_target_move_button(definition: &mut UiDefinition) {
+    let Some(objects) = definition.screen_objects_mut(UI_MAIN_SCREEN_ID) else {
+        return;
+    };
+    let combo_rect = objects.iter_mut().find(|object| object.id == "cmb_project_selector");
+    if let Some(combo) = combo_rect {
+        combo.bind.command = ui_tool::MODE_PROJECT_TARGET_MOVE.to_string();
+    }
+    let combo_rect = objects
+        .iter()
+        .find(|object| object.id == "cmb_project_selector")
+        .map(|object| (object.position.x, object.position.y, object.size.w, object.size.h));
+    let Some((combo_x, combo_y, combo_w, combo_h)) = combo_rect else {
+        return;
+    };
+
+    if let Some(button) = objects
+        .iter_mut()
+        .find(|object| object.id == "btn_project_target_move")
+    {
+        button.object_type = "button".to_string();
+        button.bind.command = ui_tool::MODE_PROJECT_TARGET_MOVE.to_string();
+        button.visual.text.value = "このフォルダへ移動".to_string();
+        button.position.x = combo_x + combo_w + 8.0;
+        button.position.y = combo_y;
+        button.size.h = combo_h.max(24.0);
+        if button.size.w < 80.0 {
+            button.size.w = 96.0;
+        }
+        return;
+    }
+
+    let button_w = 96.0;
+    let mut button = create_button_object(
+        "btn_project_target_move",
+        "このフォルダへ移動",
+        ui_tool::MODE_PROJECT_TARGET_MOVE,
+        93,
+        combo_x + combo_w + 8.0,
+        combo_y,
+        button_w,
+        combo_h.max(24.0),
+    );
+    button.visual.text.font_size = 14.0;
+    objects.push(button);
+}
+
 fn default_settings_screen() -> UiScreen {
     let mut objects = vec![
         create_label_object("lbl_settings_title", "設定", 100, 24.0, 18.0, 240.0, 28.0, "left"),
@@ -229,13 +358,41 @@ fn default_settings_screen() -> UiScreen {
             640.0,
             24.0,
         ),
-        create_label_object("lbl_settings_codex", "Codex", 100, 24.0, 128.0, 120.0, 24.0, "left"),
+        create_label_object(
+            "lbl_settings_codex",
+            "起動AコマンドA",
+            100,
+            24.0,
+            128.0,
+            120.0,
+            24.0,
+            "left",
+        ),
         create_input_object(
             "input_settings_codex",
-            ui_tool::CONFIG_CODEX_COMMAND,
+            ui_tool::CONFIG_CODEX_COMMAND_A,
             110,
             156.0,
             128.0,
+            640.0,
+            24.0,
+        ),
+        create_label_object(
+            "lbl_settings_codex_b",
+            "起動AコマンドB",
+            100,
+            24.0,
+            160.0,
+            120.0,
+            24.0,
+            "left",
+        ),
+        create_input_object(
+            "input_settings_codex_b",
+            ui_tool::CONFIG_CODEX_COMMAND_B,
+            110,
+            156.0,
+            160.0,
             640.0,
             24.0,
         ),

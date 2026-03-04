@@ -295,6 +295,13 @@ impl CodexShellApp {
             self.mark_ui_definition_dirty();
         }
         if events.save_requested {
+            let current_size = ctx.content_rect().size();
+            if current_size.x > 1.0 && current_size.y > 1.0 {
+                self.config.main_window_width = current_size.x;
+                self.config.main_window_height = current_size.y;
+                self.save_config();
+                self.ui_resize_locked_by_save = true;
+            }
             self.save_live_ui_definition("UI編集内容を保存しました");
             self.update_status("UI編集内容を保存しました");
         }
@@ -405,7 +412,15 @@ impl eframe::App for CodexShellApp {
         self.apply_window_resize_policy(ctx);
         self.drain_send_results();
         self.reload_ui_definition_if_changed(ctx);
-        self.window_size = ctx.content_rect().size();
+        let next_window_size = ctx.content_rect().size();
+        if self.ui_edit_mode {
+            let width_changed = (next_window_size.x - self.window_size.x).abs() >= 1.0;
+            let height_changed = (next_window_size.y - self.window_size.y).abs() >= 1.0;
+            if self.window_size.x > 1.0 && self.window_size.y > 1.0 && (width_changed || height_changed) {
+                self.mark_ui_definition_dirty();
+            }
+        }
+        self.window_size = next_window_size;
         self.apply_runtime_background(ctx);
 
         egui::CentralPanel::default().show(ctx, |ui| {

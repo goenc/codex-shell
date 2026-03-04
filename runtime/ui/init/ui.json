@@ -1061,7 +1061,7 @@
       "visible": true,
       "enabled": true,
       "bind": {
-        "command": "",
+        "command": "mode.project_target_move",
         "group": ""
       },
       "visual": {
@@ -1228,7 +1228,68 @@
           }
         }
       }
+    },
+    {
+      "id": "btn_project_target_move",
+      "type": "button",
+      "z_index": 93,
+      "checked": false,
+      "position": {
+        "x": 817.0,
+        "y": 18.0
+      },
+      "size": {
+        "w": 96.0,
+        "h": 28.0
+      },
+      "visible": true,
+      "enabled": true,
+      "bind": {
+        "command": "mode.project_target_move",
+        "group": ""
+      },
+      "visual": {
+        "background": {
+          "image": "btn_primary",
+          "fit": "stretch"
+        },
+        "icon": {
+          "image": "",
+          "anchor": "center",
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
+        },
+        "text": {
+          "value": "移動",
+          "align": "center"
+        },
+        "states": {
+          "hover": {
+            "background": {
+              "image": "btn_hover",
+              "fit": "stretch"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "btn_pressed",
+              "fit": "stretch"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "btn_primary",
+              "fit": "stretch"
+            }
+          }
+        }
+      }
     }
   ]
 }
-

@@ -168,6 +168,45 @@ impl CodexShellApp {
         }
     }
 
+    fn move_both_shells_to_selected_project_dir(&mut self) {
+        let Some(target_dir) = self.target_project_dir_path.clone() else {
+            self.update_status("移動対象のプロジェクトフォルダが未選択です");
+            self.push_history("プロジェクトフォルダ移動を中止しました: 未選択");
+            return;
+        };
+        if self.codex_runtime_state == CodexRuntimeState::Calculating
+            || self.codex_runtime_state_b == CodexRuntimeState::Calculating
+        {
+            self.update_status("Codex実行中のためプロジェクトフォルダへ移動できません");
+            self.push_history("プロジェクトフォルダ移動を中止しました: Codex実行中");
+            return;
+        }
+
+        let escaped = target_dir
+            .to_string_lossy()
+            .replace('\'', "''");
+        let command = format!("Set-Location -LiteralPath '{escaped}'");
+        let main_pipe = self.main_pipe_name();
+        let build_pipe = self.build_pipe_name();
+        self.send_command_to_pipe(
+            command.clone(),
+            "プロジェクト移動(相談)",
+            BUTTON_COMMAND_DELAY_MS,
+            main_pipe,
+        );
+        self.send_command_to_pipe(
+            command,
+            "プロジェクト移動(実装)",
+            BUTTON_COMMAND_DELAY_MS,
+            build_pipe,
+        );
+        self.update_status("相談/実装の作業フォルダを同じプロジェクトへ移動しました");
+        self.push_history(format!(
+            "相談/実装の作業フォルダを移動しました: {}",
+            target_dir.display()
+        ));
+    }
+
     fn browse_startup_executable(&mut self, slot: usize) {
         match select_executable_file_path() {
             Ok(Some(path)) => {
@@ -217,21 +256,24 @@ impl CodexShellApp {
     }
 
     fn send_codex_command_a(&mut self) {
-        self.send_codex_command_to("Codex", false);
+        self.send_codex_command_to("Codex", false, self.config.codex_command_a.trim().to_string());
     }
 
     fn send_codex_command_b(&mut self) {
-        self.send_codex_command_to("CodexB", true);
+        self.send_codex_command_to(
+            "CodexB",
+            true,
+            self.config.codex_command_b.trim().to_string(),
+        );
     }
 
-    fn send_codex_command_to(&mut self, source: &str, to_build_pipe: bool) {
+    fn send_codex_command_to(&mut self, source: &str, to_build_pipe: bool, command: String) {
         let selected = self.selected_reasoning_effort.clone();
         match update_reasoning_effort(&selected) {
             Ok(()) => {
                 self.push_history(format!(
                     "config.toml を更新しました: model_reasoning_effort = \"{selected}\""
                 ));
-                let command = self.config.codex_command.trim().to_string();
                 if to_build_pipe {
                     let pipe_name = self.build_pipe_name();
                     self.send_command_to_pipe(command, source, BUTTON_COMMAND_DELAY_MS, pipe_name);

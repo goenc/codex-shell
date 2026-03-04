@@ -166,11 +166,22 @@ impl CodexShellApp {
                     *state_changed = true;
                 }
             }
-            ui_tool::CONFIG_CODEX_COMMAND => {
+            ui_tool::CONFIG_CODEX_COMMAND | ui_tool::CONFIG_CODEX_COMMAND_A => {
                 let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
                         [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.codex_command),
+                        TextEdit::singleline(&mut self.config.codex_command_a),
+                    )
+                });
+                if response.inner.changed() {
+                    *state_changed = true;
+                }
+            }
+            ui_tool::CONFIG_CODEX_COMMAND_B => {
+                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
+                    ui.add_sized(
+                        [ctx.object_size.x, ctx.object_size.y],
+                        TextEdit::singleline(&mut self.config.codex_command_b),
                     )
                 });
                 if response.inner.changed() {
@@ -332,27 +343,59 @@ impl CodexShellApp {
     }
 
     fn render_obj_project_combo_box(&mut self, ctx: &mut RenderObjCtx<'_>) {
-        let enabled = ctx.controls_enabled && ctx.object.enabled;
+        let enabled = ctx.controls_enabled
+            && ctx.object.enabled
+            && self.is_bind_command_enabled(ctx.object_command);
+        let placeholder_text = ctx.object.visual.text.value.trim();
         let selected_text = self
             .project_selected_index
             .and_then(|index| self.project_declarations.get(index))
             .map(|entry| entry.name.clone())
-            .unwrap_or_else(|| "プロジェクトを選択".to_string());
+            .unwrap_or_else(|| {
+                if placeholder_text.is_empty() {
+                    "プロジェクトを選択".to_string()
+                } else {
+                    placeholder_text.to_string()
+                }
+            });
         let mut selected_index = self.project_selected_index;
         ctx.ui.add_enabled_ui(enabled, |ui| {
-            ui.set_min_width(ctx.object_size.x);
-            egui::ComboBox::from_id_salt(("project_combo_box", ctx.object_id))
-                .width(ctx.object_size.x)
-                .selected_text(selected_text)
-                .show_ui(ui, |ui| {
-                    if self.project_declarations.is_empty() {
-                        ui.label("プロジェクト宣言_*.md が見つかりません");
-                    } else {
-                        for (index, entry) in self.project_declarations.iter().enumerate() {
-                            ui.selectable_value(&mut selected_index, Some(index), entry.name.as_str());
-                        }
-                    }
-                });
+            ui.allocate_ui_with_layout(
+                ctx.object_size,
+                egui::Layout::left_to_right(egui::Align::Center),
+                |ui| {
+                    ui.scope(|ui| {
+                        let fixed_width = ctx.object_size.x.max(12.0);
+                        ui.style_mut()
+                            .text_styles
+                            .insert(egui::TextStyle::Button, ctx.text_font.clone());
+                        ui.style_mut()
+                            .text_styles
+                            .insert(egui::TextStyle::Body, ctx.text_font.clone());
+                        ui.spacing_mut().combo_width = fixed_width;
+                        ui.spacing_mut().interact_size.y = ctx.object_size.y.max(18.0);
+                        ui.set_min_width(fixed_width);
+                        ui.set_max_width(fixed_width);
+                        egui::ComboBox::from_id_salt(("project_combo_box", ctx.object_id))
+                            .width(fixed_width)
+                            .selected_text(selected_text)
+                            .show_ui(ui, |ui| {
+                                if self.project_declarations.is_empty() {
+                                    ui.label("プロジェクト宣言_*.md が見つかりません");
+                                } else {
+                                    for (index, entry) in self.project_declarations.iter().enumerate()
+                                    {
+                                        ui.selectable_value(
+                                            &mut selected_index,
+                                            Some(index),
+                                            entry.name.as_str(),
+                                        );
+                                    }
+                                }
+                            });
+                    });
+                },
+            );
         });
         if selected_index != self.project_selected_index {
             self.project_selected_index = selected_index;

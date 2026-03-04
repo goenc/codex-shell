@@ -4,11 +4,22 @@ impl CodexShellApp {
             .context("同梱フォント読み込みに失敗しました。assets/fonts を確認してください")?;
         apply_visual_fix(&cc.egui_ctx);
 
-        let config = load_config().unwrap_or_default();
+        let mut config = load_config().unwrap_or_default();
+        if config.codex_command_a.trim().is_empty() {
+            config.codex_command_a = if config.codex_command.trim().is_empty() {
+                DEFAULT_CODEX_COMMAND.to_string()
+            } else {
+                config.codex_command.clone()
+            };
+        }
+        if config.codex_command_b.trim().is_empty() {
+            config.codex_command_b = config.codex_command_a.clone();
+        }
         let ui_live_path = ensure_live_ui_file()?;
         let mut ui_definition = load_ui_definition(&ui_live_path)?;
         ui_definition.normalize_screens();
         ensure_project_target_label(&mut ui_definition);
+        ensure_project_target_move_button(&mut ui_definition);
         let ui_last_modified = ui_file_modified_time(&ui_live_path).ok();
         let ui_selected_object_id = ui_definition
             .screen_objects(UI_MAIN_SCREEN_ID)
@@ -54,10 +65,11 @@ impl CodexShellApp {
             window_size: egui::vec2(0.0, 0.0),
             input_area_size: egui::vec2(0.0, 0.0),
             ui_font_names,
-            resize_enabled: false,
+            resize_enabled: true,
             voice_input_active: false,
             pending_input_focus: false,
             build_confirm_open: false,
+            ui_resize_locked_by_save: false,
             project_runtime_active: false,
             active_project_declaration_path: None,
             target_project_dir_path: None,
@@ -88,7 +100,7 @@ impl CodexShellApp {
     }
 
     fn apply_window_resize_policy(&mut self, ctx: &egui::Context) {
-        let allow_resize = self.config.show_size_overlay && !self.is_main_window_resize_locked();
+        let allow_resize = self.ui_edit_mode && !self.ui_resize_locked_by_save;
         if self.resize_enabled == allow_resize {
             return;
         }
@@ -99,24 +111,15 @@ impl CodexShellApp {
             ctx.send_viewport_cmd(egui::ViewportCommand::MaxInnerSize(egui::vec2(8192.0, 8192.0)));
             ctx.send_viewport_cmd(egui::ViewportCommand::Resizable(true));
         } else {
-            let lock_size = if self.config.show_size_overlay
-                && self.is_main_window_resize_locked()
-                && self.window_size.x > 1.0
-                && self.window_size.y > 1.0
-            {
-                self.window_size
-            } else {
-                egui::vec2(FIXED_WINDOW_WIDTH, FIXED_WINDOW_HEIGHT)
-            };
+            let lock_size = egui::vec2(
+                self.config.main_window_width.max(100.0),
+                self.config.main_window_height.max(100.0),
+            );
             ctx.send_viewport_cmd(egui::ViewportCommand::Resizable(false));
             ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(lock_size));
             ctx.send_viewport_cmd(egui::ViewportCommand::MaxInnerSize(lock_size));
             ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(lock_size));
         }
-    }
-
-    fn is_main_window_resize_locked(&self) -> bool {
-        self.ui_edit_mode && Self::is_modal_screen(self.ui_current_screen_id.as_str())
     }
 
     fn push_history(&mut self, message: impl Into<String>) {

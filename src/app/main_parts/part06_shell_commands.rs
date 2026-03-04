@@ -52,6 +52,7 @@ impl CodexShellApp {
             Ok(mut definition) => {
                 definition.normalize_screens();
                 ensure_project_target_label(&mut definition);
+                ensure_project_target_move_button(&mut definition);
                 self.ui_definition = definition;
                 self.ui_last_modified = Some(modified);
                 self.ui_has_unsaved_changes = false;
@@ -103,6 +104,11 @@ impl CodexShellApp {
                 self.codex_runtime_state_b != CodexRuntimeState::Calculating
             }
             ui_tool::MODE_PROJECT_DEBUG_RUN => self.active_project_declaration_path.is_some(),
+            ui_tool::MODE_PROJECT_TARGET_MOVE => {
+                self.target_project_dir_path.is_some()
+                    && self.codex_runtime_state != CodexRuntimeState::Calculating
+                    && self.codex_runtime_state_b != CodexRuntimeState::Calculating
+            }
             _ => true,
         }
     }
@@ -242,6 +248,10 @@ impl CodexShellApp {
         self.launch_active_project_debug_executable();
     }
 
+    fn handle_mode_project_target_move(&mut self) {
+        self.move_both_shells_to_selected_project_dir();
+    }
+
     fn handle_input_send(&mut self) {
         self.send_input_command_by_button();
     }
@@ -296,6 +306,7 @@ impl CodexShellApp {
         });
         if self.ui_edit_mode {
             self.ui_selected_screen_id = self.ui_current_screen_id.clone();
+            self.ui_resize_locked_by_save = false;
         }
         if self.ui_edit_mode
             && (self.ui_selected_object_id.is_empty()
@@ -342,6 +353,7 @@ impl CodexShellApp {
             MODE_STOP_B => self.handle_mode_stop_b(),
             MODE_BUILD => self.handle_mode_build(),
             MODE_PROJECT_DEBUG_RUN => self.handle_mode_project_debug_run(),
+            MODE_PROJECT_TARGET_MOVE => self.handle_mode_project_target_move(),
             INPUT_SEND => self.handle_input_send(),
             INPUT_VOICE_TOGGLE => self.handle_input_voice_toggle(),
             UI_SETTINGS => self.handle_ui_settings(),
