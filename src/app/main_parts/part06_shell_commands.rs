@@ -99,6 +99,9 @@ impl CodexShellApp {
     fn is_bind_command_enabled(&self, command: &str) -> bool {
         match command.trim() {
             ui_tool::MODE_CODEX_START => self.codex_runtime_state != CodexRuntimeState::Calculating,
+            ui_tool::MODE_CODEX_START_B => {
+                self.codex_runtime_state_b != CodexRuntimeState::Calculating
+            }
             ui_tool::MODE_PROJECT_DEBUG_RUN => self.active_project_declaration_path.is_some(),
             _ => true,
         }
@@ -159,6 +162,7 @@ impl CodexShellApp {
         match object.bind.command.trim() {
             ui_tool::STATUS_MESSAGE => format!("状態: {}", self.status_message),
             ui_tool::CODEX_STATE => format!("Codex状態: {}", self.codex_runtime_state.label()),
+            CODEX_STATE_B => format!("Codex状態B: {}", self.codex_runtime_state_b.label()),
             ui_tool::PROJECT_TARGET_STATE => self
                 .active_project_declaration_path
                 .as_ref()
@@ -209,11 +213,19 @@ impl CodexShellApp {
     }
 
     fn handle_mode_codex_start(&mut self) {
-        self.send_codex_command();
+        self.send_codex_command_a();
+    }
+
+    fn handle_mode_codex_start_b(&mut self) {
+        self.send_codex_command_b();
     }
 
     fn handle_mode_stop(&mut self) {
-        self.request_interrupt();
+        self.request_interrupt_a();
+    }
+
+    fn handle_mode_stop_b(&mut self) {
+        self.request_interrupt_b();
     }
 
     fn handle_mode_build(&mut self) {
@@ -324,7 +336,9 @@ impl CodexShellApp {
         match command {
             "" => {}
             MODE_CODEX_START => self.handle_mode_codex_start(),
+            MODE_CODEX_START_B => self.handle_mode_codex_start_b(),
             MODE_STOP => self.handle_mode_stop(),
+            MODE_STOP_B => self.handle_mode_stop_b(),
             MODE_BUILD => self.handle_mode_build(),
             MODE_PROJECT_DEBUG_RUN => self.handle_mode_project_debug_run(),
             INPUT_SEND => self.handle_input_send(),

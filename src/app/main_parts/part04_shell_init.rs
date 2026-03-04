@@ -42,6 +42,7 @@ impl CodexShellApp {
             input_command: String::new(),
             status_message: "待機中".to_string(),
             codex_runtime_state: CodexRuntimeState::Stopped,
+            codex_runtime_state_b: CodexRuntimeState::Stopped,
             history: Vec::new(),
             powershell_child: None,
             build_powershell_child: None,
@@ -140,8 +141,14 @@ impl CodexShellApp {
         }
     }
 
+    fn set_codex_runtime_state_b(&mut self, state: CodexRuntimeState) {
+        self.codex_runtime_state_b = state;
+    }
+
     fn runtime_background_color(&self) -> Color32 {
-        if self.codex_runtime_state != CodexRuntimeState::Calculating {
+        let codex_a_active = self.codex_runtime_state == CodexRuntimeState::Calculating;
+        let codex_b_active = self.codex_runtime_state_b == CodexRuntimeState::Calculating;
+        if !codex_a_active && !codex_b_active {
             return Color32::from_rgb(224, 224, 224);
         }
         if self.project_runtime_active {
@@ -167,6 +174,7 @@ impl CodexShellApp {
         }
         self.active_main_pipe_name.clear();
         self.set_codex_runtime_state(CodexRuntimeState::Stopped);
+        self.set_codex_runtime_state_b(CodexRuntimeState::Stopped);
     }
 
     fn stop_build_shell_process(&mut self) {
@@ -175,6 +183,7 @@ impl CodexShellApp {
             let _ = child.wait();
         }
         self.active_build_pipe_name.clear();
+        self.set_codex_runtime_state_b(CodexRuntimeState::Stopped);
     }
 
     fn start_listener(&mut self) {

@@ -362,6 +362,7 @@ struct CodexShellApp {
     input_command: String,
     status_message: String,
     codex_runtime_state: CodexRuntimeState,
+    codex_runtime_state_b: CodexRuntimeState,
     history: Vec<String>,
     powershell_child: Option<Child>,
     build_powershell_child: Option<Child>,

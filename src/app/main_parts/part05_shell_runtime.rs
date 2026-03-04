@@ -249,7 +249,15 @@ impl CodexShellApp {
         }
     }
 
-    fn send_codex_command(&mut self) {
+    fn send_codex_command_a(&mut self) {
+        self.send_codex_command_to("Codex", false);
+    }
+
+    fn send_codex_command_b(&mut self) {
+        self.send_codex_command_to("CodexB", true);
+    }
+
+    fn send_codex_command_to(&mut self, source: &str, to_build_pipe: bool) {
         let selected = self.selected_reasoning_effort.clone();
         match update_reasoning_effort(&selected) {
             Ok(()) => {
@@ -257,19 +265,34 @@ impl CodexShellApp {
                     "config.toml を更新しました: model_reasoning_effort = \"{selected}\""
                 ));
                 let command = self.config.codex_command.trim().to_string();
-                self.send_command(command, "Codex", BUTTON_COMMAND_DELAY_MS);
+                if to_build_pipe {
+                    let pipe_name = self.build_pipe_name();
+                    self.send_command_to_pipe(command, source, BUTTON_COMMAND_DELAY_MS, pipe_name);
+                } else {
+                    self.send_command(command, source, BUTTON_COMMAND_DELAY_MS);
+                }
             }
             Err(err) => {
                 self.update_status(format!("config.toml 更新失敗: {err}"));
                 self.push_history(format!("config.toml 更新失敗: {err}"));
-                self.set_codex_runtime_state(CodexRuntimeState::Stopped);
+                if to_build_pipe {
+                    self.set_codex_runtime_state_b(CodexRuntimeState::Stopped);
+                } else {
+                    self.set_codex_runtime_state(CodexRuntimeState::Stopped);
+                }
             }
         }
     }
 
-    fn request_interrupt(&mut self) {
+    fn request_interrupt_a(&mut self) {
         self.send_command("__interrupt__".to_string(), "停止", 0);
         self.set_codex_runtime_state(CodexRuntimeState::Stopped);
+    }
+
+    fn request_interrupt_b(&mut self) {
+        let pipe_name = self.build_pipe_name();
+        self.send_command_to_pipe("__interrupt__".to_string(), "停止B", 0, pipe_name);
+        self.set_codex_runtime_state_b(CodexRuntimeState::Stopped);
     }
 
     fn drain_send_results(&mut self) {
@@ -280,17 +303,25 @@ impl CodexShellApp {
                         self.update_status("停止要求を送信しました");
                         self.push_history("停止要求を送信しました");
                         self.set_codex_runtime_state(CodexRuntimeState::Stopped);
+                    } else if source == "停止B" {
+                        self.update_status("停止B要求を送信しました");
+                        self.push_history("停止B要求を送信しました");
+                        self.set_codex_runtime_state_b(CodexRuntimeState::Stopped);
                     } else if source == "Codex" {
                         self.update_status("Codex起動コマンドを送信しました");
-                self.push_history(format!("{source}: {command}"));
-                self.set_codex_runtime_state(CodexRuntimeState::Calculating);
-                self.project_runtime_active = false;
-                self.active_project_declaration_path = None;
-                self.refresh_project_declarations();
-                self.project_selector_open = true;
-            } else if source == "プロジェクト開始" {
-                self.update_status("プロジェクト開始を送信しました");
-                self.push_history(format!("{source}: {command}"));
+                        self.push_history(format!("{source}: {command}"));
+                        self.set_codex_runtime_state(CodexRuntimeState::Calculating);
+                        self.project_runtime_active = false;
+                        self.active_project_declaration_path = None;
+                        self.refresh_project_declarations();
+                        self.project_selector_open = true;
+                    } else if source == "CodexB" {
+                        self.update_status("Codex起動Bコマンドを送信しました");
+                        self.push_history(format!("{source}: {command}"));
+                        self.set_codex_runtime_state_b(CodexRuntimeState::Calculating);
+                    } else if source == "プロジェクト開始" {
+                        self.update_status("プロジェクト開始を送信しました");
+                        self.push_history(format!("{source}: {command}"));
                         self.project_runtime_active = true;
                     } else {
                         self.update_status(format!("{source}コマンド送信済み"));
@@ -302,6 +333,8 @@ impl CodexShellApp {
                     self.push_history(format!("送信失敗 ({source}): {error}"));
                     if source == "Codex" {
                         self.set_codex_runtime_state(CodexRuntimeState::Stopped);
+                    } else if source == "CodexB" || source == "停止B" {
+                        self.set_codex_runtime_state_b(CodexRuntimeState::Stopped);
                     } else if source == "プロジェクト開始" {
                         self.project_runtime_active = false;
                     }

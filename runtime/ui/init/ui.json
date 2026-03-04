@@ -132,6 +132,126 @@
       }
     },
     {
+      "id": "btn_codex_start_b",
+      "type": "button",
+      "z_index": 90,
+      "position": {
+        "x": 24.0,
+        "y": 52.0
+      },
+      "size": {
+        "w": 120.0,
+        "h": 28.0
+      },
+      "visible": true,
+      "enabled": true,
+      "bind": {
+        "command": "mode.codex_start_b"
+      },
+      "visual": {
+        "background": {
+          "image": "btn_primary",
+          "fit": "stretch"
+        },
+        "icon": {
+          "image": "",
+          "anchor": "center",
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
+        },
+        "text": {
+          "value": "Codex起動B",
+          "align": "center"
+        },
+        "states": {
+          "hover": {
+            "background": {
+              "image": "btn_hover",
+              "fit": "stretch"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "btn_pressed",
+              "fit": "stretch"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "btn_primary",
+              "fit": "stretch"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "btn_stop_b",
+      "type": "button",
+      "z_index": 20,
+      "position": {
+        "x": 152.0,
+        "y": 52.0
+      },
+      "size": {
+        "w": 96.0,
+        "h": 28.0
+      },
+      "visible": true,
+      "enabled": true,
+      "bind": {
+        "command": "mode.stop_b"
+      },
+      "visual": {
+        "background": {
+          "image": "btn_primary",
+          "fit": "stretch"
+        },
+        "icon": {
+          "image": "",
+          "anchor": "center",
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
+        },
+        "text": {
+          "value": "停止B",
+          "align": "center"
+        },
+        "states": {
+          "hover": {
+            "background": {
+              "image": "btn_hover",
+              "fit": "stretch"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "btn_pressed",
+              "fit": "stretch"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "btn_primary",
+              "fit": "stretch"
+            }
+          }
+        }
+      }
+    },
+    {
       "id": "btn_settings",
       "type": "button",
       "z_index": 30,
@@ -821,6 +941,66 @@
       "bind": {
         "command": "codex.state",
         "group": ""
+      },
+      "visual": {
+        "background": {
+          "image": "",
+          "fit": "none"
+        },
+        "icon": {
+          "image": "",
+          "anchor": "center",
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
+        },
+        "text": {
+          "value": "",
+          "align": "left"
+        },
+        "states": {
+          "hover": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "lbl_codex_state_b",
+      "type": "label",
+      "z_index": 85,
+      "position": {
+        "x": 778.0,
+        "y": 76.0
+      },
+      "size": {
+        "w": 220.0,
+        "h": 28.0
+      },
+      "visible": true,
+      "enabled": true,
+      "bind": {
+        "command": "codex.state_b"
       },
       "visual": {
         "background": {

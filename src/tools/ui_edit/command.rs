@@ -3,9 +3,12 @@
 pub const PROJECT_TARGET_STATE: &str = "project.target_state";
 pub const STATUS_MESSAGE: &str = "status.message";
 pub const CODEX_STATE: &str = "codex.state";
+pub const CODEX_STATE_B: &str = "codex.state_b";
 pub const UI_EDIT_LOCKED_HINT: &str = "ui.edit.locked_hint";
 pub const MODE_CODEX_START: &str = "mode.codex_start";
+pub const MODE_CODEX_START_B: &str = "mode.codex_start_b";
 pub const MODE_STOP: &str = "mode.stop";
+pub const MODE_STOP_B: &str = "mode.stop_b";
 pub const MODE_BUILD: &str = "mode.build";
 pub const MODE_PROJECT_DEBUG_RUN: &str = "mode.project_debug_run";
 pub const INPUT_SEND: &str = "input.send";
@@ -36,9 +39,12 @@ pub const ALL_UI_COMMANDS: &[&str] = &[
     PROJECT_TARGET_STATE,
     STATUS_MESSAGE,
     CODEX_STATE,
+    CODEX_STATE_B,
     UI_EDIT_LOCKED_HINT,
     MODE_CODEX_START,
+    MODE_CODEX_START_B,
     MODE_STOP,
+    MODE_STOP_B,
     MODE_BUILD,
     MODE_PROJECT_DEBUG_RUN,
     INPUT_SEND,
