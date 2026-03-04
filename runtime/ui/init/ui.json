@@ -862,68 +862,6 @@
       }
     },
     {
-      "id": "panel_header",
-      "type": "panel",
-      "z_index": 5,
-      "checked": false,
-      "position": {
-        "x": 12.0,
-        "y": 8.0
-      },
-      "size": {
-        "w": 896.0,
-        "h": 40.0
-      },
-      "visible": true,
-      "enabled": true,
-      "bind": {
-        "command": "",
-        "group": ""
-      },
-      "visual": {
-        "background": {
-          "image": "",
-          "fit": "none"
-        },
-        "icon": {
-          "image": "",
-          "anchor": "center",
-          "offset": {
-            "x": 0.0,
-            "y": 0.0
-          },
-          "size": {
-            "w": 0.0,
-            "h": 0.0
-          }
-        },
-        "text": {
-          "value": "",
-          "align": "left"
-        },
-        "states": {
-          "hover": {
-            "background": {
-              "image": "",
-              "fit": "none"
-            }
-          },
-          "pressed": {
-            "background": {
-              "image": "",
-              "fit": "none"
-            }
-          },
-          "disabled": {
-            "background": {
-              "image": "",
-              "fit": "none"
-            }
-          }
-        }
-      }
-    },
-    {
       "id": "lbl_codex_state",
       "type": "label",
       "z_index": 85,

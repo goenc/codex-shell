@@ -132,6 +132,45 @@ fn create_checkbox_object(
     }
 }
 
+fn create_radio_object(
+    id: &str,
+    text: &str,
+    command: &str,
+    group: &str,
+    checked: bool,
+    z_index: i32,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+) -> UiObject {
+    UiObject {
+        id: id.to_string(),
+        object_type: "radio".to_string(),
+        z_index,
+        checked,
+        position: UiPosition { x, y },
+        size: UiSize { w, h },
+        visible: true,
+        enabled: true,
+        bind: UiBind {
+            command: command.to_string(),
+            group: group.to_string(),
+        },
+        visual: UiVisual {
+            text: UiText {
+                value: text.to_string(),
+                align: "center".to_string(),
+                font_size: 16.0,
+                font_family: "noto_sans_jp".to_string(),
+                bold: false,
+                italic: false,
+            },
+            ..UiVisual::default()
+        },
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 struct UiAssets {

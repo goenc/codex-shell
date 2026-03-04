@@ -93,6 +93,7 @@ impl UiDefinition {
         }
         self.remove_legacy_pipe_settings_objects();
         self.ensure_settings_codex_command_fields();
+        self.relocate_reasoning_controls_to_settings();
         ensure_project_target_move_button(self);
         self.objects.clear();
     }
@@ -176,6 +177,101 @@ impl UiDefinition {
                 b_y,
                 input_w,
                 input_h,
+            ));
+        }
+    }
+
+    fn relocate_reasoning_controls_to_settings(&mut self) {
+        let reasoning_commands = [
+            ui_tool::REASONING_MEDIUM,
+            ui_tool::REASONING_HIGH,
+            ui_tool::REASONING_XHIGH,
+        ];
+        let reasoning_ids = [
+            "lbl_reasoning_effort",
+            "lbl_settings_reasoning_effort",
+            "radio_reasoning_medium",
+            "radio_reasoning_high",
+            "radio_reasoning_xhigh",
+            "radio_settings_reasoning_medium",
+            "radio_settings_reasoning_high",
+            "radio_settings_reasoning_xhigh",
+        ];
+        if let Some(main_objects) = self.screen_objects_mut(UI_MAIN_SCREEN_ID) {
+            main_objects.retain(|object| {
+                !reasoning_ids.contains(&object.id.as_str())
+                    && !reasoning_commands.contains(&object.bind.command.trim())
+            });
+        }
+
+        let Some(settings_objects) = self.screen_objects_mut(UI_SETTINGS_SCREEN_ID) else {
+            return;
+        };
+        let has_label = settings_objects.iter().any(|object| {
+            object.id == "lbl_settings_reasoning_effort" || object.id == "lbl_reasoning_effort"
+        });
+        let has_medium = settings_objects
+            .iter()
+            .any(|object| object.bind.command.trim() == ui_tool::REASONING_MEDIUM);
+        let has_high = settings_objects
+            .iter()
+            .any(|object| object.bind.command.trim() == ui_tool::REASONING_HIGH);
+        let has_xhigh = settings_objects
+            .iter()
+            .any(|object| object.bind.command.trim() == ui_tool::REASONING_XHIGH);
+
+        if !has_label {
+            settings_objects.push(create_label_object(
+                "lbl_settings_reasoning_effort",
+                "思考深度",
+                100,
+                320.0,
+                18.0,
+                72.0,
+                28.0,
+                "left",
+            ));
+        }
+        if !has_medium {
+            settings_objects.push(create_radio_object(
+                "radio_settings_reasoning_medium",
+                "medium",
+                ui_tool::REASONING_MEDIUM,
+                "reasoning_effort",
+                true,
+                110,
+                396.0,
+                18.0,
+                78.0,
+                28.0,
+            ));
+        }
+        if !has_high {
+            settings_objects.push(create_radio_object(
+                "radio_settings_reasoning_high",
+                "high",
+                ui_tool::REASONING_HIGH,
+                "reasoning_effort",
+                false,
+                110,
+                482.0,
+                18.0,
+                66.0,
+                28.0,
+            ));
+        }
+        if !has_xhigh {
+            settings_objects.push(create_radio_object(
+                "radio_settings_reasoning_xhigh",
+                "xhigh",
+                ui_tool::REASONING_XHIGH,
+                "reasoning_effort",
+                false,
+                110,
+                556.0,
+                18.0,
+                72.0,
+                28.0,
             ));
         }
     }

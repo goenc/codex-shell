@@ -291,28 +291,11 @@ impl CodexShellApp {
     }
 
     fn send_codex_command_to(&mut self, source: &str, to_build_pipe: bool, command: String) {
-        let selected = self.selected_reasoning_effort.clone();
-        match update_reasoning_effort(&selected) {
-            Ok(()) => {
-                self.push_history(format!(
-                    "config.toml を更新しました: model_reasoning_effort = \"{selected}\""
-                ));
-                if to_build_pipe {
-                    let pipe_name = self.build_pipe_name();
-                    self.send_command_to_pipe(command, source, BUTTON_COMMAND_DELAY_MS, pipe_name);
-                } else {
-                    self.send_command(command, source, BUTTON_COMMAND_DELAY_MS);
-                }
-            }
-            Err(err) => {
-                self.update_status(format!("config.toml 更新失敗: {err}"));
-                self.push_history(format!("config.toml 更新失敗: {err}"));
-                if to_build_pipe {
-                    self.set_codex_runtime_state_b(CodexRuntimeState::Stopped);
-                } else {
-                    self.set_codex_runtime_state(CodexRuntimeState::Stopped);
-                }
-            }
+        if to_build_pipe {
+            let pipe_name = self.build_pipe_name();
+            self.send_command_to_pipe(command, source, BUTTON_COMMAND_DELAY_MS, pipe_name);
+        } else {
+            self.send_command(command, source, BUTTON_COMMAND_DELAY_MS);
         }
     }
 

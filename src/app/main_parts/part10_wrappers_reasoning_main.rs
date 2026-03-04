@@ -22,6 +22,24 @@ fn maybe_run_conpty_listener_mode() -> Result<bool> {
     app::conpty_listener::maybe_run_from_args()
 }
 
+fn load_reasoning_effort() -> String {
+    let config_path = Path::new(CODEX_CONFIG_PATH);
+    let Ok(current) = fs::read_to_string(config_path) else {
+        return "medium".to_string();
+    };
+    let Ok(verify_pattern) = Regex::new(r#"model_reasoning_effort\s*=\s*"(.*?)""#) else {
+        return "medium".to_string();
+    };
+    for captures in verify_pattern.captures_iter(&current) {
+        if let Some(value) = captures.get(1).map(|m| m.as_str())
+            && matches!(value, "medium" | "high" | "xhigh")
+        {
+            return value.to_string();
+        }
+    }
+    "medium".to_string()
+}
+
 fn update_reasoning_effort(selected: &str) -> Result<(), String> {
     if !matches!(selected, "medium" | "high" | "xhigh") {
         return Err(format!("不正な思考深度です: {selected}"));

@@ -289,7 +289,22 @@ impl CodexShellApp {
     }
 
     fn handle_reasoning_effort(&mut self, effort: &str) {
-        self.selected_reasoning_effort = effort.to_string();
+        if self.selected_reasoning_effort == effort {
+            return;
+        }
+        match update_reasoning_effort(effort) {
+            Ok(()) => {
+                self.selected_reasoning_effort = effort.to_string();
+                self.update_status(format!("思考深度を {effort} に設定しました"));
+                self.push_history(format!(
+                    "config.toml を更新しました: model_reasoning_effort = \"{effort}\""
+                ));
+            }
+            Err(err) => {
+                self.update_status(format!("config.toml 更新失敗: {err}"));
+                self.push_history(format!("config.toml 更新失敗: {err}"));
+            }
+        }
     }
 
     fn handle_ui_edit_toggle(&mut self) {

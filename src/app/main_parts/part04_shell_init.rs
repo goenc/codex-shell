@@ -35,6 +35,7 @@ impl CodexShellApp {
         let (send_tx, send_rx) = mpsc::channel::<SendRequest>();
         let (send_result_tx, send_result_rx) = mpsc::channel::<SendResult>();
         spawn_send_worker(send_rx, send_result_tx);
+        let selected_reasoning_effort = load_reasoning_effort();
 
         let mut app = Self {
             config,
@@ -49,7 +50,7 @@ impl CodexShellApp {
             ui_selected_screen_id: UI_MAIN_SCREEN_ID.to_string(),
             ui_selected_object_id,
             ui_selected_object_ids,
-            selected_reasoning_effort: "medium".to_string(),
+            selected_reasoning_effort,
             input_command: String::new(),
             status_message: "待機中".to_string(),
             codex_runtime_state: CodexRuntimeState::Stopped,
