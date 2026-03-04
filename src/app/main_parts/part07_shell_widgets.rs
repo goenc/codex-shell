@@ -483,6 +483,9 @@ impl CodexShellApp {
         if ctx.object.visual.text.italic {
             rich = rich.italics();
         }
+        if !enabled {
+            rich = rich.color(Color32::from_gray(140));
+        }
         let response = ctx.ui.add_enabled_ui(enabled, |ui| {
             ui.add_sized([ctx.object_size.x, ctx.object_size.y], egui::Button::new(rich))
         });
