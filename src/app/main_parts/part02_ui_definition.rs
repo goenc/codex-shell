@@ -395,14 +395,8 @@ fn ensure_project_target_move_button(definition: &mut UiDefinition) {
         .iter_mut()
         .find(|object| object.id == "btn_project_target_move")
     {
-        button.object_type = "button".to_string();
-        button.bind.command = ui_tool::MODE_PROJECT_TARGET_MOVE.to_string();
-        button.visual.text.value = "このフォルダへ移動".to_string();
-        button.position.x = combo_x + combo_w + 8.0;
-        button.position.y = combo_y;
-        button.size.h = combo_h.max(24.0);
-        if button.size.w < 80.0 {
-            button.size.w = 96.0;
+        if button.bind.command.trim().is_empty() {
+            button.bind.command = ui_tool::MODE_PROJECT_TARGET_MOVE.to_string();
         }
         return;
     }
