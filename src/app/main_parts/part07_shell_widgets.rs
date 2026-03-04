@@ -371,9 +371,15 @@ impl CodexShellApp {
                             let green = Color32::from_rgb(188, 233, 188);
                             let open_green = Color32::from_rgb(172, 224, 172);
                             let visuals = &mut ui.style_mut().visuals;
+                            visuals.widgets.noninteractive.weak_bg_fill = green;
+                            visuals.widgets.noninteractive.bg_fill = green;
+                            visuals.widgets.inactive.weak_bg_fill = green;
                             visuals.widgets.inactive.bg_fill = green;
+                            visuals.widgets.hovered.weak_bg_fill = green;
                             visuals.widgets.hovered.bg_fill = green;
+                            visuals.widgets.active.weak_bg_fill = open_green;
                             visuals.widgets.active.bg_fill = open_green;
+                            visuals.widgets.open.weak_bg_fill = open_green;
                             visuals.widgets.open.bg_fill = open_green;
                         }
                         ui.style_mut()
