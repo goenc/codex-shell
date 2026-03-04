@@ -49,11 +49,10 @@ fn find_project_declaration_files(base_dir: &Path) -> Result<Vec<PathBuf>> {
 fn read_project_name_from_declaration(path: &Path) -> Option<String> {
     let body = fs::read_to_string(path).ok()?;
     let first_line = body.lines().next()?.trim();
-    let normalized = first_line.trim_start_matches('#').trim();
-    if normalized.is_empty() {
+    if first_line.is_empty() {
         None
     } else {
-        Some(normalized.to_string())
+        Some(first_line.to_string())
     }
 }
 

@@ -164,11 +164,11 @@ impl CodexShellApp {
             ui_tool::CODEX_STATE => format!("Codex状態: {}", self.codex_runtime_state.label()),
             CODEX_STATE_B => format!("Codex状態B: {}", self.codex_runtime_state_b.label()),
             ui_tool::PROJECT_TARGET_STATE => self
-                .active_project_declaration_path
-                .as_ref()
-                .map(|path| project_name_from_declaration_path(path))
+                .project_selected_index
+                .and_then(|index| self.project_declarations.get(index))
+                .map(|entry| entry.name.clone())
                 .filter(|name| !name.trim().is_empty())
-                .unwrap_or_else(|| "プロジェクト無し".to_string()),
+                .unwrap_or_else(|| "プロジェクト未選択".to_string()),
             ui_tool::UI_EDIT_LOCKED_HINT => "編集モード中のため操作は無効".to_string(),
             ui_tool::INPUT_VOICE_TOGGLE => {
                 if self.voice_input_active {
@@ -195,7 +195,7 @@ impl CodexShellApp {
 
     fn resolve_label_color(&self, object: &UiObject) -> Color32 {
         match object.bind.command.trim() {
-            ui_tool::PROJECT_TARGET_STATE if self.active_project_declaration_path.is_some() => {
+            ui_tool::PROJECT_TARGET_STATE if self.target_project_dir_path.is_some() => {
                 Color32::from_rgb(255, 140, 0)
             }
             _ => Color32::BLACK,
@@ -262,6 +262,7 @@ impl CodexShellApp {
         if !self.ui_edit_mode {
             self.ui_selected_screen_id = self.ui_current_screen_id.clone();
         }
+        self.refresh_project_declarations();
     }
 
     fn handle_config_save(&mut self) {

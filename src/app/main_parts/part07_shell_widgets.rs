@@ -3,69 +3,6 @@ impl CodexShellApp {
     fn render_runtime_header(&mut self, _ctx: &egui::Context) {
     }
 
-    fn render_project_selector_window(&mut self, ctx: &egui::Context) {
-        if self.ui_current_screen_id != UI_MAIN_SCREEN_ID || !self.project_selector_open {
-            return;
-        }
-
-        let mut open = true;
-        egui::Window::new("プロジェクト選択")
-            .collapsible(false)
-            .resizable(false)
-            .order(egui::Order::Tooltip)
-            .default_pos(egui::pos2(24.0, 56.0))
-            .fixed_size(egui::vec2(360.0, 250.0))
-            .open(&mut open)
-            .show(ctx, |ui| {
-                ui.label(RichText::new("プロジェクト宣言").color(Color32::BLACK));
-                ui.add_space(6.0);
-                egui::Frame::default()
-                    .stroke(egui::Stroke::new(1.0, Color32::BLACK))
-                    .inner_margin(egui::Margin::same(4))
-                    .show(ui, |ui| {
-                        ui.set_min_size(egui::vec2(332.0, 148.0));
-                        egui::ScrollArea::vertical().max_height(148.0).show(ui, |ui| {
-                            if self.project_declarations.is_empty() {
-                                ui.label(
-                                    RichText::new("プロジェクト宣言_*.md が見つかりません")
-                                        .color(Color32::BLACK),
-                                );
-                            } else {
-                                for (index, entry) in self.project_declarations.iter().enumerate() {
-                                    if ui
-                                        .selectable_label(
-                                            self.project_selected_index == Some(index),
-                                            entry.name.as_str(),
-                                        )
-                                        .clicked()
-                                    {
-                                        self.project_selected_index = Some(index);
-                                    }
-                                }
-                            }
-                        });
-                    });
-                ui.add_space(8.0);
-                ui.horizontal(|ui| {
-                    if ui.button("更新").clicked() {
-                        self.refresh_project_declarations();
-                    }
-                    if ui
-                        .add_enabled(
-                            self.project_selected_index.is_some(),
-                            egui::Button::new("開始"),
-                        )
-                        .clicked()
-                    {
-                        self.start_selected_project_declaration();
-                    }
-                });
-            });
-        if !open {
-            self.project_selector_open = false;
-        }
-    }
-
     fn render_build_confirm_dialog(&mut self, ctx: &egui::Context) {
         if !self.build_confirm_open {
             return;
@@ -394,6 +331,35 @@ impl CodexShellApp {
             });
     }
 
+    fn render_obj_project_combo_box(&mut self, ctx: &mut RenderObjCtx<'_>) {
+        let enabled = ctx.controls_enabled && ctx.object.enabled;
+        let selected_text = self
+            .project_selected_index
+            .and_then(|index| self.project_declarations.get(index))
+            .map(|entry| entry.name.clone())
+            .unwrap_or_else(|| "プロジェクトを選択".to_string());
+        let mut selected_index = self.project_selected_index;
+        ctx.ui.add_enabled_ui(enabled, |ui| {
+            ui.set_min_width(ctx.object_size.x);
+            egui::ComboBox::from_id_salt(("project_combo_box", ctx.object_id))
+                .width(ctx.object_size.x)
+                .selected_text(selected_text)
+                .show_ui(ui, |ui| {
+                    if self.project_declarations.is_empty() {
+                        ui.label("プロジェクト宣言_*.md が見つかりません");
+                    } else {
+                        for (index, entry) in self.project_declarations.iter().enumerate() {
+                            ui.selectable_value(&mut selected_index, Some(index), entry.name.as_str());
+                        }
+                    }
+                });
+        });
+        if selected_index != self.project_selected_index {
+            self.project_selected_index = selected_index;
+            self.sync_selected_project_target_dir();
+        }
+    }
+
     fn render_obj_checkbox(&self, ctx: &mut RenderObjCtx<'_>) -> Option<bool> {
         let text = self.resolve_object_text(ctx.object);
         let enabled = ctx.controls_enabled
@@ -477,6 +443,9 @@ impl CodexShellApp {
             "label" => self.render_obj_label(ctx),
             "input" => self.render_obj_input(ctx, state_changed),
             "image" => self.render_obj_image(ctx),
+            "combo_box" | "combobox" | "project_dropdown" | "dropdown" => {
+                self.render_obj_project_combo_box(ctx)
+            }
             "checkbox" => {
                 *checkbox_changed = self.render_obj_checkbox(ctx);
             }

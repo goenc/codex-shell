@@ -1046,6 +1046,68 @@
       }
     },
     {
+      "id": "cmb_project_selector",
+      "type": "combo_box",
+      "z_index": 92,
+      "checked": false,
+      "position": {
+        "x": 579.0,
+        "y": 18.0
+      },
+      "size": {
+        "w": 230.0,
+        "h": 28.0
+      },
+      "visible": true,
+      "enabled": true,
+      "bind": {
+        "command": "",
+        "group": ""
+      },
+      "visual": {
+        "background": {
+          "image": "",
+          "fit": "none"
+        },
+        "icon": {
+          "image": "",
+          "anchor": "center",
+          "offset": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "w": 0.0,
+            "h": 0.0
+          }
+        },
+        "text": {
+          "value": "プロジェクトを選択",
+          "align": "left"
+        },
+        "states": {
+          "hover": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "pressed": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          },
+          "disabled": {
+            "background": {
+              "image": "",
+              "fit": "none"
+            }
+          }
+        }
+      }
+    },
+    {
       "id": "lbl_edit_locked_hint",
       "type": "label",
       "z_index": 95,
@@ -1169,3 +1231,4 @@
     }
   ]
 }
+

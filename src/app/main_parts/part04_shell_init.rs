@@ -60,9 +60,9 @@ impl CodexShellApp {
             build_confirm_open: false,
             project_runtime_active: false,
             active_project_declaration_path: None,
+            target_project_dir_path: None,
             project_declarations: Vec::new(),
             project_selected_index: None,
-            project_selector_open: false,
         };
 
         app.push_history(format!(
@@ -70,6 +70,7 @@ impl CodexShellApp {
             loaded_font.display()
         ));
         app.push_history(format!("UI定義を読み込みました: {}", app.ui_live_path.display()));
+        app.refresh_project_declarations();
         app.save_config();
         app.start_listener();
         app.launch_startup_executables();
@@ -135,7 +136,6 @@ impl CodexShellApp {
     fn set_codex_runtime_state(&mut self, state: CodexRuntimeState) {
         self.codex_runtime_state = state;
         if state != CodexRuntimeState::Calculating {
-            self.project_selector_open = false;
             self.project_runtime_active = false;
             self.active_project_declaration_path = None;
         }

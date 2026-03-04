@@ -95,19 +95,6 @@ fn create_button_object(
     }
 }
 
-fn project_name_from_declaration_path(path: &Path) -> String {
-    let stem = path
-        .file_stem()
-        .and_then(|value| value.to_str())
-        .unwrap_or_default();
-    let trimmed = stem.trim_start_matches(PROJECT_DECLARATION_PREFIX).trim();
-    if trimmed.is_empty() {
-        stem.to_string()
-    } else {
-        trimmed.to_string()
-    }
-}
-
 fn create_checkbox_object(
     id: &str,
     text: &str,
@@ -381,9 +368,9 @@ struct CodexShellApp {
     build_confirm_open: bool,
     project_runtime_active: bool,
     active_project_declaration_path: Option<PathBuf>,
+    target_project_dir_path: Option<PathBuf>,
     project_declarations: Vec<ProjectDeclarationEntry>,
     project_selected_index: Option<usize>,
-    project_selector_open: bool,
 }
 
 struct RenderObjCtx<'a> {

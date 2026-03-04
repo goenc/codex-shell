@@ -244,12 +244,15 @@ impl CodexShellApp {
         if state_changed {
             // ランタイム同期で変わる checked は即保存しない。
         }
-        ctx.memory_mut(|memory| {
-            let areas = memory.areas_mut();
-            for layer in rendered_layers {
-                areas.move_to_top(layer);
-            }
-        });
+        let popup_open = egui::Popup::is_any_open(ctx);
+        if !popup_open {
+            ctx.memory_mut(|memory| {
+                let areas = memory.areas_mut();
+                for layer in rendered_layers {
+                    areas.move_to_top(layer);
+                }
+            });
+        }
 
         if controls_enabled {
             for command in clicked_commands {
@@ -411,7 +414,6 @@ impl eframe::App for CodexShellApp {
         self.render_runtime_header(ctx);
         self.render_runtime_ui_objects(ctx);
         self.render_build_confirm_dialog(ctx);
-        self.render_project_selector_window(ctx);
 
         self.render_ui_editor(ctx);
         ctx.request_repaint_after(Duration::from_millis(UI_RELOAD_CHECK_INTERVAL_MS));

@@ -1,4 +1,11 @@
 impl CodexShellApp {
+    fn sync_selected_project_target_dir(&mut self) {
+        self.target_project_dir_path = self
+            .project_selected_index
+            .and_then(|index| self.project_declarations.get(index))
+            .and_then(|entry| entry.path.as_ref())
+            .and_then(|path| path.parent().map(Path::to_path_buf));
+    }
 
     fn launch_startup_executables(&mut self) {
         let startup_entries = [
@@ -89,10 +96,6 @@ impl CodexShellApp {
                 .cmp(&right.name)
                 .then(left.path.cmp(&right.path))
         });
-        entries.push(ProjectDeclarationEntry {
-            name: PROJECT_DECLARATION_NONE_LABEL.to_string(),
-            path: None,
-        });
         self.project_declarations = entries;
         self.project_selected_index = match selected_path {
             Some(path) => self
@@ -102,43 +105,7 @@ impl CodexShellApp {
                 .or_else(|| (!self.project_declarations.is_empty()).then_some(0)),
             None => (!self.project_declarations.is_empty()).then_some(0),
         };
-    }
-
-    fn start_selected_project_declaration(&mut self) {
-        let Some(index) = self.project_selected_index else {
-            self.update_status("開始対象プロジェクトがありません");
-            return;
-        };
-        let Some(entry) = self.project_declarations.get(index).cloned() else {
-            self.update_status("開始対象プロジェクトが見つかりません");
-            return;
-        };
-        let Some(path) = entry.path else {
-            self.project_selector_open = false;
-            self.active_project_declaration_path = None;
-            self.update_status("プロジェクト指定なしを選択しました");
-            self.push_history("プロジェクト指定なしで開始しました");
-            return;
-        };
-        if !path.is_file() {
-            self.update_status(format!(
-                "プロジェクト宣言ファイルが見つかりません: {}",
-                path.display()
-            ));
-            return;
-        }
-        self.send_command(
-            path.to_string_lossy().into_owned(),
-            "プロジェクト開始",
-            BUTTON_COMMAND_DELAY_MS,
-        );
-        self.project_selector_open = false;
-        self.active_project_declaration_path = Some(path.clone());
-        self.push_history(format!(
-            "プロジェクト開始を送信しました: {} ({})",
-            entry.name,
-            path.display()
-        ));
+        self.sync_selected_project_target_dir();
     }
 
     fn launch_active_project_debug_executable(&mut self) {
@@ -311,10 +278,6 @@ impl CodexShellApp {
                         self.update_status("Codex起動コマンドを送信しました");
                         self.push_history(format!("{source}: {command}"));
                         self.set_codex_runtime_state(CodexRuntimeState::Calculating);
-                        self.project_runtime_active = false;
-                        self.active_project_declaration_path = None;
-                        self.refresh_project_declarations();
-                        self.project_selector_open = true;
                     } else if source == "CodexB" {
                         self.update_status("Codex起動Bコマンドを送信しました");
                         self.push_history(format!("{source}: {command}"));
