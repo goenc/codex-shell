@@ -151,6 +151,12 @@ pub(crate) fn terminate_running_executable(path: &str) -> Result<usize> {
     Ok(process_ids.len())
 }
 
+pub(crate) fn count_running_executable(path: &str) -> Result<usize> {
+    let process_ids = find_process_ids_by_executable(Path::new(path))
+        .with_context(|| format!("実行中プロセス検索に失敗: {path}"))?;
+    Ok(process_ids.len())
+}
+
 pub(crate) fn select_executable_file_path() -> Result<Option<String>> {
     let script = r#"
 Add-Type -AssemblyName System.Windows.Forms

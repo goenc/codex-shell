@@ -6,6 +6,10 @@ fn terminate_running_executable(path: &str) -> Result<usize> {
     app::process_ops::terminate_running_executable(path)
 }
 
+fn count_running_executable(path: &str) -> Result<usize> {
+    app::process_ops::count_running_executable(path)
+}
+
 fn select_executable_file_path() -> Result<Option<String>> {
     app::process_ops::select_executable_file_path()
 }

@@ -346,6 +346,7 @@ impl CodexShellApp {
         let enabled = ctx.controls_enabled
             && ctx.object.enabled
             && self.is_bind_command_enabled(ctx.object_command);
+        let highlight_green = self.is_selected_project_highlighted();
         let placeholder_text = ctx.object.visual.text.value.trim();
         let selected_text = self
             .project_selected_index
@@ -366,6 +367,15 @@ impl CodexShellApp {
                 |ui| {
                     ui.scope(|ui| {
                         let fixed_width = ctx.object_size.x.max(12.0);
+                        if highlight_green {
+                            let green = Color32::from_rgb(188, 233, 188);
+                            let open_green = Color32::from_rgb(172, 224, 172);
+                            let visuals = &mut ui.style_mut().visuals;
+                            visuals.widgets.inactive.bg_fill = green;
+                            visuals.widgets.hovered.bg_fill = green;
+                            visuals.widgets.active.bg_fill = open_green;
+                            visuals.widgets.open.bg_fill = open_green;
+                        }
                         ui.style_mut()
                             .text_styles
                             .insert(egui::TextStyle::Button, ctx.text_font.clone());

@@ -372,6 +372,7 @@ struct CodexShellApp {
     target_project_dir_path: Option<PathBuf>,
     project_declarations: Vec<ProjectDeclarationEntry>,
     project_selected_index: Option<usize>,
+    moved_project_highlight_keys: HashSet<String>,
 }
 
 struct RenderObjCtx<'a> {

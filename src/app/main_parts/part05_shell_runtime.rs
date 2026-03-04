@@ -1,4 +1,23 @@
 impl CodexShellApp {
+    fn project_entry_highlight_key(entry: &ProjectDeclarationEntry) -> String {
+        if let Some(path) = entry.path.as_ref() {
+            normalize_path_for_dedup(path)
+        } else {
+            entry.name.trim().to_ascii_lowercase()
+        }
+    }
+
+    fn selected_project_highlight_key(&self) -> Option<String> {
+        self.project_selected_index
+            .and_then(|index| self.project_declarations.get(index))
+            .map(Self::project_entry_highlight_key)
+    }
+
+    fn is_selected_project_highlighted(&self) -> bool {
+        self.selected_project_highlight_key()
+            .is_some_and(|key| self.moved_project_highlight_keys.contains(&key))
+    }
+
     fn sync_selected_project_target_dir(&mut self) {
         self.target_project_dir_path = self
             .project_selected_index
@@ -28,18 +47,19 @@ impl CodexShellApp {
                 ));
                 continue;
             }
-            match terminate_running_executable(path) {
-                Ok(killed) => {
-                    if killed > 0 {
+            match count_running_executable(path) {
+                Ok(running) => {
+                    if running > 0 {
                         self.push_history(format!(
-                            "{label} の既存プロセスを停止しました 件数={killed}: {path}"
+                            "{label} は既に起動中のため自動起動をスキップしました 件数={running}: {path}"
                         ));
+                        continue;
                     }
                 }
                 Err(err) => {
-                    self.update_status(format!("{label} 停止失敗: {err}"));
+                    self.update_status(format!("{label} 起動確認失敗: {err}"));
                     self.push_history(format!(
-                        "{label} の既存プロセス停止に失敗したため自動起動を中止しました: {path} ({err})"
+                        "{label} の起動確認に失敗したため自動起動を中止しました: {path} ({err})"
                     ));
                     continue;
                 }
@@ -200,6 +220,9 @@ impl CodexShellApp {
             BUTTON_COMMAND_DELAY_MS,
             build_pipe,
         );
+        if let Some(key) = self.selected_project_highlight_key() {
+            self.moved_project_highlight_keys.insert(key);
+        }
         self.update_status("相談/実装の作業フォルダを同じプロジェクトへ移動しました");
         self.push_history(format!(
             "相談/実装の作業フォルダを移動しました: {}",
