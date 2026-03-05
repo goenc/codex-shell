@@ -60,59 +60,59 @@ fn resolve_project_debug_executable_path(declaration_path: &Path) -> Result<Path
     let project_dir = declaration_path
         .parent()
         .ok_or_else(|| anyhow!("宣言ファイルの親フォルダを取得できません: {}", declaration_path.display()))?;
-    let debug_dir = project_dir.join("target").join("debug");
-    if !debug_dir.is_dir() {
-        return Err(anyhow!(
-            "debugフォルダが見つかりません: {}",
-            debug_dir.display()
-        ));
-    }
-    let mut candidates = Vec::new();
-    let entries = fs::read_dir(&debug_dir)
-        .with_context(|| format!("debugフォルダ読み込みに失敗: {}", debug_dir.display()))?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
-        }
-        if !path
-            .extension()
-            .and_then(|v| v.to_str())
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("exe"))
-        {
-            continue;
-        }
-        candidates.push(path);
-    }
-    if candidates.is_empty() {
-        return Err(anyhow!(
-            "debug実行ファイルが見つかりません: {}",
-            debug_dir.display()
-        ));
-    }
     let folder_name = project_dir
         .file_name()
         .and_then(|v| v.to_str())
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-    if let Some(preferred) = candidates.iter().find(|path| {
-        path.file_stem()
-            .and_then(|v| v.to_str())
-            .is_some_and(|stem| stem.eq_ignore_ascii_case(&folder_name))
-    }) {
-        return Ok(preferred.clone());
+        .ok_or_else(|| anyhow!("プロジェクトフォルダ名を取得できません: {}", project_dir.display()))?;
+    let exe_path = project_dir
+        .join("codex-shell")
+        .join("debug")
+        .join(format!("{folder_name}.exe"));
+    if !exe_path.is_file() {
+        return Err(anyhow!(
+            "debug実行ファイルが見つかりません: {}",
+            exe_path.display()
+        ));
     }
-    if candidates.len() == 1 {
-        return Ok(candidates[0].clone());
+    Ok(exe_path)
+}
+
+fn format_system_time_hhmm(system_time: SystemTime) -> Option<String> {
+    #[cfg(windows)]
+    {
+        use windows::Win32::Foundation::{FILETIME, SYSTEMTIME};
+        use windows::Win32::System::Time::{FileTimeToSystemTime, SystemTimeToTzSpecificLocalTime};
+
+        let since_unix = system_time.duration_since(UNIX_EPOCH).ok()?;
+        let unix_100ns = since_unix
+            .as_secs()
+            .checked_mul(10_000_000)?
+            .checked_add((since_unix.subsec_nanos() / 100) as u64)?;
+        let windows_epoch_offset_100ns = 11644473600_u64.checked_mul(10_000_000)?;
+        let filetime_ticks = unix_100ns.checked_add(windows_epoch_offset_100ns)?;
+        let file_time = FILETIME {
+            dwLowDateTime: filetime_ticks as u32,
+            dwHighDateTime: (filetime_ticks >> 32) as u32,
+        };
+        let mut utc_time = SYSTEMTIME::default();
+        if unsafe { FileTimeToSystemTime(&file_time, &mut utc_time) }.is_err() {
+            return None;
+        }
+        let mut local_time = SYSTEMTIME::default();
+        if unsafe { SystemTimeToTzSpecificLocalTime(None, &utc_time, &mut local_time) }.is_err() {
+            return None;
+        }
+        return Some(format!("{:02}:{:02}", local_time.wHour, local_time.wMinute));
     }
-    let list = candidates
-        .iter()
-        .filter_map(|path| path.file_name().and_then(|v| v.to_str()))
-        .collect::<Vec<_>>()
-        .join(", ");
-    Err(anyhow!(
-        "debug実行ファイルが複数あります。フォルダ名一致も見つかりません: {list}"
-    ))
+
+    #[cfg(not(windows))]
+    {
+        let since_unix = system_time.duration_since(UNIX_EPOCH).ok()?;
+        let total_minutes = (since_unix.as_secs() / 60) % (24 * 60);
+        let hour = total_minutes / 60;
+        let minute = total_minutes % 60;
+        Some(format!("{hour:02}:{minute:02}"))
+    }
 }
 
 fn resolve_project_debug_launch_target(exe_path: &Path) -> PathBuf {

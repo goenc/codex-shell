@@ -89,6 +89,26 @@ impl CodexShellApp {
                     );
                 });
 
+            if object_command == ui_tool::MODE_PROJECT_DEBUG_RUN
+                && let Some(modified_hhmm) = self.active_project_debug_modified_hhmm()
+            {
+                let debug_time_layer = egui::LayerId::new(
+                    egui::Order::Foreground,
+                    egui::Id::new(("debug_button_time", object_id.clone())),
+                );
+                let painter = ctx.layer_painter(debug_time_layer);
+                painter.text(
+                    egui::pos2(
+                        area_response.response.rect.left(),
+                        area_response.response.rect.bottom() + 2.0,
+                    ),
+                    egui::Align2::LEFT_TOP,
+                    format!("更新日時 {modified_hhmm}"),
+                    egui::FontId::new(12.0, egui::FontFamily::Proportional),
+                    Color32::BLACK,
+                );
+            }
+
             let pointer_clicked_on_area = ctx.input(|input| {
                 input.pointer.primary_clicked()
                     && input

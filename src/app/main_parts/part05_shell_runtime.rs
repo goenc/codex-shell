@@ -188,6 +188,13 @@ impl CodexShellApp {
         }
     }
 
+    fn active_project_debug_modified_hhmm(&self) -> Option<String> {
+        let declaration_path = self.active_project_declaration_path.as_ref()?;
+        let exe_path = resolve_project_debug_executable_path(declaration_path).ok()?;
+        let modified = fs::metadata(exe_path).ok()?.modified().ok()?;
+        format_system_time_hhmm(modified)
+    }
+
     fn move_both_shells_to_selected_project_dir(&mut self) {
         let Some(target_dir) = self.target_project_dir_path.clone() else {
             self.update_status("移動対象のプロジェクトフォルダが未選択です");
