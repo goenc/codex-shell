@@ -37,7 +37,7 @@ pub(crate) fn render_ui_editor_viewport(
         .map(|rect| egui::pos2(rect.max.x + 12.0, rect.min.y));
     let mut builder = egui::ViewportBuilder::default()
         .with_title("UI編集")
-        .with_inner_size([360.0, 570.0])
+        .with_inner_size([360.0, 715.0])
         .with_min_inner_size([320.0, 470.0])
         .with_resizable(true)
         .with_close_button(true);
