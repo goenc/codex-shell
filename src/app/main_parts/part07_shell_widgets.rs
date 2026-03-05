@@ -475,6 +475,11 @@ impl CodexShellApp {
         let text = self.resolve_object_text(ctx.object);
         let disabled_for_selected_project = ctx.object_id == "btn_project_target_move"
             && self.is_selected_project_highlighted();
+        let codex_a_running = ctx.object_command == ui_tool::MODE_CODEX_START
+            && self.codex_runtime_state == CodexRuntimeState::Calculating;
+        let codex_b_running = ctx.object_command == ui_tool::MODE_CODEX_START_B
+            && self.codex_runtime_state_b == CodexRuntimeState::Calculating;
+        let highlight_orange = codex_a_running || codex_b_running;
         let enabled = ctx.controls_enabled
             && ctx.object.enabled
             && self.is_bind_command_enabled(ctx.object_command)
@@ -486,13 +491,30 @@ impl CodexShellApp {
         if ctx.object.visual.text.italic {
             rich = rich.italics();
         }
-        if !enabled {
+        if !enabled && !highlight_orange {
             rich = rich.color(Color32::from_gray(140));
         }
-        let response = ctx.ui.add_enabled_ui(enabled, |ui| {
-            ui.add_sized([ctx.object_size.x, ctx.object_size.y], egui::Button::new(rich))
+        let response = ctx.ui.scope(|ui| {
+            if highlight_orange {
+                let orange = Color32::from_rgb(255, 192, 120);
+                let orange_active = Color32::from_rgb(247, 176, 92);
+                let visuals = &mut ui.style_mut().visuals;
+                visuals.widgets.noninteractive.weak_bg_fill = orange;
+                visuals.widgets.noninteractive.bg_fill = orange;
+                visuals.widgets.inactive.weak_bg_fill = orange;
+                visuals.widgets.inactive.bg_fill = orange;
+                visuals.widgets.hovered.weak_bg_fill = orange;
+                visuals.widgets.hovered.bg_fill = orange;
+                visuals.widgets.active.weak_bg_fill = orange_active;
+                visuals.widgets.active.bg_fill = orange_active;
+                visuals.widgets.open.weak_bg_fill = orange_active;
+                visuals.widgets.open.bg_fill = orange_active;
+            }
+            ui.add_enabled_ui(enabled, |ui| {
+                ui.add_sized([ctx.object_size.x, ctx.object_size.y], egui::Button::new(rich))
+            })
         });
-        response.inner.clicked()
+        response.inner.inner.clicked()
     }
 
     fn render_obj_by_type(

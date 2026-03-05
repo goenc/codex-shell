@@ -51,7 +51,6 @@ impl CodexShellApp {
         match load_ui_definition(&self.ui_live_path) {
             Ok(mut definition) => {
                 definition.normalize_screens();
-                ensure_project_target_label(&mut definition);
                 ensure_project_target_move_button(&mut definition);
                 self.ui_definition = definition;
                 self.ui_last_modified = Some(modified);

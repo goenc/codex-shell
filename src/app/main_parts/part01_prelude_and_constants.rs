@@ -45,7 +45,6 @@ const UI_MAIN_SCREEN_ID: &str = "main";
 const UI_SETTINGS_SCREEN_ID: &str = "settings";
 const PROJECT_DECLARATION_PREFIX: &str = "プロジェクト宣言_";
 const PROJECT_DECLARATION_SUFFIX: &str = ".md";
-const PROJECT_TARGET_LABEL_ID: &str = "lbl_project_target";
 const UI_BASE_OUTER_MARGIN: f32 = 16.0;
 const UI_BASE_COMPONENT_GAP: f32 = 8.0;
 const PANEL_HORIZONTAL_PADDING: f32 = 8.0;

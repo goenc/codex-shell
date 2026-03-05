@@ -92,6 +92,7 @@ impl UiDefinition {
             self.screens.push(default_settings_screen());
         }
         self.remove_legacy_pipe_settings_objects();
+        self.remove_legacy_runtime_status_labels();
         self.ensure_settings_codex_command_fields();
         self.relocate_reasoning_controls_to_settings();
         ensure_project_target_move_button(self);
@@ -106,6 +107,17 @@ impl UiDefinition {
             object.id != "lbl_settings_pipe_name"
                 && object.id != "input_settings_pipe_name"
                 && object.bind.command.trim() != "config.pipe_name"
+        });
+    }
+
+    fn remove_legacy_runtime_status_labels(&mut self) {
+        let Some(main_objects) = self.screen_objects_mut(UI_MAIN_SCREEN_ID) else {
+            return;
+        };
+        main_objects.retain(|object| {
+            object.id != "lbl_codex_state"
+                && object.id != "lbl_codex_state_b"
+                && object.id != "lbl_project_target"
         });
     }
 
@@ -324,55 +336,6 @@ impl Default for UiScreen {
             objects: Vec::new(),
         }
     }
-}
-
-fn ensure_project_target_label(definition: &mut UiDefinition) {
-    let Some(objects) = definition.screen_objects_mut(UI_MAIN_SCREEN_ID) else {
-        return;
-    };
-    if objects
-        .iter()
-        .any(|object| object.id == PROJECT_TARGET_LABEL_ID)
-    {
-        return;
-    }
-
-    let start_rect = objects
-        .iter()
-        .find(|object| object.id == "btn_codex_start")
-        .map(|object| (object.position.y, object.size.h));
-    let input_rect = objects
-        .iter()
-        .find(|object| object.id == "input_command")
-        .map(|object| (object.position.x, object.position.y, object.size.w));
-
-    let height = 24.0;
-    let x = input_rect.map_or(24.0, |(x, _, _)| x);
-    let width = input_rect.map_or(780.0, |(_, _, width)| width.max(220.0));
-    let y = match (start_rect, input_rect) {
-        (Some((start_y, start_h)), Some((_, input_y, _))) => {
-            let start_bottom = start_y + start_h;
-            let mut candidate = start_bottom + 6.0;
-            if candidate + height > input_y {
-                candidate = ((start_bottom + input_y - height) / 2.0).max(start_bottom);
-            }
-            candidate
-        }
-        _ => 56.0,
-    };
-
-    let mut object = create_label_object(
-        PROJECT_TARGET_LABEL_ID,
-        "プロジェクト無し",
-        45,
-        x,
-        y,
-        width,
-        height,
-        "left",
-    );
-    object.bind.command = ui_tool::PROJECT_TARGET_STATE.to_string();
-    objects.push(object);
 }
 
 fn ensure_project_target_move_button(definition: &mut UiDefinition) {

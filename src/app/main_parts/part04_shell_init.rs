@@ -18,7 +18,6 @@ impl CodexShellApp {
         let ui_live_path = ensure_live_ui_file()?;
         let mut ui_definition = load_ui_definition(&ui_live_path)?;
         ui_definition.normalize_screens();
-        ensure_project_target_label(&mut ui_definition);
         ensure_project_target_move_button(&mut ui_definition);
         let ui_last_modified = ui_file_modified_time(&ui_live_path).ok();
         let ui_selected_object_id = ui_definition
