@@ -32,12 +32,18 @@ pub(crate) fn render_ui_editor_viewport(
     let mut events = UiEditorEvents::default();
 
     let viewport_id = egui::ViewportId::from_hash_of("ui_editor_viewport");
-    let builder = egui::ViewportBuilder::default()
+    let default_position = ctx
+        .input(|input| input.viewport().outer_rect)
+        .map(|rect| egui::pos2(rect.max.x + 12.0, rect.min.y));
+    let mut builder = egui::ViewportBuilder::default()
         .with_title("UI編集")
-        .with_inner_size([360.0, 520.0])
-        .with_min_inner_size([320.0, 420.0])
+        .with_inner_size([360.0, 570.0])
+        .with_min_inner_size([320.0, 470.0])
         .with_resizable(true)
         .with_close_button(true);
+    if let Some(position) = default_position {
+        builder = builder.with_position(position);
+    }
 
     ctx.show_viewport_immediate(viewport_id, builder, |editor_ctx, viewport_class| {
         if editor_ctx.input(|input| input.viewport().close_requested()) {
