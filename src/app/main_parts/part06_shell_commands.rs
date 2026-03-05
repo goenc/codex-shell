@@ -289,6 +289,10 @@ impl CodexShellApp {
         self.browse_startup_executable(slot);
     }
 
+    fn handle_browse_build_root_dir(&mut self) {
+        self.browse_build_root_dir();
+    }
+
     fn handle_reasoning_effort(&mut self, effort: &str) {
         if self.selected_reasoning_effort == effort {
             return;
@@ -380,6 +384,7 @@ impl CodexShellApp {
             CONFIG_STARTUP_EXE_2_BROWSE => self.handle_browse_startup_exe(2),
             CONFIG_STARTUP_EXE_3_BROWSE => self.handle_browse_startup_exe(3),
             CONFIG_STARTUP_EXE_4_BROWSE => self.handle_browse_startup_exe(4),
+            CONFIG_BUILD_ROOT_DIR_BROWSE => self.handle_browse_build_root_dir(),
             REASONING_MEDIUM => self.handle_reasoning_effort("medium"),
             REASONING_HIGH => self.handle_reasoning_effort("high"),
             REASONING_XHIGH => self.handle_reasoning_effort("xhigh"),

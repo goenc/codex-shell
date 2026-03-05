@@ -134,7 +134,8 @@ impl CodexShellApp {
             self.push_history("デバッグEXE起動を中止しました: 開始済みプロジェクトなし");
             return;
         };
-        let exe_path = match resolve_project_debug_executable_path(&declaration_path) {
+        let build_root_dir = self.effective_build_root_dir();
+        let exe_path = match resolve_project_debug_executable_path(&declaration_path, &build_root_dir) {
             Ok(path) => path,
             Err(err) => {
                 self.update_status(format!("デバッグEXE解決に失敗: {err}"));
@@ -190,9 +191,22 @@ impl CodexShellApp {
 
     fn active_project_debug_modified_hhmm(&self) -> Option<String> {
         let declaration_path = self.active_project_declaration_path.as_ref()?;
-        let exe_path = resolve_project_debug_executable_path(declaration_path).ok()?;
+        let build_root_dir = self.effective_build_root_dir();
+        let exe_path = resolve_project_debug_executable_path(declaration_path, &build_root_dir).ok()?;
         let modified = fs::metadata(exe_path).ok()?.modified().ok()?;
         format_system_time_hhmm(modified)
+    }
+
+    fn effective_build_root_dir(&self) -> PathBuf {
+        let configured = self.config.build_root_dir.trim();
+        if !configured.is_empty() {
+            return PathBuf::from(configured);
+        }
+        let fallback = self.config.working_dir.trim();
+        if !fallback.is_empty() {
+            return PathBuf::from(fallback);
+        }
+        PathBuf::from(".")
     }
 
     fn move_both_shells_to_selected_project_dir(&mut self) {
@@ -254,6 +268,23 @@ impl CodexShellApp {
             Err(err) => {
                 self.update_status(format!("自動起動EXE{slot} 参照に失敗: {err}"));
                 self.push_history(format!("自動起動EXE{slot} 参照に失敗しました: {err}"));
+            }
+        }
+    }
+
+    fn browse_build_root_dir(&mut self) {
+        match select_folder_path() {
+            Ok(Some(path)) => {
+                self.config.build_root_dir = path.clone();
+                self.update_status("ビルルートを設定しました");
+                self.push_history(format!("ビルルートを参照設定しました: {path}"));
+            }
+            Ok(None) => {
+                self.update_status("ビルルートの参照をキャンセルしました");
+            }
+            Err(err) => {
+                self.update_status(format!("ビルルート参照に失敗: {err}"));
+                self.push_history(format!("ビルルート参照に失敗しました: {err}"));
             }
         }
     }

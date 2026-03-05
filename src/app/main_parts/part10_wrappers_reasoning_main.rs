@@ -14,6 +14,10 @@ fn select_executable_file_path() -> Result<Option<String>> {
     app::process_ops::select_executable_file_path()
 }
 
+fn select_folder_path() -> Result<Option<String>> {
+    app::process_ops::select_folder_path()
+}
+
 fn spawn_send_worker(send_rx: Receiver<SendRequest>, result_tx: Sender<SendResult>) {
     app::pipe_ops::spawn_send_worker(send_rx, result_tx);
 }

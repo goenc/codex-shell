@@ -3,6 +3,7 @@
 struct AppConfig {
     working_dir: String,
     build_command: String,
+    build_root_dir: String,
     codex_command: String,
     codex_command_a: String,
     codex_command_b: String,
@@ -23,6 +24,9 @@ impl Default for AppConfig {
                 .map(|path| path.to_string_lossy().into_owned())
                 .unwrap_or_else(|_| ".".to_string()),
             build_command: DEFAULT_BUILD_COMMAND.to_string(),
+            build_root_dir: std::env::current_dir()
+                .map(|path| path.to_string_lossy().into_owned())
+                .unwrap_or_else(|_| ".".to_string()),
             codex_command: DEFAULT_CODEX_COMMAND.to_string(),
             codex_command_a: DEFAULT_CODEX_COMMAND.to_string(),
             codex_command_b: DEFAULT_CODEX_COMMAND.to_string(),
@@ -93,6 +97,7 @@ impl UiDefinition {
         }
         self.remove_legacy_pipe_settings_objects();
         self.remove_legacy_runtime_status_labels();
+        self.ensure_settings_build_root_field();
         self.ensure_settings_codex_command_fields();
         self.relocate_reasoning_controls_to_settings();
         ensure_project_target_move_button(self);
@@ -119,6 +124,54 @@ impl UiDefinition {
                 && object.id != "lbl_codex_state_b"
                 && object.id != "lbl_project_target"
         });
+    }
+
+    fn ensure_settings_build_root_field(&mut self) {
+        let Some(settings_objects) = self.screen_objects_mut(UI_SETTINGS_SCREEN_ID) else {
+            return;
+        };
+        let mut input_rect: Option<(f32, f32, f32, f32, i32)> = None;
+        let mut has_browse = false;
+        for object in settings_objects.iter_mut() {
+            if object.id == "lbl_settings_build" || object.id == "lbl_settings_build_root" {
+                object.id = "lbl_settings_build_root".to_string();
+                object.visual.text.value = "ビルルート".to_string();
+            }
+            if object.id == "input_settings_build" || object.id == "input_settings_build_root" {
+                object.id = "input_settings_build_root".to_string();
+                object.bind.command = ui_tool::CONFIG_BUILD_ROOT_DIR.to_string();
+                input_rect = Some((
+                    object.position.x,
+                    object.position.y,
+                    object.size.w,
+                    object.size.h,
+                    object.z_index,
+                ));
+            }
+            if object.id == "btn_settings_build_root_browse"
+                || object.bind.command.trim() == ui_tool::CONFIG_BUILD_ROOT_DIR_BROWSE
+            {
+                object.id = "btn_settings_build_root_browse".to_string();
+                object.bind.command = ui_tool::CONFIG_BUILD_ROOT_DIR_BROWSE.to_string();
+                object.visual.text.value = "参照".to_string();
+                has_browse = true;
+            }
+        }
+        if has_browse {
+            return;
+        }
+        let (input_x, input_y, input_w, input_h, input_z) =
+            input_rect.unwrap_or((156.0, 96.0, 640.0, 24.0, 110));
+        settings_objects.push(create_button_object(
+            "btn_settings_build_root_browse",
+            "参照",
+            ui_tool::CONFIG_BUILD_ROOT_DIR_BROWSE,
+            input_z + 10,
+            input_x + input_w + 8.0,
+            input_y,
+            72.0,
+            input_h,
+        ));
     }
 
     fn ensure_settings_codex_command_fields(&mut self) {
@@ -401,14 +454,24 @@ fn default_settings_screen() -> UiScreen {
             640.0,
             24.0,
         ),
-        create_label_object("lbl_settings_build", "ビルド", 100, 24.0, 96.0, 120.0, 24.0, "left"),
+        create_label_object("lbl_settings_build_root", "ビルルート", 100, 24.0, 96.0, 120.0, 24.0, "left"),
         create_input_object(
-            "input_settings_build",
-            ui_tool::CONFIG_BUILD_COMMAND,
+            "input_settings_build_root",
+            ui_tool::CONFIG_BUILD_ROOT_DIR,
             110,
             156.0,
             96.0,
             640.0,
+            24.0,
+        ),
+        create_button_object(
+            "btn_settings_build_root_browse",
+            "参照",
+            ui_tool::CONFIG_BUILD_ROOT_DIR_BROWSE,
+            120,
+            804.0,
+            96.0,
+            72.0,
             24.0,
         ),
         create_label_object(

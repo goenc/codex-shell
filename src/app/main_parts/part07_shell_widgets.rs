@@ -166,6 +166,17 @@ impl CodexShellApp {
                     *state_changed = true;
                 }
             }
+            ui_tool::CONFIG_BUILD_ROOT_DIR => {
+                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
+                    ui.add_sized(
+                        [ctx.object_size.x, ctx.object_size.y],
+                        TextEdit::singleline(&mut self.config.build_root_dir),
+                    )
+                });
+                if response.inner.changed() {
+                    *state_changed = true;
+                }
+            }
             ui_tool::CONFIG_CODEX_COMMAND | ui_tool::CONFIG_CODEX_COMMAND_A => {
                 let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(

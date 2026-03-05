@@ -56,7 +56,7 @@ fn read_project_name_from_declaration(path: &Path) -> Option<String> {
     }
 }
 
-fn resolve_project_debug_executable_path(declaration_path: &Path) -> Result<PathBuf> {
+fn resolve_project_debug_executable_path(declaration_path: &Path, build_root_dir: &Path) -> Result<PathBuf> {
     let project_dir = declaration_path
         .parent()
         .ok_or_else(|| anyhow!("宣言ファイルの親フォルダを取得できません: {}", declaration_path.display()))?;
@@ -64,8 +64,8 @@ fn resolve_project_debug_executable_path(declaration_path: &Path) -> Result<Path
         .file_name()
         .and_then(|v| v.to_str())
         .ok_or_else(|| anyhow!("プロジェクトフォルダ名を取得できません: {}", project_dir.display()))?;
-    let exe_path = project_dir
-        .join("codex-shell")
+    let exe_path = build_root_dir
+        .join(folder_name)
         .join("debug")
         .join(format!("{folder_name}.exe"));
     if !exe_path.is_file() {
