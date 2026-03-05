@@ -1,0 +1,7 @@
+既に移動済みで緑背景のプロジェクト選択時はプロジェクト移動ボタンを無効表示にする
+
+・既に移動済みで緑背景のプロジェクト選択時はプロジェクト移動ボタンを無効表示にする
+・render_obj_buttonでbtn_project_target_moveかつis_selected_project_highlighted時に無効化条件を追加
+・既存のボタン無効表示ルール(add_enabled_uiとグレー文字)に従う表示へ統一
+・cargo build (dev profile) が成功
+

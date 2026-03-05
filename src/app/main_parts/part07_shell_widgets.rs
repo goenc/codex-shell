@@ -473,9 +473,12 @@ impl CodexShellApp {
 
     fn render_obj_button(&self, ctx: &mut RenderObjCtx<'_>) -> bool {
         let text = self.resolve_object_text(ctx.object);
+        let disabled_for_selected_project = ctx.object_id == "btn_project_target_move"
+            && self.is_selected_project_highlighted();
         let enabled = ctx.controls_enabled
             && ctx.object.enabled
-            && self.is_bind_command_enabled(ctx.object_command);
+            && self.is_bind_command_enabled(ctx.object_command)
+            && !disabled_for_selected_project;
         let mut rich = RichText::new(text).font(ctx.text_font.clone());
         if ctx.object.visual.text.bold {
             rich = rich.strong();
