@@ -148,7 +148,7 @@ impl CodexShellApp {
                 let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
                         [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.working_dir),
+                        TextEdit::singleline(&mut self.config.working_dir).return_key(None),
                     )
                 });
                 if response.inner.changed() {
@@ -159,7 +159,7 @@ impl CodexShellApp {
                 let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
                         [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.build_command),
+                        TextEdit::singleline(&mut self.config.build_command).return_key(None),
                     )
                 });
                 if response.inner.changed() {
@@ -170,7 +170,7 @@ impl CodexShellApp {
                 let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
                         [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.build_root_dir),
+                        TextEdit::singleline(&mut self.config.build_root_dir).return_key(None),
                     )
                 });
                 if response.inner.changed() {
@@ -181,7 +181,7 @@ impl CodexShellApp {
                 let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
                         [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.codex_command_a),
+                        TextEdit::singleline(&mut self.config.codex_command_a).return_key(None),
                     )
                 });
                 if response.inner.changed() {
@@ -192,7 +192,7 @@ impl CodexShellApp {
                 let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
                         [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.codex_command_b),
+                        TextEdit::singleline(&mut self.config.codex_command_b).return_key(None),
                     )
                 });
                 if response.inner.changed() {
@@ -203,7 +203,7 @@ impl CodexShellApp {
                 let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
                         [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.input_prefix),
+                        TextEdit::singleline(&mut self.config.input_prefix).return_key(None),
                     )
                 });
                 if response.inner.changed() {
@@ -214,7 +214,7 @@ impl CodexShellApp {
                 let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
                         [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.startup_exe_1),
+                        TextEdit::singleline(&mut self.config.startup_exe_1).return_key(None),
                     )
                 });
                 if response.inner.changed() {
@@ -225,7 +225,7 @@ impl CodexShellApp {
                 let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
                         [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.startup_exe_2),
+                        TextEdit::singleline(&mut self.config.startup_exe_2).return_key(None),
                     )
                 });
                 if response.inner.changed() {
@@ -236,7 +236,7 @@ impl CodexShellApp {
                 let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
                         [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.startup_exe_3),
+                        TextEdit::singleline(&mut self.config.startup_exe_3).return_key(None),
                     )
                 });
                 if response.inner.changed() {
@@ -247,7 +247,7 @@ impl CodexShellApp {
                 let response = ctx.ui.add_enabled_ui(enabled, |ui| {
                     ui.add_sized(
                         [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.startup_exe_4),
+                        TextEdit::singleline(&mut self.config.startup_exe_4).return_key(None),
                     )
                 });
                 if response.inner.changed() {
