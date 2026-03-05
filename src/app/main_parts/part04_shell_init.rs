@@ -76,7 +76,7 @@ impl CodexShellApp {
             target_project_dir_path: None,
             project_declarations: Vec::new(),
             project_selected_index: None,
-            moved_project_highlight_keys: HashSet::new(),
+            moved_project_highlight_key: None,
         };
 
         app.push_history(format!(

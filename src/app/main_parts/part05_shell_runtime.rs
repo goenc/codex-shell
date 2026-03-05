@@ -15,7 +15,7 @@ impl CodexShellApp {
 
     fn is_selected_project_highlighted(&self) -> bool {
         self.selected_project_highlight_key()
-            .is_some_and(|key| self.moved_project_highlight_keys.contains(&key))
+            .is_some_and(|key| self.moved_project_highlight_key.as_deref() == Some(key.as_str()))
     }
 
     fn sync_selected_project_target_dir(&mut self) {
@@ -220,9 +220,7 @@ impl CodexShellApp {
             BUTTON_COMMAND_DELAY_MS,
             build_pipe,
         );
-        if let Some(key) = self.selected_project_highlight_key() {
-            self.moved_project_highlight_keys.insert(key);
-        }
+        self.moved_project_highlight_key = self.selected_project_highlight_key();
         self.update_status("相談/実装の作業フォルダを同じプロジェクトへ移動しました");
         self.push_history(format!(
             "相談/実装の作業フォルダを移動しました: {}",
