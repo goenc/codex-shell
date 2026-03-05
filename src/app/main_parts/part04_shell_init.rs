@@ -293,8 +293,14 @@ impl CodexShellApp {
         }
     }
 
+    fn input_command_without_trailing_newlines(&self) -> String {
+        self.input_command
+            .trim_end_matches(['\r', '\n'])
+            .to_string()
+    }
+
     fn send_input_command_by_button(&mut self) {
-        let input_body = self.input_command.trim().to_string();
+        let input_body = self.input_command_without_trailing_newlines();
         let command = if input_body.is_empty() {
             String::new()
         } else if self.config.input_prefix.trim().is_empty() {
@@ -308,7 +314,7 @@ impl CodexShellApp {
     }
 
     fn send_build_command(&mut self) {
-        let build_input = self.input_command.trim().to_string();
+        let build_input = self.input_command_without_trailing_newlines();
         if build_input.is_empty() {
             self.cancel_build_when_empty();
             return;

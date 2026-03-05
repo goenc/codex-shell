@@ -7,7 +7,7 @@ impl CodexShellApp {
         if !self.build_confirm_open {
             return;
         }
-        if self.input_command.trim().is_empty() {
+        if self.input_command_without_trailing_newlines().is_empty() {
             self.cancel_build_when_empty();
             return;
         }
@@ -25,7 +25,7 @@ impl CodexShellApp {
                 ui.add_space(10.0);
                 ui.horizontal(|ui| {
                     if ui.button("はい").clicked() {
-                        if self.input_command.trim().is_empty() {
+                        if self.input_command_without_trailing_newlines().is_empty() {
                             self.cancel_build_when_empty();
                         } else {
                             self.build_confirm_open = false;

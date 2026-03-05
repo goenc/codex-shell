@@ -102,6 +102,8 @@ impl CodexShellApp {
             ui_tool::MODE_CODEX_START_B => {
                 self.codex_runtime_state_b != CodexRuntimeState::Calculating
             }
+            ui_tool::MODE_STOP => self.codex_runtime_state == CodexRuntimeState::Calculating,
+            ui_tool::MODE_STOP_B => self.codex_runtime_state_b == CodexRuntimeState::Calculating,
             ui_tool::MODE_PROJECT_DEBUG_RUN => self.active_project_declaration_path.is_some(),
             ui_tool::MODE_PROJECT_TARGET_MOVE => {
                 self.target_project_dir_path.is_some()
@@ -234,7 +236,7 @@ impl CodexShellApp {
     }
 
     fn handle_mode_build(&mut self) {
-        if self.input_command.trim().is_empty() {
+        if self.input_command_without_trailing_newlines().is_empty() {
             self.cancel_build_when_empty();
             return;
         }
