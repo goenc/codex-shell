@@ -26,6 +26,13 @@ impl CodexShellApp {
             .and_then(|path| path.parent().map(Path::to_path_buf));
     }
 
+    fn selected_project_declaration_path(&self) -> Option<PathBuf> {
+        self.project_selected_index
+            .and_then(|index| self.project_declarations.get(index))
+            .and_then(|entry| entry.path.as_ref())
+            .cloned()
+    }
+
     fn launch_startup_executables(&mut self) {
         let startup_entries = [
             ("自動起動EXE1", self.config.startup_exe_1.clone()),
@@ -129,13 +136,17 @@ impl CodexShellApp {
     }
 
     fn launch_active_project_debug_executable(&mut self) {
-        let Some(declaration_path) = self.active_project_declaration_path.clone() else {
-            self.update_status("開始済みプロジェクトがないためデバッグEXEを起動できません");
-            self.push_history("デバッグEXE起動を中止しました: 開始済みプロジェクトなし");
+        if !self.is_selected_project_highlighted() {
+            self.update_status("緑ハイライトのプロジェクトが未選択のためデバッグEXEを起動できません");
+            self.push_history("デバッグEXE起動を中止しました: 緑ハイライト未選択");
+            return;
+        }
+        let Some(declaration_path) = self.selected_project_declaration_path() else {
+            self.update_status("プロジェクト未選択のためデバッグEXEを起動できません");
+            self.push_history("デバッグEXE起動を中止しました: プロジェクト未選択");
             return;
         };
-        let build_root_dir = self.effective_build_root_dir();
-        let exe_path = match resolve_project_debug_executable_path(&declaration_path, &build_root_dir) {
+        let exe_path = match resolve_project_debug_executable_path(&declaration_path) {
             Ok(path) => path,
             Err(err) => {
                 self.update_status(format!("デバッグEXE解決に失敗: {err}"));
@@ -190,23 +201,13 @@ impl CodexShellApp {
     }
 
     fn active_project_debug_modified_hhmm(&self) -> Option<String> {
-        let declaration_path = self.active_project_declaration_path.as_ref()?;
-        let build_root_dir = self.effective_build_root_dir();
-        let exe_path = resolve_project_debug_executable_path(declaration_path, &build_root_dir).ok()?;
+        if !self.is_selected_project_highlighted() {
+            return None;
+        }
+        let declaration_path = self.selected_project_declaration_path()?;
+        let exe_path = resolve_project_debug_executable_path(&declaration_path).ok()?;
         let modified = fs::metadata(exe_path).ok()?.modified().ok()?;
         format_system_time_hhmm(modified)
-    }
-
-    fn effective_build_root_dir(&self) -> PathBuf {
-        let configured = self.config.build_root_dir.trim();
-        if !configured.is_empty() {
-            return PathBuf::from(configured);
-        }
-        let fallback = self.config.working_dir.trim();
-        if !fallback.is_empty() {
-            return PathBuf::from(fallback);
-        }
-        PathBuf::from(".")
     }
 
     fn move_both_shells_to_selected_project_dir(&mut self) {

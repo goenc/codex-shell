@@ -104,7 +104,15 @@ impl CodexShellApp {
             }
             ui_tool::MODE_STOP => self.codex_runtime_state == CodexRuntimeState::Calculating,
             ui_tool::MODE_STOP_B => self.codex_runtime_state_b == CodexRuntimeState::Calculating,
-            ui_tool::MODE_PROJECT_DEBUG_RUN => self.active_project_declaration_path.is_some(),
+            ui_tool::MODE_PROJECT_DEBUG_RUN => {
+                if !self.is_selected_project_highlighted() {
+                    return false;
+                }
+                let Some(declaration_path) = self.selected_project_declaration_path() else {
+                    return false;
+                };
+                resolve_project_debug_executable_path(&declaration_path).is_ok()
+            }
             ui_tool::MODE_PROJECT_TARGET_MOVE => {
                 self.target_project_dir_path.is_some()
                     && self.codex_runtime_state != CodexRuntimeState::Calculating

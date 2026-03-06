@@ -1,4 +1,4 @@
 CodexShell
 codex-shell
 C:\Users\gonec\RustProjects\codex-shell
-ASSUME_ENVIRONMENT_COMPLETE_ON_RESUME
+C:\Users\gonec\RustBuildCache\codex-shell\debug\codex-shell.exe

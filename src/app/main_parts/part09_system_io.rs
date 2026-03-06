@@ -56,18 +56,21 @@ fn read_project_name_from_declaration(path: &Path) -> Option<String> {
     }
 }
 
-fn resolve_project_debug_executable_path(declaration_path: &Path, build_root_dir: &Path) -> Result<PathBuf> {
-    let project_dir = declaration_path
-        .parent()
-        .ok_or_else(|| anyhow!("宣言ファイルの親フォルダを取得できません: {}", declaration_path.display()))?;
-    let folder_name = project_dir
-        .file_name()
-        .and_then(|v| v.to_str())
-        .ok_or_else(|| anyhow!("プロジェクトフォルダ名を取得できません: {}", project_dir.display()))?;
-    let exe_path = build_root_dir
-        .join(folder_name)
-        .join("debug")
-        .join(format!("{folder_name}.exe"));
+fn resolve_project_debug_executable_path(declaration_path: &Path) -> Result<PathBuf> {
+    let body = fs::read_to_string(declaration_path)
+        .with_context(|| format!("宣言ファイル読み込みに失敗: {}", declaration_path.display()))?;
+    let line_4 = body
+        .lines()
+        .nth(3)
+        .map(str::trim)
+        .ok_or_else(|| anyhow!("宣言ファイルの4行目が見つかりません: {}", declaration_path.display()))?;
+    if line_4.is_empty() {
+        return Err(anyhow!(
+            "宣言ファイルの4行目にEXEパスがありません: {}",
+            declaration_path.display()
+        ));
+    }
+    let exe_path = PathBuf::from(line_4.trim_matches('"'));
     if !exe_path.is_file() {
         return Err(anyhow!(
             "debug実行ファイルが見つかりません: {}",
