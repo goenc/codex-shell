@@ -1,0 +1,6 @@
+MANDATORY CONTEXT FILE
+
+This file must always be read before performing any task.
+
+Primary repository:
+https://github.com/goenc/codex-shell

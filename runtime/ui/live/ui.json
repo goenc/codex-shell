@@ -3,11 +3,11 @@
   "assets": {
     "base_dir": "assets/ui",
     "images": {
+      "btn_hover": "buttons/hover.png",
       "icon_build": "icons/build.png",
-      "btn_primary": "buttons/primary.png",
       "btn_pressed": "buttons/pressed.png",
-      "icon_voice": "icons/voice.png",
-      "btn_hover": "buttons/hover.png"
+      "btn_primary": "buttons/primary.png",
+      "icon_voice": "icons/voice.png"
     }
   },
   "screens": [
@@ -1244,7 +1244,7 @@
               }
             },
             "text": {
-              "value": "ビルドルート",
+              "value": "ビルルート",
               "align": "left",
               "font_size": 16.0,
               "font_family": "noto_sans_jp",
@@ -1675,8 +1675,8 @@
           "z_index": 120,
           "checked": false,
           "position": {
-            "x": 47.0,
-            "y": 378.0
+            "x": 50.0,
+            "y": 413.0
           },
           "size": {
             "w": 120.0,
@@ -1741,8 +1741,8 @@
           "z_index": 120,
           "checked": false,
           "position": {
-            "x": 175.0,
-            "y": 378.0
+            "x": 178.0,
+            "y": 413.0
           },
           "size": {
             "w": 180.0,
@@ -1807,8 +1807,8 @@
           "z_index": 120,
           "checked": false,
           "position": {
-            "x": 363.0,
-            "y": 378.0
+            "x": 366.0,
+            "y": 413.0
           },
           "size": {
             "w": 120.0,
@@ -1873,8 +1873,8 @@
           "z_index": 130,
           "checked": true,
           "position": {
-            "x": 491.0,
-            "y": 378.0
+            "x": 494.0,
+            "y": 413.0
           },
           "size": {
             "w": 120.0,
@@ -2401,7 +2401,7 @@
           "z_index": 110,
           "checked": false,
           "position": {
-            "x": 181.0,
+            "x": 179.0,
             "y": 335.0
           },
           "size": {
@@ -3160,6 +3160,138 @@
             "text": {
               "value": "参照",
               "align": "center",
+              "font_size": 16.0,
+              "font_family": "noto_sans_jp",
+              "bold": false,
+              "italic": false
+            },
+            "states": {
+              "hover": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "pressed": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "disabled": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "chk_settings_open_consultation_window_on_startup",
+          "type": "checkbox",
+          "z_index": 110,
+          "checked": false,
+          "position": {
+            "x": 194.0,
+            "y": 369.0
+          },
+          "size": {
+            "w": 272.0,
+            "h": 28.0
+          },
+          "visible": true,
+          "enabled": true,
+          "bind": {
+            "command": "config.open_consultation_window_on_startup",
+            "group": ""
+          },
+          "visual": {
+            "background": {
+              "image": "",
+              "fit": ""
+            },
+            "icon": {
+              "image": "",
+              "anchor": "center",
+              "offset": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "size": {
+                "w": 120.0,
+                "h": 32.0
+              }
+            },
+            "text": {
+              "value": "起動時に相談ウィンドウを開く",
+              "align": "left",
+              "font_size": 16.0,
+              "font_family": "noto_sans_jp",
+              "bold": false,
+              "italic": false
+            },
+            "states": {
+              "hover": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "pressed": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "disabled": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "chk_settings_open_implementation_window_on_startup",
+          "type": "checkbox",
+          "z_index": 110,
+          "checked": false,
+          "position": {
+            "x": 473.0,
+            "y": 367.0
+          },
+          "size": {
+            "w": 284.0,
+            "h": 28.0
+          },
+          "visible": true,
+          "enabled": true,
+          "bind": {
+            "command": "config.open_implementation_window_on_startup",
+            "group": ""
+          },
+          "visual": {
+            "background": {
+              "image": "",
+              "fit": ""
+            },
+            "icon": {
+              "image": "",
+              "anchor": "center",
+              "offset": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "size": {
+                "w": 120.0,
+                "h": 32.0
+              }
+            },
+            "text": {
+              "value": "起動時に実装ウィンドウを開く",
+              "align": "left",
               "font_size": 16.0,
               "font_family": "noto_sans_jp",
               "bold": false,

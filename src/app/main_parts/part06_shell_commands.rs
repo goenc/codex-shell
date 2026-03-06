@@ -225,6 +225,40 @@ impl CodexShellApp {
         if !object.visible {
             return false;
         }
+        let consult_window_is_running = self.powershell_child.is_some();
+        let implement_window_is_running = self.build_powershell_child.is_some();
+        let consult_visible = consult_window_is_running;
+        let implement_visible = implement_window_is_running;
+        let project_select_visible = consult_window_is_running || implement_window_is_running;
+
+        if !consult_visible {
+            let is_consult_object = matches!(
+                object.bind.command.trim(),
+                ui_tool::MODE_CODEX_START | ui_tool::MODE_STOP
+            ) || object.id == "btn_input_send";
+            if is_consult_object {
+                return false;
+            }
+        }
+
+        if !implement_visible
+            && matches!(
+                object.bind.command.trim(),
+                ui_tool::MODE_CODEX_START_B
+                    | ui_tool::MODE_STOP_B
+                    | ui_tool::MODE_BUILD
+                    | ui_tool::MODE_PROJECT_DEBUG_RUN
+            )
+        {
+            return false;
+        }
+
+        if !project_select_visible
+            && (object.id == "cmb_project_selector" || object.id == "btn_project_target_move")
+        {
+            return false;
+        }
+
         match object.bind.command.trim() {
             ui_tool::UI_EDIT_LOCKED_HINT => self.ui_edit_mode,
             _ => true,
