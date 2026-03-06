@@ -96,23 +96,32 @@ impl CodexShellApp {
         }
     }
 
+    fn is_project_launch_command(command: &str) -> bool {
+        matches!(
+            command.trim(),
+            ui_tool::MODE_CODEX_START
+                | ui_tool::MODE_CODEX_START_B
+                | ui_tool::MODE_PROJECT_DEBUG_RUN
+        )
+    }
+
     fn is_bind_command_enabled(&self, command: &str) -> bool {
-        match command.trim() {
+        let command = command.trim();
+        if Self::is_project_launch_command(command) && !self.is_project_launch_ready() {
+            return false;
+        }
+        match command {
             ui_tool::MODE_CODEX_START => self.codex_runtime_state != CodexRuntimeState::Calculating,
             ui_tool::MODE_CODEX_START_B => {
                 self.codex_runtime_state_b != CodexRuntimeState::Calculating
             }
             ui_tool::MODE_STOP => self.codex_runtime_state == CodexRuntimeState::Calculating,
             ui_tool::MODE_STOP_B => self.codex_runtime_state_b == CodexRuntimeState::Calculating,
-            ui_tool::MODE_PROJECT_DEBUG_RUN => {
-                if !self.is_selected_project_highlighted() {
-                    return false;
-                }
-                let Some(declaration_path) = self.selected_project_declaration_path() else {
-                    return false;
-                };
-                resolve_project_debug_executable_path(&declaration_path).is_ok()
-            }
+            ui_tool::MODE_PROJECT_DEBUG_RUN => self
+                .selected_project_declaration_path()
+                .is_some_and(|declaration_path| {
+                    resolve_project_debug_executable_path(&declaration_path).is_ok()
+                }),
             ui_tool::MODE_PROJECT_TARGET_MOVE => {
                 self.target_project_dir_path.is_some()
                     && self.codex_runtime_state != CodexRuntimeState::Calculating

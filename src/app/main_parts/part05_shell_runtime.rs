@@ -18,6 +18,10 @@ impl CodexShellApp {
             .is_some_and(|key| self.moved_project_highlight_key.as_deref() == Some(key.as_str()))
     }
 
+    fn is_project_launch_ready(&self) -> bool {
+        self.is_selected_project_highlighted()
+    }
+
     fn sync_selected_project_target_dir(&mut self) {
         self.target_project_dir_path = self
             .project_selected_index
@@ -136,7 +140,7 @@ impl CodexShellApp {
     }
 
     fn launch_active_project_debug_executable(&mut self) {
-        if !self.is_selected_project_highlighted() {
+        if !self.is_project_launch_ready() {
             self.update_status("緑ハイライトのプロジェクトが未選択のためデバッグEXEを起動できません");
             self.push_history("デバッグEXE起動を中止しました: 緑ハイライト未選択");
             return;
@@ -201,7 +205,7 @@ impl CodexShellApp {
     }
 
     fn active_project_debug_modified_hhmm(&self) -> Option<String> {
-        if !self.is_selected_project_highlighted() {
+        if !self.is_project_launch_ready() {
             return None;
         }
         let declaration_path = self.selected_project_declaration_path()?;
