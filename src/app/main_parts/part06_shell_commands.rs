@@ -121,6 +121,12 @@ impl CodexShellApp {
             ui_tool::REASONING_HIGH => Some(self.selected_reasoning_effort == "high"),
             ui_tool::REASONING_XHIGH => Some(self.selected_reasoning_effort == "xhigh"),
             ui_tool::CONFIG_SHOW_SIZE_OVERLAY => Some(self.config.show_size_overlay),
+            ui_tool::CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP => {
+                Some(self.config.open_consultation_window_on_startup)
+            }
+            ui_tool::CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP => {
+                Some(self.config.open_implementation_window_on_startup)
+            }
             _ => None,
         }
     }
@@ -142,6 +148,12 @@ impl CodexShellApp {
                 ui_tool::REASONING_HIGH => Some(selected_reasoning_effort == "high"),
                 ui_tool::REASONING_XHIGH => Some(selected_reasoning_effort == "xhigh"),
                 ui_tool::CONFIG_SHOW_SIZE_OVERLAY => Some(self.config.show_size_overlay),
+                ui_tool::CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP => {
+                    Some(self.config.open_consultation_window_on_startup)
+                }
+                ui_tool::CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP => {
+                    Some(self.config.open_implementation_window_on_startup)
+                }
                 _ => None,
             };
             if let Some(desired_checked) = desired && object.checked != desired_checked {

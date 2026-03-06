@@ -37,6 +37,10 @@ pub const CONFIG_STARTUP_EXE_3_BROWSE: &str = "config.startup_exe_3.browse";
 pub const CONFIG_STARTUP_EXE_4_BROWSE: &str = "config.startup_exe_4.browse";
 pub const CONFIG_BUILD_ROOT_DIR_BROWSE: &str = "config.build_root_dir.browse";
 pub const CONFIG_SHOW_SIZE_OVERLAY: &str = "config.show_size_overlay";
+pub const CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP: &str =
+    "config.open_consultation_window_on_startup";
+pub const CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP: &str =
+    "config.open_implementation_window_on_startup";
 pub const CONFIG_SAVE: &str = "config.save";
 pub const CONFIG_RESTART_LISTENER: &str = "config.restart_listener";
 
@@ -78,6 +82,8 @@ pub const ALL_UI_COMMANDS: &[&str] = &[
     CONFIG_STARTUP_EXE_4_BROWSE,
     CONFIG_BUILD_ROOT_DIR_BROWSE,
     CONFIG_SHOW_SIZE_OVERLAY,
+    CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP,
+    CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP,
     CONFIG_SAVE,
     CONFIG_RESTART_LISTENER,
 ];

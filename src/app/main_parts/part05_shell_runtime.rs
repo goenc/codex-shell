@@ -328,9 +328,15 @@ impl CodexShellApp {
 
     fn send_codex_command_to(&mut self, source: &str, to_build_pipe: bool, command: String) {
         if to_build_pipe {
+            if !self.ensure_build_shell_process_started() {
+                return;
+            }
             let pipe_name = self.build_pipe_name();
             self.send_command_to_pipe(command, source, BUTTON_COMMAND_DELAY_MS, pipe_name);
         } else {
+            if !self.ensure_main_shell_process_started() {
+                return;
+            }
             self.send_command(command, source, BUTTON_COMMAND_DELAY_MS);
         }
     }

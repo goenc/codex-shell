@@ -13,6 +13,8 @@ struct AppConfig {
     startup_exe_3: String,
     startup_exe_4: String,
     show_size_overlay: bool,
+    open_consultation_window_on_startup: bool,
+    open_implementation_window_on_startup: bool,
     main_window_width: f32,
     main_window_height: f32,
 }
@@ -36,6 +38,8 @@ impl Default for AppConfig {
             startup_exe_3: String::new(),
             startup_exe_4: String::new(),
             show_size_overlay: true,
+            open_consultation_window_on_startup: true,
+            open_implementation_window_on_startup: true,
             main_window_width: FIXED_WINDOW_WIDTH,
             main_window_height: FIXED_WINDOW_HEIGHT,
         }
@@ -99,6 +103,7 @@ impl UiDefinition {
         self.remove_legacy_runtime_status_labels();
         self.ensure_settings_build_root_field();
         self.ensure_settings_codex_command_fields();
+        self.ensure_settings_startup_window_checkboxes();
         self.relocate_reasoning_controls_to_settings();
         ensure_project_target_move_button(self);
         self.objects.clear();
@@ -242,6 +247,47 @@ impl UiDefinition {
                 b_y,
                 input_w,
                 input_h,
+            ));
+        }
+    }
+
+    fn ensure_settings_startup_window_checkboxes(&mut self) {
+        let Some(settings_objects) = self.screen_objects_mut(UI_SETTINGS_SCREEN_ID) else {
+            return;
+        };
+        let has_consultation = settings_objects.iter().any(|object| {
+            object.id == "chk_settings_open_consultation_window_on_startup"
+                || object.bind.command.trim()
+                    == ui_tool::CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP
+        });
+        let has_implementation = settings_objects.iter().any(|object| {
+            object.id == "chk_settings_open_implementation_window_on_startup"
+                || object.bind.command.trim()
+                    == ui_tool::CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP
+        });
+
+        if !has_consultation {
+            settings_objects.push(create_checkbox_object(
+                "chk_settings_open_consultation_window_on_startup",
+                "起動時に相談ウィンドウを開く",
+                ui_tool::CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP,
+                110,
+                312.0,
+                336.0,
+                272.0,
+                28.0,
+            ));
+        }
+        if !has_implementation {
+            settings_objects.push(create_checkbox_object(
+                "chk_settings_open_implementation_window_on_startup",
+                "起動時に実装ウィンドウを開く",
+                ui_tool::CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP,
+                110,
+                592.0,
+                336.0,
+                284.0,
+                28.0,
             ));
         }
     }
@@ -655,6 +701,26 @@ fn default_settings_screen() -> UiScreen {
             24.0,
             336.0,
             280.0,
+            28.0,
+        ),
+        create_checkbox_object(
+            "chk_settings_open_consultation_window_on_startup",
+            "起動時に相談ウィンドウを開く",
+            ui_tool::CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP,
+            110,
+            312.0,
+            336.0,
+            272.0,
+            28.0,
+        ),
+        create_checkbox_object(
+            "chk_settings_open_implementation_window_on_startup",
+            "起動時に実装ウィンドウを開く",
+            ui_tool::CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP,
+            110,
+            592.0,
+            336.0,
+            284.0,
             28.0,
         ),
         create_button_object(

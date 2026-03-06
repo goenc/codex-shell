@@ -196,24 +196,47 @@ impl CodexShellApp {
 
         let working_dir = self.config.working_dir.trim().to_string();
         let (main_pipe_name, build_pipe_name) = self.runtime_pipe_names();
+        let mut started_any = false;
+        if self.config.open_consultation_window_on_startup {
+            if self.start_main_shell_process(&main_pipe_name, &working_dir) {
+                started_any = true;
+            }
+        } else {
+            self.push_history("設定により相談ウィンドウの起動をスキップしました");
+        }
 
-        match spawn_listener_process(&main_pipe_name, &working_dir, "相談") {
+        if self.config.open_implementation_window_on_startup {
+            if self.start_build_shell_process(&build_pipe_name, &working_dir) {
+                started_any = true;
+            }
+        } else {
+            self.push_history("設定により実装ウィンドウの起動をスキップしました");
+        }
+
+        if !started_any {
+            self.update_status("設定により相談/実装ウィンドウの起動をスキップしました");
+        }
+    }
+
+    fn start_main_shell_process(&mut self, main_pipe_name: &str, working_dir: &str) -> bool {
+        match spawn_listener_process(main_pipe_name, working_dir, "相談") {
             Ok(child) => {
                 let pid = child.id();
                 self.powershell_child = Some(child);
-                self.active_main_pipe_name = main_pipe_name.clone();
+                self.active_main_pipe_name = main_pipe_name.to_string();
                 self.update_status(format!("ConPTY待ち受け起動中 PID={pid}"));
                 self.push_history(format!("ConPTY待ち受けを起動しました PID={pid}"));
-                self.start_build_shell_process(&build_pipe_name, &working_dir);
+                true
             }
             Err(err) => {
                 self.update_status(format!("ConPTY待ち受け起動失敗: {err}"));
                 self.push_history(format!("ConPTY待ち受け起動に失敗しました: {err}"));
+                false
             }
         }
     }
 
-    fn start_build_shell_process(&mut self, build_pipe_name: &str, working_dir: &str) {
+    fn start_build_shell_process(&mut self, build_pipe_name: &str, working_dir: &str) -> bool {
         match spawn_listener_process(build_pipe_name, working_dir, "実装") {
             Ok(child) => {
                 let pid = child.id();
@@ -222,12 +245,32 @@ impl CodexShellApp {
                 self.push_history(format!(
                     "ビルド用ConPTY待ち受けを起動しました PID={pid} pipe={build_pipe_name}"
                 ));
+                true
             }
             Err(err) => {
                 self.update_status(format!("ビルド用ConPTY起動失敗: {err}"));
                 self.push_history(format!("ビルド用ConPTY待ち受けの起動に失敗しました: {err}"));
+                false
             }
         }
+    }
+
+    fn ensure_main_shell_process_started(&mut self) -> bool {
+        if self.powershell_child.is_some() {
+            return true;
+        }
+        let working_dir = self.config.working_dir.trim().to_string();
+        let (main_pipe_name, _) = self.runtime_pipe_names();
+        self.start_main_shell_process(&main_pipe_name, &working_dir)
+    }
+
+    fn ensure_build_shell_process_started(&mut self) -> bool {
+        if self.build_powershell_child.is_some() {
+            return true;
+        }
+        let working_dir = self.config.working_dir.trim().to_string();
+        let (_, build_pipe_name) = self.runtime_pipe_names();
+        self.start_build_shell_process(&build_pipe_name, &working_dir)
     }
 
     fn runtime_pipe_names(&self) -> (String, String) {
@@ -314,6 +357,9 @@ impl CodexShellApp {
     }
 
     fn send_build_command(&mut self) {
+        if !self.ensure_build_shell_process_started() {
+            return;
+        }
         let build_input = self.input_command_without_trailing_newlines();
         if build_input.is_empty() {
             self.cancel_build_when_empty();

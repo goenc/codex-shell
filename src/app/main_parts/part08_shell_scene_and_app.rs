@@ -159,6 +159,14 @@ impl CodexShellApp {
                     state_changed = true;
                     if object_command == ui_tool::CONFIG_SHOW_SIZE_OVERLAY {
                         self.config.show_size_overlay = next_checked;
+                    } else if object_command
+                        == ui_tool::CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP
+                    {
+                        self.config.open_consultation_window_on_startup = next_checked;
+                    } else if object_command
+                        == ui_tool::CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP
+                    {
+                        self.config.open_implementation_window_on_startup = next_checked;
                     } else if !object_command.is_empty() {
                         clicked_commands.push(object_command.clone());
                     }
