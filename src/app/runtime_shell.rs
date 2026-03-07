@@ -217,11 +217,7 @@ impl UiDefinition {
             ui_tool::REASONING_HIGH,
             ui_tool::REASONING_XHIGH,
         ];
-        let remove_ids = [
-            "lbl_main_model",
-            "cmb_main_model",
-            "lbl_main_reasoning_effort",
-            "cmb_main_reasoning_effort",
+        let legacy_remove_ids = [
             "lbl_settings_model",
             "cmb_settings_model",
             "lbl_reasoning_effort",
@@ -238,56 +234,70 @@ impl UiDefinition {
         ];
         if let Some(main_objects) = self.screen_objects_mut(UI_MAIN_SCREEN_ID) {
             main_objects.retain(|object| {
-                !remove_ids.contains(&object.id.as_str())
+                !legacy_remove_ids.contains(&object.id.as_str())
                     && !reasoning_commands.contains(&object.bind.command.trim())
             });
-            main_objects.push(create_label_object(
-                "lbl_main_model",
-                "モデル",
-                100,
-                24.0,
-                18.0,
-                72.0,
-                28.0,
-                "left",
-            ));
-            main_objects.push(create_combo_object(
-                "cmb_main_model",
-                "モデルを選択",
-                ui_tool::CONFIG_MODEL,
-                110,
-                100.0,
-                18.0,
-                184.0,
-                28.0,
-            ));
-            main_objects.push(create_label_object(
-                "lbl_main_reasoning_effort",
-                "思考深度",
-                100,
-                300.0,
-                18.0,
-                96.0,
-                28.0,
-                "left",
-            ));
-            main_objects.push(create_combo_object(
-                "cmb_main_reasoning_effort",
-                "思考深度を選択",
-                ui_tool::CONFIG_MODEL_REASONING_EFFORT,
-                110,
-                396.0,
-                18.0,
-                104.0,
-                28.0,
-            ));
+            if !main_objects.iter().any(|object| object.id == "lbl_main_model") {
+                main_objects.push(create_label_object(
+                    "lbl_main_model",
+                    "モデル",
+                    100,
+                    24.0,
+                    18.0,
+                    72.0,
+                    28.0,
+                    "left",
+                ));
+            }
+            if !main_objects.iter().any(|object| object.id == "cmb_main_model") {
+                main_objects.push(create_combo_object(
+                    "cmb_main_model",
+                    "モデルを選択",
+                    ui_tool::CONFIG_MODEL,
+                    110,
+                    100.0,
+                    18.0,
+                    184.0,
+                    28.0,
+                ));
+            }
+            if !main_objects
+                .iter()
+                .any(|object| object.id == "lbl_main_reasoning_effort")
+            {
+                main_objects.push(create_label_object(
+                    "lbl_main_reasoning_effort",
+                    "思考深度",
+                    100,
+                    300.0,
+                    18.0,
+                    96.0,
+                    28.0,
+                    "left",
+                ));
+            }
+            if !main_objects
+                .iter()
+                .any(|object| object.id == "cmb_main_reasoning_effort")
+            {
+                main_objects.push(create_combo_object(
+                    "cmb_main_reasoning_effort",
+                    "思考深度を選択",
+                    ui_tool::CONFIG_MODEL_REASONING_EFFORT,
+                    110,
+                    396.0,
+                    18.0,
+                    104.0,
+                    28.0,
+                ));
+            }
         }
 
         let Some(settings_objects) = self.screen_objects_mut(UI_SETTINGS_SCREEN_ID) else {
             return;
         };
         settings_objects.retain(|object| {
-            !remove_ids.contains(&object.id.as_str())
+            !legacy_remove_ids.contains(&object.id.as_str())
                 && !reasoning_commands.contains(&object.bind.command.trim())
         });
     }
