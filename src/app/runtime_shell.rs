@@ -937,7 +937,10 @@ impl CodexShellApp {
 
     fn send_input_command_by_button(&mut self) {
         let input = self.input_command.clone();
-        let _ = self.send_text_to_powershell(&input);
+        let command = format!("$prompt = @\"\n{input}\n\"@\ncodex exec $prompt");
+        if self.send_text_to_powershell(&command) {
+            self.input_command.clear();
+        }
         self.pending_input_focus = true;
     }
 
