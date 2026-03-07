@@ -12,6 +12,15 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+#[cfg(windows)]
+use windows::core::BOOL;
+#[cfg(windows)]
+use windows::Win32::Foundation::{HWND, LPARAM};
+#[cfg(windows)]
+use windows::Win32::UI::WindowsAndMessaging::{
+    DeleteMenu, DrawMenuBar, EnumWindows, GetSystemMenu, GetWindowThreadProcessId,
+    IsWindowVisible, MENU_ITEM_FLAGS, MF_BYCOMMAND, SC_CLOSE,
+};
 
 use crate::tools::ui_edit::api as ui_tool;
 use super::process_runtime;
@@ -56,6 +65,69 @@ const MODEL_CANDIDATES: [&str; 3] = ["gpt-5.3-codex", "gpt-5.3-codex-spark", "gp
 const REASONING_EFFORT_CANDIDATES: [&str; 4] = ["low", "medium", "high", "xhigh"];
 #[cfg(windows)]
 const CREATE_NEW_CONSOLE_FLAG: u32 = 0x0000_0010;
+
+#[cfg(windows)]
+#[derive(Default)]
+struct WindowSearchContext {
+    target_pid: u32,
+    hwnd: HWND,
+}
+
+#[cfg(windows)]
+unsafe extern "system" fn enum_visible_window_by_pid(hwnd: HWND, lparam: LPARAM) -> BOOL {
+    let context = unsafe { &mut *(lparam.0 as *mut WindowSearchContext) };
+    let mut window_pid = 0u32;
+    unsafe {
+        let _ = GetWindowThreadProcessId(hwnd, Some(&mut window_pid));
+    }
+    if window_pid == context.target_pid && unsafe { IsWindowVisible(hwnd).as_bool() } {
+        context.hwnd = hwnd;
+        return BOOL(0);
+    }
+    BOOL(1)
+}
+
+#[cfg(windows)]
+fn find_visible_window_by_pid(pid: u32) -> Option<HWND> {
+    let mut context = WindowSearchContext {
+        target_pid: pid,
+        ..Default::default()
+    };
+    unsafe {
+        let _ = EnumWindows(
+            Some(enum_visible_window_by_pid),
+            LPARAM((&mut context as *mut WindowSearchContext) as isize),
+        );
+    }
+    (!context.hwnd.0.is_null()).then_some(context.hwnd)
+}
+
+#[cfg(windows)]
+fn disable_window_close_button_for_pid(pid: u32) -> Result<()> {
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let hwnd = loop {
+        if let Some(hwnd) = find_visible_window_by_pid(pid) {
+            break hwnd;
+        }
+        if Instant::now() >= deadline {
+            return Err(anyhow!(
+                "PowerShellウィンドウが見つからないため閉じるボタンを無効化できませんでした"
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    };
+
+    unsafe {
+        let system_menu = GetSystemMenu(hwnd, false);
+        if system_menu.0.is_null() {
+            return Err(anyhow!("システムメニュー取得に失敗しました"));
+        }
+        DeleteMenu(system_menu, SC_CLOSE, MENU_ITEM_FLAGS(MF_BYCOMMAND.0))
+            .context("閉じるボタンの削除に失敗しました")?;
+        DrawMenuBar(hwnd).context("メニューバー更新に失敗しました")?;
+    }
+    Ok(())
+}
 
 
 
@@ -1141,6 +1213,10 @@ impl CodexShellApp {
                     self.push_history("PowerShell起動失敗: stdin取得不可");
                     return;
                 };
+                #[cfg(windows)]
+                if let Err(err) = disable_window_close_button_for_pid(child.id()) {
+                    self.push_history(format!("PowerShell閉じるボタン無効化失敗: {err}"));
+                }
                 self.powershell_session = Some(PowerShellSession {
                     process: child,
                     stdin,
