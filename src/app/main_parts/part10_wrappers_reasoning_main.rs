@@ -18,10 +18,6 @@ fn select_folder_path() -> Result<Option<String>> {
     app::process_ops::select_folder_path()
 }
 
-fn spawn_send_worker(send_rx: Receiver<SendRequest>, result_tx: Sender<SendResult>) {
-    app::pipe_ops::spawn_send_worker(send_rx, result_tx);
-}
-
 fn load_reasoning_effort() -> String {
     let config_path = Path::new(CODEX_CONFIG_PATH);
     let Ok(current) = fs::read_to_string(config_path) else {

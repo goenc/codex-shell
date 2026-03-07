@@ -228,28 +228,10 @@ impl CodexShellApp {
             return;
         }
 
-        let escaped = target_dir
-            .to_string_lossy()
-            .replace('\'', "''");
-        let command = format!("Set-Location -LiteralPath '{escaped}'");
-        let main_pipe = self.main_pipe_name();
-        let build_pipe = self.build_pipe_name();
-        self.send_command_to_pipe(
-            command.clone(),
-            "プロジェクト移動(相談)",
-            BUTTON_COMMAND_DELAY_MS,
-            main_pipe,
-        );
-        self.send_command_to_pipe(
-            command,
-            "プロジェクト移動(実装)",
-            BUTTON_COMMAND_DELAY_MS,
-            build_pipe,
-        );
         self.moved_project_highlight_key = self.selected_project_highlight_key();
-        self.update_status("相談/実装の作業フォルダを同じプロジェクトへ移動しました");
+        self.update_status("通信機能削除のため作業フォルダ移動コマンドは実行しません");
         self.push_history(format!(
-            "相談/実装の作業フォルダを移動しました: {}",
+            "作業フォルダ移動コマンドは無効です: {}",
             target_dir.display()
         ));
         let startup_executables = vec![
@@ -339,30 +321,6 @@ impl CodexShellApp {
             Err(err) => {
                 self.update_status(format!("音声入力ホットキー送信失敗: {err}"));
                 self.push_history(format!("音声入力ホットキー送信失敗: {err}"));
-            }
-        }
-    }
-
-    fn drain_send_results(&mut self) {
-        while let Ok(result) = self.send_result_rx.try_recv() {
-            match result {
-                SendResult::Sent { source, command } => {
-                    if source == "プロジェクト開始" {
-                        self.update_status("プロジェクト開始を送信しました");
-                        self.push_history(format!("{source}: {command}"));
-                        self.project_runtime_active = true;
-                    } else {
-                        self.update_status(format!("{source}コマンド送信済み"));
-                        self.push_history(format!("{source}: {command}"));
-                    }
-                }
-                SendResult::Failed { source, error } => {
-                    self.update_status(format!("送信失敗: {error}"));
-                    self.push_history(format!("送信失敗 ({source}): {error}"));
-                    if source == "プロジェクト開始" {
-                        self.project_runtime_active = false;
-                    }
-                }
             }
         }
     }

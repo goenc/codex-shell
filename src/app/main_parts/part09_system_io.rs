@@ -423,11 +423,6 @@ fn config_file_path() -> PathBuf {
     config_base_dir().join("config.json")
 }
 
-#[allow(dead_code)]
-fn listener_script_path() -> PathBuf {
-    config_base_dir().join(LISTENER_FILE_NAME)
-}
-
 fn asset_base_candidates() -> Vec<PathBuf> {
     let mut candidates = Vec::new();
     if let Ok(current_dir) = std::env::current_dir() {
@@ -643,26 +638,6 @@ fn apply_visual_fix(ctx: &egui::Context) {
         style.visuals.widgets.active.corner_radius = egui::CornerRadius::same(4);
         style.visuals.widgets.open.corner_radius = egui::CornerRadius::same(4);
     });
-}
-
-#[allow(dead_code)]
-fn write_listener_script(path: &Path) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).with_context(|| {
-            format!(
-                "待ち受けスクリプトディレクトリ作成に失敗: {}",
-                parent.display()
-            )
-        })?;
-    }
-
-    let mut script_bytes = Vec::with_capacity(3 + LISTENER_SCRIPT.len());
-    script_bytes.extend_from_slice(&[0xEF, 0xBB, 0xBF]);
-    script_bytes.extend_from_slice(LISTENER_SCRIPT.as_bytes());
-
-    fs::write(path, script_bytes)
-        .with_context(|| format!("待ち受けスクリプト保存に失敗: {}", path.display()))?;
-    Ok(())
 }
 
 #[cfg(test)]

@@ -338,18 +338,6 @@ struct UiStateVisual {
     background: UiBackground,
 }
 
-struct SendRequest {
-    source: String,
-    pipe_name: String,
-    command: String,
-    delay_ms: u64,
-}
-
-enum SendResult {
-    Sent { source: String, command: String },
-    Failed { source: String, error: String },
-}
-
 #[derive(Clone, Debug)]
 struct ProjectDeclarationEntry {
     name: String,
@@ -390,14 +378,6 @@ struct CodexShellApp {
     codex_runtime_state: CodexRuntimeState,
     codex_runtime_state_b: CodexRuntimeState,
     history: Vec<String>,
-    powershell_child: Option<Child>,
-    build_powershell_child: Option<Child>,
-    active_main_pipe_name: String,
-    active_build_pipe_name: String,
-    send_tx: Sender<SendRequest>,
-    send_result_rx: Receiver<SendResult>,
-    #[allow(dead_code)]
-    listener_script_path: PathBuf,
     window_size: egui::Vec2,
     input_area_size: egui::Vec2,
     ui_font_names: Vec<String>,
@@ -406,7 +386,6 @@ struct CodexShellApp {
     pending_input_focus: bool,
     ui_resize_locked_by_save: bool,
     project_runtime_active: bool,
-    active_project_declaration_path: Option<PathBuf>,
     target_project_dir_path: Option<PathBuf>,
     project_declarations: Vec<ProjectDeclarationEntry>,
     project_selected_index: Option<usize>,

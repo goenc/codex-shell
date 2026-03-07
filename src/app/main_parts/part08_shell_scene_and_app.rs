@@ -424,13 +424,10 @@ impl eframe::App for CodexShellApp {
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-        self.stop_listener_process();
-        self.stop_build_shell_process();
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.apply_window_resize_policy(ctx);
-        self.drain_send_results();
         self.reload_ui_definition_if_changed(ctx);
         let next_window_size = ctx.content_rect().size();
         if self.ui_edit_mode {

@@ -20,10 +20,6 @@ impl CodexShellApp {
         } else {
             vec![ui_selected_object_id.clone()]
         };
-        let listener_script_path = listener_script_path();
-        let (send_tx, send_rx) = mpsc::channel::<SendRequest>();
-        let (send_result_tx, send_result_rx) = mpsc::channel::<SendResult>();
-        spawn_send_worker(send_rx, send_result_tx);
         let selected_reasoning_effort = load_reasoning_effort();
 
         let mut app = Self {
@@ -45,13 +41,6 @@ impl CodexShellApp {
             codex_runtime_state: CodexRuntimeState::Stopped,
             codex_runtime_state_b: CodexRuntimeState::Stopped,
             history: Vec::new(),
-            powershell_child: None,
-            build_powershell_child: None,
-            active_main_pipe_name: String::new(),
-            active_build_pipe_name: String::new(),
-            send_tx,
-            send_result_rx,
-            listener_script_path,
             window_size: egui::vec2(0.0, 0.0),
             input_area_size: egui::vec2(0.0, 0.0),
             ui_font_names,
@@ -60,7 +49,6 @@ impl CodexShellApp {
             pending_input_focus: false,
             ui_resize_locked_by_save: false,
             project_runtime_active: false,
-            active_project_declaration_path: None,
             target_project_dir_path: None,
             project_declarations: Vec::new(),
             project_selected_index: None,
@@ -125,18 +113,6 @@ impl CodexShellApp {
         self.status_message = message.into();
     }
 
-    fn set_codex_runtime_state(&mut self, state: CodexRuntimeState) {
-        self.codex_runtime_state = state;
-        if state != CodexRuntimeState::Calculating {
-            self.project_runtime_active = false;
-            self.active_project_declaration_path = None;
-        }
-    }
-
-    fn set_codex_runtime_state_b(&mut self, state: CodexRuntimeState) {
-        self.codex_runtime_state_b = state;
-    }
-
     fn runtime_background_color(&self) -> Color32 {
         let codex_a_active = self.codex_runtime_state == CodexRuntimeState::Calculating;
         let codex_b_active = self.codex_runtime_state_b == CodexRuntimeState::Calculating;
@@ -159,76 +135,14 @@ impl CodexShellApp {
         });
     }
 
-    fn stop_listener_process(&mut self) {
-        if let Some(mut child) = self.powershell_child.take() {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
-        self.active_main_pipe_name.clear();
-        self.set_codex_runtime_state(CodexRuntimeState::Stopped);
-        self.set_codex_runtime_state_b(CodexRuntimeState::Stopped);
-    }
-
-    fn stop_build_shell_process(&mut self) {
-        if let Some(mut child) = self.build_powershell_child.take() {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
-        self.active_build_pipe_name.clear();
-        self.set_codex_runtime_state_b(CodexRuntimeState::Stopped);
-    }
-
-    fn main_pipe_name(&self) -> String {
-        if self.active_main_pipe_name.trim().is_empty() {
-            DEFAULT_PIPE_NAME.to_string()
-        } else {
-            self.active_main_pipe_name.clone()
-        }
-    }
-
-    fn build_pipe_name(&self) -> String {
-        if self.active_build_pipe_name.trim().is_empty() {
-            format!("{DEFAULT_PIPE_NAME}_build")
-        } else {
-            self.active_build_pipe_name.clone()
-        }
-    }
-
     fn send_command(&mut self, command: String, source: &str, delay_ms: u64) {
-        let pipe_name = self.main_pipe_name();
-        self.send_command_to_pipe(command, source, delay_ms, pipe_name);
-    }
-
-    fn send_command_to_pipe(
-        &mut self,
-        command: String,
-        source: &str,
-        delay_ms: u64,
-        pipe_name: String,
-    ) {
         if command.trim().is_empty() {
             self.update_status("空コマンドは送信しません");
             return;
         }
-
-        let request = SendRequest {
-            source: source.to_string(),
-            pipe_name,
-            command,
-            delay_ms,
-        };
-        if self.send_tx.send(request).is_ok() {
-            if delay_ms == 0 {
-                self.update_status(format!("{source}送信要求を受け付けました"));
-            } else {
-                self.update_status(format!(
-                    "{source}送信要求を受け付けました ({delay_ms}ms遅延)"
-                ));
-            }
-        } else {
-            self.update_status("送信処理スレッドが停止しています");
-            self.push_history(format!("送信失敗 ({source}): 送信処理スレッド停止"));
-        }
+        let _ = delay_ms;
+        self.update_status("通信機能は削除されています");
+        self.push_history(format!("{source}送信は無効です: {command}"));
     }
 
     fn input_command_without_trailing_newlines(&self) -> String {

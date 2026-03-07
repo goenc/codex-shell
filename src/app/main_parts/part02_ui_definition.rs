@@ -88,7 +88,6 @@ impl UiDefinition {
             self.screens.push(default_settings_screen());
         }
         self.remove_deprecated_persistent_shell_objects();
-        self.remove_legacy_pipe_settings_objects();
         self.remove_legacy_runtime_status_labels();
         self.ensure_settings_build_root_field();
         self.relocate_reasoning_controls_to_settings();
@@ -109,7 +108,6 @@ impl UiDefinition {
             ui_tool::CONFIG_INPUT_PREFIX,
             ui_tool::CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP,
             ui_tool::CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP,
-            ui_tool::CONFIG_RESTART_LISTENER,
         ];
         const DEPRECATED_IDS: &[&str] = &[
             "btn_codex_start",
@@ -133,17 +131,6 @@ impl UiDefinition {
                     && !DEPRECATED_COMMANDS.contains(&object.bind.command.trim())
             });
         }
-    }
-
-    fn remove_legacy_pipe_settings_objects(&mut self) {
-        let Some(settings_objects) = self.screen_objects_mut(UI_SETTINGS_SCREEN_ID) else {
-            return;
-        };
-        settings_objects.retain(|object| {
-            object.id != "lbl_settings_pipe_name"
-                && object.id != "input_settings_pipe_name"
-                && object.bind.command.trim() != "config.pipe_name"
-        });
     }
 
     fn remove_legacy_runtime_status_labels(&mut self) {

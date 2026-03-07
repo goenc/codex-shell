@@ -42,7 +42,6 @@ pub const CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP: &str =
 pub const CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP: &str =
     "config.open_implementation_window_on_startup";
 pub const CONFIG_SAVE: &str = "config.save";
-pub const CONFIG_RESTART_LISTENER: &str = "config.restart_listener";
 
 pub const ALL_UI_COMMANDS: &[&str] = &[
     PROJECT_TARGET_STATE,
@@ -85,7 +84,6 @@ pub const ALL_UI_COMMANDS: &[&str] = &[
     CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP,
     CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP,
     CONFIG_SAVE,
-    CONFIG_RESTART_LISTENER,
 ];
 
 pub fn is_known_ui_command(command: &str) -> bool {
