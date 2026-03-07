@@ -51,6 +51,7 @@ const FIXED_INPUT_HEIGHT_PADDING: f32 = 12.0;
 const INPUT_COMMAND_ID_SALT: &str = "input_command_text_edit";
 const VOICE_INPUT_HOTKEY_LABEL: &str = "Ctrl+Alt+Right";
 const POWERSHELL_EXECUTABLE: &str = "pwsh.exe";
+const AUTO_START_SLOT_COUNT: usize = 4;
 #[cfg(windows)]
 const CREATE_NEW_CONSOLE_FLAG: u32 = 0x0000_0010;
 
@@ -60,6 +61,10 @@ const CREATE_NEW_CONSOLE_FLAG: u32 = 0x0000_0010;
 #[serde(default)]
 pub(crate) struct AppConfig {
     pub(crate) working_dir: String,
+    pub(crate) auto_start_exe_1: String,
+    pub(crate) auto_start_exe_2: String,
+    pub(crate) auto_start_exe_3: String,
+    pub(crate) auto_start_exe_4: String,
     pub(crate) main_window_width: f32,
     pub(crate) main_window_height: f32,
 }
@@ -70,9 +75,47 @@ impl Default for AppConfig {
             working_dir: std::env::current_dir()
                 .map(|path| path.to_string_lossy().into_owned())
                 .unwrap_or_else(|_| ".".to_string()),
+            auto_start_exe_1: String::new(),
+            auto_start_exe_2: String::new(),
+            auto_start_exe_3: String::new(),
+            auto_start_exe_4: String::new(),
             main_window_width: FIXED_WINDOW_WIDTH,
             main_window_height: FIXED_WINDOW_HEIGHT,
         }
+    }
+}
+
+impl AppConfig {
+    fn bound_input_mut(&mut self, command: &str) -> Option<&mut String> {
+        match command.trim() {
+            ui_tool::CONFIG_WORKING_DIR => Some(&mut self.working_dir),
+            ui_tool::CONFIG_AUTO_START_EXE_1 => Some(&mut self.auto_start_exe_1),
+            ui_tool::CONFIG_AUTO_START_EXE_2 => Some(&mut self.auto_start_exe_2),
+            ui_tool::CONFIG_AUTO_START_EXE_3 => Some(&mut self.auto_start_exe_3),
+            ui_tool::CONFIG_AUTO_START_EXE_4 => Some(&mut self.auto_start_exe_4),
+            _ => None,
+        }
+    }
+
+    fn auto_start_path(&self, slot: usize) -> Option<&str> {
+        match slot {
+            0 => Some(&self.auto_start_exe_1),
+            1 => Some(&self.auto_start_exe_2),
+            2 => Some(&self.auto_start_exe_3),
+            3 => Some(&self.auto_start_exe_4),
+            _ => None,
+        }
+    }
+
+    fn set_auto_start_path(&mut self, slot: usize, path: String) -> bool {
+        match slot {
+            0 => self.auto_start_exe_1 = path,
+            1 => self.auto_start_exe_2 = path,
+            2 => self.auto_start_exe_3 = path,
+            3 => self.auto_start_exe_4 = path,
+            _ => return false,
+        }
+        true
     }
 }
 
@@ -131,6 +174,7 @@ impl UiDefinition {
         }
         self.ensure_input_send_button();
         self.relocate_reasoning_controls_to_settings();
+        self.ensure_auto_start_controls_in_settings();
         ensure_project_target_move_button(self);
         self.objects.clear();
     }
@@ -259,6 +303,41 @@ impl UiDefinition {
         }
     }
 
+    fn ensure_auto_start_controls_in_settings(&mut self) {
+        let Some(settings_objects) = self.screen_objects_mut(UI_SETTINGS_SCREEN_ID) else {
+            return;
+        };
+        for (slot, y) in auto_start_slot_layouts() {
+            let input_id = format!("input_settings_auto_start_exe_{}", slot + 1);
+            let button_id = format!("btn_settings_auto_start_exe_{}_browse", slot + 1);
+            let command = auto_start_input_command(slot);
+            let browse_command = auto_start_browse_command(slot);
+            if !settings_objects.iter().any(|object| object.id == input_id) {
+                settings_objects.push(create_input_object(
+                    input_id.as_str(),
+                    command,
+                    110,
+                    156.0,
+                    y,
+                    544.0,
+                    24.0,
+                ));
+            }
+            if !settings_objects.iter().any(|object| object.id == button_id) {
+                settings_objects.push(create_button_object(
+                    button_id.as_str(),
+                    "参照",
+                    browse_command,
+                    120,
+                    708.0,
+                    y,
+                    88.0,
+                    24.0,
+                ));
+            }
+        }
+    }
+
     pub(crate) fn screen_ids(&self) -> Vec<String> {
         self.screens.iter().map(|screen| screen.id.clone()).collect()
     }
@@ -372,13 +451,23 @@ fn default_settings_screen() -> UiScreen {
             640.0,
             24.0,
         ),
+        create_label_object(
+            "lbl_settings_auto_start_exe",
+            "自動起動ソフト",
+            100,
+            24.0,
+            100.0,
+            120.0,
+            24.0,
+            "left",
+        ),
         create_button_object(
             "btn_settings_save",
             "設定保存",
             ui_tool::CONFIG_SAVE,
             120,
             24.0,
-            96.0,
+            224.0,
             120.0,
             28.0,
         ),
@@ -387,8 +476,8 @@ fn default_settings_screen() -> UiScreen {
             "閉じる",
             ui_tool::NAV_BACK_MAIN,
             120,
-            152.0,
-            96.0,
+            256.0,
+            224.0,
             120.0,
             28.0,
         ),
@@ -408,9 +497,56 @@ fn default_settings_screen() -> UiScreen {
             object.checked = false;
         }
     }
+    for (slot, y) in auto_start_slot_layouts() {
+        let input_id = format!("input_settings_auto_start_exe_{}", slot + 1);
+        let button_id = format!("btn_settings_auto_start_exe_{}_browse", slot + 1);
+        objects.push(create_input_object(
+            input_id.as_str(),
+            auto_start_input_command(slot),
+            110,
+            156.0,
+            y,
+            544.0,
+            24.0,
+        ));
+        objects.push(create_button_object(
+            button_id.as_str(),
+            "参照",
+            auto_start_browse_command(slot),
+            120,
+            708.0,
+            y,
+            88.0,
+            24.0,
+        ));
+    }
     UiScreen {
         id: UI_SETTINGS_SCREEN_ID.to_string(),
         objects,
+    }
+}
+
+fn auto_start_slot_layouts() -> [(usize, f32); AUTO_START_SLOT_COUNT] {
+    [(0, 100.0), (1, 132.0), (2, 164.0), (3, 196.0)]
+}
+
+fn auto_start_input_command(slot: usize) -> &'static str {
+    match slot {
+        0 => ui_tool::CONFIG_AUTO_START_EXE_1,
+        1 => ui_tool::CONFIG_AUTO_START_EXE_2,
+        2 => ui_tool::CONFIG_AUTO_START_EXE_3,
+        3 => ui_tool::CONFIG_AUTO_START_EXE_4,
+        _ => "",
+    }
+}
+
+fn auto_start_browse_command(slot: usize) -> &'static str {
+    match slot {
+        0 => ui_tool::CONFIG_AUTO_START_EXE_1_BROWSE,
+        1 => ui_tool::CONFIG_AUTO_START_EXE_2_BROWSE,
+        2 => ui_tool::CONFIG_AUTO_START_EXE_3_BROWSE,
+        3 => ui_tool::CONFIG_AUTO_START_EXE_4_BROWSE,
+        _ => "",
     }
 }
 
@@ -869,6 +1005,7 @@ impl CodexShellApp {
             loaded_font.display()
         ));
         app.push_history(format!("UI定義を読み込みました: {}", app.ui_live_path.display()));
+        app.launch_configured_auto_start_executables();
         app.refresh_project_declarations();
         app.start_powershell_session();
         app.save_config();
@@ -1261,6 +1398,68 @@ impl CodexShellApp {
         }
     }
 
+    fn handle_auto_start_exe_browse(&mut self, slot: usize) {
+        match process_runtime::select_executable_file_path() {
+            Ok(Some(path)) => {
+                if self.config.set_auto_start_path(slot, path.clone()) {
+                    self.update_status(format!("自動起動設定{}を更新しました", slot + 1));
+                    self.push_history(format!("自動起動設定{}を更新: {}", slot + 1, path));
+                }
+            }
+            Ok(None) => {
+                self.update_status(format!("自動起動設定{}の選択をキャンセルしました", slot + 1));
+                self.push_history(format!("自動起動設定{}の参照選択をキャンセル", slot + 1));
+            }
+            Err(err) => {
+                self.update_status(format!("自動起動設定{}の参照に失敗: {err}", slot + 1));
+                self.push_history(format!("自動起動設定{}の参照失敗: {err}", slot + 1));
+            }
+        }
+    }
+
+    fn launch_configured_auto_start_executables(&mut self) {
+        for slot in 0..AUTO_START_SLOT_COUNT {
+            let Some(raw_path) = self.config.auto_start_path(slot) else {
+                continue;
+            };
+            let trimmed = raw_path.trim().to_string();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let path = Path::new(&trimmed);
+            if !is_valid_auto_start_executable_path(path) {
+                self.update_status(format!(
+                    "自動起動設定{}をスキップしました: 無効なEXEパスです",
+                    slot + 1
+                ));
+                self.push_history(format!(
+                    "自動起動設定{}をスキップ: 無効なEXEパス {}",
+                    slot + 1,
+                    path.display()
+                ));
+                continue;
+            }
+            match try_spawn_auto_start_executable(path) {
+                Ok(()) => {
+                    self.update_status(format!("自動起動設定{}を起動しました", slot + 1));
+                    self.push_history(format!(
+                        "自動起動設定{}を起動しました: {}",
+                        slot + 1,
+                        path.display()
+                    ));
+                }
+                Err(err) => {
+                    self.update_status(format!("自動起動設定{}の起動失敗: {err}", slot + 1));
+                    self.push_history(format!(
+                        "自動起動設定{}の起動失敗: {} ({err})",
+                        slot + 1,
+                        path.display()
+                    ));
+                }
+            }
+        }
+    }
+
 }
 
 
@@ -1593,6 +1792,10 @@ impl CodexShellApp {
             UI_SETTINGS => self.handle_ui_settings(),
             NAV_BACK_MAIN => self.handle_nav_back_main(),
             CONFIG_SAVE => self.handle_config_save(),
+            ui_tool::CONFIG_AUTO_START_EXE_1_BROWSE => self.handle_auto_start_exe_browse(0),
+            ui_tool::CONFIG_AUTO_START_EXE_2_BROWSE => self.handle_auto_start_exe_browse(1),
+            ui_tool::CONFIG_AUTO_START_EXE_3_BROWSE => self.handle_auto_start_exe_browse(2),
+            ui_tool::CONFIG_AUTO_START_EXE_4_BROWSE => self.handle_auto_start_exe_browse(3),
             REASONING_MEDIUM => self.handle_reasoning_effort("medium"),
             REASONING_HIGH => self.handle_reasoning_effort("high"),
             REASONING_XHIGH => self.handle_reasoning_effort("xhigh"),
@@ -1701,98 +1904,93 @@ impl CodexShellApp {
 
     fn render_obj_input(&mut self, ctx: &mut RenderObjCtx<'_>, state_changed: &mut bool) {
         let enabled = ctx.controls_enabled && ctx.object.enabled;
-        match ctx.object_command {
-            ui_tool::CONFIG_WORKING_DIR => {
-                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
-                    ui.add_sized(
-                        [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.working_dir).return_key(None),
-                    )
-                });
-                if response.inner.changed() {
-                    *state_changed = true;
-                }
+        if let Some(bound_input) = self.config.bound_input_mut(ctx.object_command) {
+            let response = ctx.ui.add_enabled_ui(enabled, |ui| {
+                ui.add_sized(
+                    [ctx.object_size.x, ctx.object_size.y],
+                    TextEdit::singleline(bound_input).return_key(None),
+                )
+            });
+            if response.inner.changed() {
+                *state_changed = true;
             }
-            _ => {
-                let input_font_id = egui::FontId::monospace(INPUT_FONT_SIZE);
-                let row_height = ctx.ui.fonts_mut(|fonts| fonts.row_height(&input_font_id));
-                let desired_rows = ((ctx.object_size.y - FIXED_INPUT_HEIGHT_PADDING).max(row_height)
-                    / row_height)
-                    .floor()
-                    .max(1.0) as usize;
-                let frame_stroke = if ctx.object_id == "input_command" {
-                    egui::Stroke::NONE
-                } else {
-                    egui::Stroke::new(1.0, Color32::BLACK)
-                };
-                let frame_fill = if ctx.object_id == "input_command" {
-                    Color32::from_gray(242)
-                } else {
-                    Color32::WHITE
-                };
-                let input_response = egui::Frame::default()
-                    .fill(frame_fill)
-                    .stroke(frame_stroke)
-                    .inner_margin(egui::Margin::same(4))
-                    .show(ctx.ui, |ui| {
-                        let input_line_count = if ctx.object_id == "input_command" {
-                            self.input_command.chars().filter(|ch| *ch == '\n').count() + 1
-                        } else {
-                            1
-                        };
-                        let mut editor = TextEdit::multiline(&mut self.input_command)
-                            .id_source(INPUT_COMMAND_ID_SALT)
-                            .font(input_font_id)
-                            .interactive(enabled)
-                            .desired_width(f32::INFINITY)
-                            .desired_rows(desired_rows);
-                        if ctx.object_id == "input_command" {
-                            let ime_commit_this_frame = ui.input(|input| {
-                                input.events.iter().any(|event| {
-                                    matches!(event, egui::Event::Ime(egui::ImeEvent::Commit(_)))
-                                })
-                            });
-                            let input_return_key = if ime_commit_this_frame {
-                                None
-                            } else {
-                                Some(egui::KeyboardShortcut::new(
-                                    egui::Modifiers::NONE,
-                                    egui::Key::Enter,
-                                ))
-                            };
-                            editor = editor.frame(false).return_key(input_return_key);
-                            let visible_height = (ctx.object_size.y - 8.0).max(1.0);
-                            let editor_height = ((input_line_count.max(desired_rows) as f32)
-                                * row_height
-                                + FIXED_INPUT_HEIGHT_PADDING)
-                                .max(visible_height);
-                            return egui::ScrollArea::vertical()
-                                .id_salt("input_command_vertical_scroll")
-                                .auto_shrink([false, false])
-                                .max_height(visible_height)
-                                .show(ui, |ui| {
-                                    ui.add_sized(
-                                        [(ctx.object_size.x - 8.0).max(1.0), editor_height],
-                                        editor,
-                                    )
-                                })
-                                .inner;
-                        }
-                        ui.add_sized(
-                            [
-                                (ctx.object_size.x - 8.0).max(1.0),
-                                (ctx.object_size.y - 8.0).max(1.0),
-                            ],
-                            editor,
-                        )
-                    });
-                if enabled && self.pending_input_focus {
-                    input_response.inner.request_focus();
-                    self.pending_input_focus = false;
-                }
-                self.input_area_size = input_response.response.rect.size();
-            }
+            return;
         }
+
+        let input_font_id = egui::FontId::monospace(INPUT_FONT_SIZE);
+        let row_height = ctx.ui.fonts_mut(|fonts| fonts.row_height(&input_font_id));
+        let desired_rows = ((ctx.object_size.y - FIXED_INPUT_HEIGHT_PADDING).max(row_height)
+            / row_height)
+            .floor()
+            .max(1.0) as usize;
+        let frame_stroke = if ctx.object_id == "input_command" {
+            egui::Stroke::NONE
+        } else {
+            egui::Stroke::new(1.0, Color32::BLACK)
+        };
+        let frame_fill = if ctx.object_id == "input_command" {
+            Color32::from_gray(242)
+        } else {
+            Color32::WHITE
+        };
+        let input_response = egui::Frame::default()
+            .fill(frame_fill)
+            .stroke(frame_stroke)
+            .inner_margin(egui::Margin::same(4))
+            .show(ctx.ui, |ui| {
+                let input_line_count = if ctx.object_id == "input_command" {
+                    self.input_command.chars().filter(|ch| *ch == '\n').count() + 1
+                } else {
+                    1
+                };
+                let mut editor = TextEdit::multiline(&mut self.input_command)
+                    .id_source(INPUT_COMMAND_ID_SALT)
+                    .font(input_font_id)
+                    .interactive(enabled)
+                    .desired_width(f32::INFINITY)
+                    .desired_rows(desired_rows);
+                if ctx.object_id == "input_command" {
+                    let ime_commit_this_frame = ui.input(|input| {
+                        input
+                            .events
+                            .iter()
+                            .any(|event| matches!(event, egui::Event::Ime(egui::ImeEvent::Commit(_))))
+                    });
+                    let input_return_key = if ime_commit_this_frame {
+                        None
+                    } else {
+                        Some(egui::KeyboardShortcut::new(
+                            egui::Modifiers::NONE,
+                            egui::Key::Enter,
+                        ))
+                    };
+                    editor = editor.frame(false).return_key(input_return_key);
+                    let visible_height = (ctx.object_size.y - 8.0).max(1.0);
+                    let editor_height = ((input_line_count.max(desired_rows) as f32) * row_height
+                        + FIXED_INPUT_HEIGHT_PADDING)
+                        .max(visible_height);
+                    return egui::ScrollArea::vertical()
+                        .id_salt("input_command_vertical_scroll")
+                        .auto_shrink([false, false])
+                        .max_height(visible_height)
+                        .show(ui, |ui| {
+                            ui.add_sized([(ctx.object_size.x - 8.0).max(1.0), editor_height], editor)
+                        })
+                        .inner;
+                }
+                ui.add_sized(
+                    [
+                        (ctx.object_size.x - 8.0).max(1.0),
+                        (ctx.object_size.y - 8.0).max(1.0),
+                    ],
+                    editor,
+                )
+            });
+        if enabled && self.pending_input_focus {
+            input_response.inner.request_focus();
+            self.pending_input_focus = false;
+        }
+        self.input_area_size = input_response.response.rect.size();
     }
 
     fn render_obj_image(&self, ctx: &mut RenderObjCtx<'_>) {
@@ -2594,6 +2792,22 @@ fn launch_target_with_shell(target: &Path, working_dir: &Path) -> Result<()> {
             target.display()
         ));
     }
+    Ok(())
+}
+
+fn is_valid_auto_start_executable_path(path: &Path) -> bool {
+    if !path.is_file() {
+        return false;
+    }
+    path.extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("exe"))
+}
+
+fn try_spawn_auto_start_executable(path: &Path) -> Result<()> {
+    Command::new(path)
+        .spawn()
+        .with_context(|| format!("自動起動失敗: {}", path.display()))?;
     Ok(())
 }
 

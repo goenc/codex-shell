@@ -11,6 +11,14 @@ pub const REASONING_MEDIUM: &str = "reasoning.medium";
 pub const REASONING_HIGH: &str = "reasoning.high";
 pub const REASONING_XHIGH: &str = "reasoning.xhigh";
 pub const CONFIG_WORKING_DIR: &str = "config.working_dir";
+pub const CONFIG_AUTO_START_EXE_1: &str = "config.auto_start_exe.1";
+pub const CONFIG_AUTO_START_EXE_2: &str = "config.auto_start_exe.2";
+pub const CONFIG_AUTO_START_EXE_3: &str = "config.auto_start_exe.3";
+pub const CONFIG_AUTO_START_EXE_4: &str = "config.auto_start_exe.4";
+pub const CONFIG_AUTO_START_EXE_1_BROWSE: &str = "config.auto_start_exe.1.browse";
+pub const CONFIG_AUTO_START_EXE_2_BROWSE: &str = "config.auto_start_exe.2.browse";
+pub const CONFIG_AUTO_START_EXE_3_BROWSE: &str = "config.auto_start_exe.3.browse";
+pub const CONFIG_AUTO_START_EXE_4_BROWSE: &str = "config.auto_start_exe.4.browse";
 pub const CONFIG_SAVE: &str = "config.save";
  
 pub const ALL_UI_COMMANDS: &[&str] = &[
@@ -27,6 +35,14 @@ pub const ALL_UI_COMMANDS: &[&str] = &[
     REASONING_HIGH,
     REASONING_XHIGH,
     CONFIG_WORKING_DIR,
+    CONFIG_AUTO_START_EXE_1,
+    CONFIG_AUTO_START_EXE_2,
+    CONFIG_AUTO_START_EXE_3,
+    CONFIG_AUTO_START_EXE_4,
+    CONFIG_AUTO_START_EXE_1_BROWSE,
+    CONFIG_AUTO_START_EXE_2_BROWSE,
+    CONFIG_AUTO_START_EXE_3_BROWSE,
+    CONFIG_AUTO_START_EXE_4_BROWSE,
     CONFIG_SAVE,
 ];
 
