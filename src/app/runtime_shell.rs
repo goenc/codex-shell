@@ -5,11 +5,12 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::io::Write;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::Arc;
-use std::sync::mpsc::{self, Receiver, TryRecvError};
-use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::tools::ui_edit::api as ui_tool;
@@ -49,7 +50,9 @@ const INPUT_FONT_SIZE: f32 = 15.0;
 const FIXED_INPUT_HEIGHT_PADDING: f32 = 12.0;
 const INPUT_COMMAND_ID_SALT: &str = "input_command_text_edit";
 const VOICE_INPUT_HOTKEY_LABEL: &str = "Ctrl+Alt+Right";
-const TEST_EXEC_COMMAND_LINE: &str = "echo TEST EXECUTION && cd && dir /b";
+const POWERSHELL_EXECUTABLE: &str = "pwsh.exe";
+#[cfg(windows)]
+const CREATE_NEW_CONSOLE_FLAG: u32 = 0x0000_0010;
 
 
 
@@ -141,7 +144,7 @@ impl UiDefinition {
         }) {
             button.id = "btn_input_send".to_string();
             button.bind.command = ui_tool::INPUT_SEND.to_string();
-            button.visual.text.value = "テスト実行".to_string();
+            button.visual.text.value = "送信".to_string();
             return;
         }
         let input_rect = main_objects
@@ -151,7 +154,7 @@ impl UiDefinition {
         let (input_x, input_y, input_w, input_h) = input_rect.unwrap_or((37.0, 103.0, 763.0, 220.0));
         main_objects.push(create_button_object(
             "btn_input_send",
-            "テスト実行",
+            "送信",
             ui_tool::INPUT_SEND,
             70,
             input_x + input_w + 8.0,
@@ -781,8 +784,7 @@ struct CodexShellApp {
     resize_enabled: bool,
     voice_input_active: bool,
     pending_input_focus: bool,
-    codex_exec_in_progress: bool,
-    codex_exec_result_rx: Option<Receiver<CodexExecResult>>,
+    powershell_session: Option<PowerShellSession>,
     ui_resize_locked_by_save: bool,
     target_project_dir_path: Option<PathBuf>,
     project_declarations: Vec<ProjectDeclarationEntry>,
@@ -801,11 +803,9 @@ struct RenderObjCtx<'a> {
     controls_enabled: bool,
 }
 
-struct CodexExecResult {
-    status_code: Option<i32>,
-    stdout: String,
-    stderr: String,
-    launch_error: Option<String>,
+struct PowerShellSession {
+    process: Child,
+    stdin: ChildStdin,
 }
 
 
@@ -856,8 +856,7 @@ impl CodexShellApp {
             resize_enabled: true,
             voice_input_active: false,
             pending_input_focus: false,
-            codex_exec_in_progress: false,
-            codex_exec_result_rx: None,
+            powershell_session: None,
             ui_resize_locked_by_save: false,
             target_project_dir_path: None,
             project_declarations: Vec::new(),
@@ -871,6 +870,7 @@ impl CodexShellApp {
         ));
         app.push_history(format!("UI定義を読み込みました: {}", app.ui_live_path.display()));
         app.refresh_project_declarations();
+        app.start_powershell_session();
         app.save_config();
         Ok(app)
     }
@@ -936,108 +936,120 @@ impl CodexShellApp {
     }
 
     fn send_input_command_by_button(&mut self) {
-        if self.codex_exec_in_progress {
-            self.update_status("テスト実行中のため受け付けできません");
-            return;
-        }
-        if !self.is_project_launch_ready() {
-            self.update_status("PROJECT NOT SELECTED");
-            self.push_history("PROJECT NOT SELECTED");
-            self.pending_input_focus = true;
-            return;
-        }
-        let Some(working_dir) = self.target_project_dir_path.clone() else {
-            self.update_status("PROJECT NOT SELECTED");
-            self.push_history("PROJECT NOT SELECTED");
-            self.pending_input_focus = true;
-            return;
-        };
-        self.start_codex_exec(TEST_EXEC_COMMAND_LINE.to_string(), working_dir);
+        let input = self.input_command.clone();
+        let _ = self.send_text_to_powershell(&input);
         self.pending_input_focus = true;
     }
 
-    fn start_codex_exec(&mut self, input: String, working_dir: PathBuf) {
-        let working_dir_text = working_dir.display().to_string();
-        let (result_tx, result_rx) = mpsc::channel::<CodexExecResult>();
-        self.codex_exec_result_rx = Some(result_rx);
-        self.codex_exec_in_progress = true;
-        self.update_status(format!("テスト実行中... ({working_dir_text})"));
-        self.push_history(format!("COMMAND: {input}"));
-        self.push_history(format!("WORKDIR: {working_dir_text}"));
-
-        thread::spawn(move || {
-            let mut command = Command::new("cmd");
-            command
-                .arg("/C")
-                .arg(&input)
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped());
-            command.current_dir(working_dir);
-
-            let result = match command.output() {
-                Ok(output) => CodexExecResult {
-                    status_code: output.status.code(),
-                    stdout: String::from_utf8_lossy(&output.stdout).trim().to_string(),
-                    stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
-                    launch_error: None,
-                },
-                Err(err) => {
-                    let message = format!("テスト実行起動に失敗しました: {err}");
-                    CodexExecResult {
-                        status_code: None,
-                        stdout: String::new(),
-                        stderr: String::new(),
-                        launch_error: Some(message),
-                    }
-                }
-            };
-            let _ = result_tx.send(result);
-        });
-    }
-
-    fn drain_codex_exec_result(&mut self) {
-        let Some(rx) = self.codex_exec_result_rx.as_ref() else {
+    fn start_powershell_session(&mut self) {
+        if self.powershell_session.is_some() {
             return;
-        };
-        match rx.try_recv() {
-            Ok(result) => {
-                self.codex_exec_in_progress = false;
-                self.codex_exec_result_rx = None;
-                if let Some(error) = result.launch_error {
-                    self.update_status(error.clone());
-                    self.push_history(format!("EXEC ERROR: {error}"));
+        }
+
+        let mut command = Command::new(POWERSHELL_EXECUTABLE);
+        command.arg("-NoLogo").arg("-NoExit").stdin(Stdio::piped());
+        #[cfg(windows)]
+        {
+            command.creation_flags(CREATE_NEW_CONSOLE_FLAG);
+        }
+
+        match command.spawn() {
+            Ok(mut child) => {
+                let Some(stdin) = child.stdin.take() else {
+                    let _ = child.kill();
+                    self.update_status("PowerShell起動失敗: stdin取得不可");
+                    self.push_history("PowerShell起動失敗: stdin取得不可");
                     return;
-                }
-
-                let code = result.status_code.unwrap_or(-1);
-                if code == 0 {
-                    self.update_status("テスト実行が完了しました");
-                } else {
-                    self.update_status(format!("テスト実行が失敗しました code={code}"));
-                }
-                self.push_history(format!("EXIT CODE: {code}"));
-
-                if !result.stdout.is_empty() {
-                    for line in result.stdout.lines() {
-                        self.push_history(format!("STDOUT: {line}"));
-                    }
-                }
-                if !result.stderr.is_empty() {
-                    for line in result.stderr.lines() {
-                        self.push_history(format!("STDERR: {line}"));
-                    }
-                }
+                };
+                self.powershell_session = Some(PowerShellSession {
+                    process: child,
+                    stdin,
+                });
+                self.update_status("PowerShellを起動しました");
+                self.push_history("PowerShellを起動しました");
             }
-            Err(TryRecvError::Empty) => {}
-            Err(TryRecvError::Disconnected) => {
-                self.codex_exec_in_progress = false;
-                self.codex_exec_result_rx = None;
-                self.update_status("テスト実行結果の受信に失敗しました");
-                self.push_history("テスト実行結果受信チャネルが切断されました");
+            Err(err) => {
+                self.update_status(format!("PowerShell起動失敗: {err}"));
+                self.push_history(format!("PowerShell起動失敗: {err}"));
             }
         }
     }
 
+    fn refresh_powershell_session(&mut self) {
+        let mut exited_message = None;
+        if let Some(session) = self.powershell_session.as_mut() {
+            match session.process.try_wait() {
+                Ok(Some(status)) => {
+                    exited_message = Some(format!("PowerShell終了検出: {status}"));
+                }
+                Ok(None) => {}
+                Err(err) => {
+                    exited_message = Some(format!("PowerShell状態確認失敗: {err}"));
+                }
+            }
+        }
+        if let Some(message) = exited_message {
+            self.powershell_session = None;
+            self.update_status(message.clone());
+            self.push_history(message);
+        }
+    }
+
+    fn send_text_to_powershell(&mut self, text: &str) -> bool {
+        if self.powershell_session.is_none() {
+            self.update_status("PowerShell未起動のため送信しません");
+            self.push_history("PowerShell未起動のため送信しません");
+            return false;
+        }
+
+        let mut clear_session = false;
+        let mut status_message = None;
+        let send_result = {
+            let session = self
+                .powershell_session
+                .as_mut()
+                .expect("powershell_session existence checked");
+
+            match session.process.try_wait() {
+                Ok(Some(status)) => {
+                    clear_session = true;
+                    status_message = Some(format!("PowerShell終了済みのため送信しません: {status}"));
+                    Err(())
+                }
+                Ok(None) => {
+                    if let Err(err) = session.stdin.write_all(text.as_bytes()) {
+                        clear_session = true;
+                        status_message = Some(format!("PowerShell送信失敗: {err}"));
+                        Err(())
+                    } else if let Err(err) = session.stdin.write_all(b"\n") {
+                        clear_session = true;
+                        status_message = Some(format!("PowerShell改行送信失敗: {err}"));
+                        Err(())
+                    } else if let Err(err) = session.stdin.flush() {
+                        clear_session = true;
+                        status_message = Some(format!("PowerShell送信反映失敗: {err}"));
+                        Err(())
+                    } else {
+                        Ok(())
+                    }
+                }
+                Err(err) => {
+                    clear_session = true;
+                    status_message = Some(format!("PowerShell状態確認失敗: {err}"));
+                    Err(())
+                }
+            }
+        };
+
+        if clear_session {
+            self.powershell_session = None;
+        }
+        if let Some(message) = status_message {
+            self.update_status(message.clone());
+            self.push_history(message);
+        }
+        send_result.is_ok()
+    }
 }
 
 
@@ -1207,12 +1219,18 @@ impl CodexShellApp {
             self.push_history("プロジェクトフォルダ移動を中止しました: 未選択");
             return;
         };
-        self.moved_project_highlight_key = self.selected_project_highlight_key();
-        self.update_status("通信機能削除のため作業フォルダ移動コマンドは実行しません");
-        self.push_history(format!(
-            "作業フォルダ移動コマンドは無効です: {}",
-            target_dir.display()
-        ));
+        let target_dir_text = target_dir.display().to_string();
+        let escaped = target_dir_text.replace('\'', "''");
+        let command = format!("Set-Location '{escaped}'");
+        if self.send_text_to_powershell(&command) {
+            self.moved_project_highlight_key = self.selected_project_highlight_key();
+            self.update_status(format!("PowerShell作業フォルダを移動しました: {target_dir_text}"));
+            self.push_history(format!(
+                "PowerShell作業フォルダ移動コマンド送信: {target_dir_text}"
+            ));
+        } else {
+            self.moved_project_highlight_key = None;
+        }
     }
 
     fn toggle_voice_input(&mut self) {
@@ -1354,7 +1372,7 @@ impl CodexShellApp {
             return false;
         }
         match command {
-            ui_tool::INPUT_SEND => !self.codex_exec_in_progress,
+            ui_tool::INPUT_SEND => true,
             ui_tool::MODE_PROJECT_DEBUG_RUN => self
                 .selected_project_declaration_path()
                 .is_some_and(|declaration_path| {
@@ -2402,7 +2420,7 @@ impl eframe::App for CodexShellApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.apply_window_resize_policy(ctx);
-        self.drain_codex_exec_result();
+        self.refresh_powershell_session();
         self.reload_ui_definition_if_changed(ctx);
         let next_window_size = ctx.content_rect().size();
         if self.ui_edit_mode {
