@@ -115,6 +115,7 @@ impl UiDefinition {
             "btn_stop",
             "btn_stop_b",
             "btn_build",
+            "btn_input_send",
             "lbl_settings_codex",
             "input_settings_codex",
             "lbl_settings_codex_b",
@@ -129,6 +130,7 @@ impl UiDefinition {
             screen.objects.retain(|object| {
                 !DEPRECATED_IDS.contains(&object.id.as_str())
                     && !DEPRECATED_COMMANDS.contains(&object.bind.command.trim())
+                    && object.bind.command.trim() != "input.send"
             });
         }
     }

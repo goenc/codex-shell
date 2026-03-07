@@ -236,10 +236,6 @@ impl CodexShellApp {
         self.move_both_shells_to_selected_project_dir();
     }
 
-    fn handle_input_send(&mut self) {
-        self.send_input_command_by_button();
-    }
-
     fn handle_input_voice_toggle(&mut self) {
         self.toggle_voice_input();
     }
@@ -347,7 +343,6 @@ impl CodexShellApp {
             "" => {}
             MODE_PROJECT_DEBUG_RUN => self.handle_mode_project_debug_run(),
             MODE_PROJECT_TARGET_MOVE => self.handle_mode_project_target_move(),
-            INPUT_SEND => self.handle_input_send(),
             INPUT_VOICE_TOGGLE => self.handle_input_voice_toggle(),
             UI_SETTINGS => self.handle_ui_settings(),
             NAV_BACK_MAIN => self.handle_nav_back_main(),

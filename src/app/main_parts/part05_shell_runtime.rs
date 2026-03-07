@@ -306,10 +306,10 @@ impl CodexShellApp {
             Ok(()) => {
                 self.voice_input_active = !self.voice_input_active;
                 self.update_status(format!(
-                    "音声入力ホットキー送信済み: {VOICE_INPUT_HOTKEY_LABEL}"
+                    "音声入力ホットキー実行済み: {VOICE_INPUT_HOTKEY_LABEL}"
                 ));
                 self.push_history(format!(
-                    "音声入力ホットキー送信: {} -> {}",
+                    "音声入力ホットキー実行: {} -> {}",
                     VOICE_INPUT_HOTKEY_LABEL,
                     if self.voice_input_active {
                         "読み取り中"
@@ -319,8 +319,8 @@ impl CodexShellApp {
                 ));
             }
             Err(err) => {
-                self.update_status(format!("音声入力ホットキー送信失敗: {err}"));
-                self.push_history(format!("音声入力ホットキー送信失敗: {err}"));
+                self.update_status(format!("音声入力ホットキー実行失敗: {err}"));
+                self.push_history(format!("音声入力ホットキー実行失敗: {err}"));
             }
         }
     }

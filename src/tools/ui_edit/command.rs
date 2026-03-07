@@ -12,7 +12,6 @@ pub const MODE_STOP_B: &str = "mode.stop_b";
 pub const MODE_BUILD: &str = "mode.build";
 pub const MODE_PROJECT_DEBUG_RUN: &str = "mode.project_debug_run";
 pub const MODE_PROJECT_TARGET_MOVE: &str = "mode.project_target_move";
-pub const INPUT_SEND: &str = "input.send";
 pub const INPUT_VOICE_TOGGLE: &str = "input.voice_toggle";
 pub const UI_SETTINGS: &str = "ui.settings";
 pub const NAV_BACK_MAIN: &str = "nav.back_main";
@@ -56,7 +55,6 @@ pub const ALL_UI_COMMANDS: &[&str] = &[
     MODE_BUILD,
     MODE_PROJECT_DEBUG_RUN,
     MODE_PROJECT_TARGET_MOVE,
-    INPUT_SEND,
     INPUT_VOICE_TOGGLE,
     UI_SETTINGS,
     NAV_BACK_MAIN,

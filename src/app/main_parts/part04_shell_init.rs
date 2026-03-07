@@ -135,27 +135,4 @@ impl CodexShellApp {
         });
     }
 
-    fn send_command(&mut self, command: String, source: &str, delay_ms: u64) {
-        if command.trim().is_empty() {
-            self.update_status("空コマンドは送信しません");
-            return;
-        }
-        let _ = delay_ms;
-        self.update_status("通信機能は削除されています");
-        self.push_history(format!("{source}送信は無効です: {command}"));
-    }
-
-    fn input_command_without_trailing_newlines(&self) -> String {
-        self.input_command
-            .trim_end_matches(['\r', '\n'])
-            .to_string()
-    }
-
-    fn send_input_command_by_button(&mut self) {
-        let command = self.input_command_without_trailing_newlines();
-        self.input_command.clear();
-        self.send_command(command, "入力", BUTTON_COMMAND_DELAY_MS);
-        self.pending_input_focus = true;
-    }
-
 }
