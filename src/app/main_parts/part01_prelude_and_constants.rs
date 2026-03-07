@@ -6,8 +6,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::Arc;
+use std::sync::mpsc::{self, Receiver, TryRecvError};
+use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use tools::ui_edit::api as ui_tool;
@@ -22,7 +24,6 @@ use ui_tool::{
 
 const DEFAULT_BUILD_COMMAND: &str = "cargo build";
 const MAX_HISTORY: usize = 200;
-const BUTTON_COMMAND_DELAY_MS: u64 = 400;
 const FONT_RELATIVE_PATH: &str = "assets/fonts/NotoSansJP-Regular.ttf";
 const FONT_OFL_RELATIVE_PATH: &str = "assets/fonts/OFL.txt";
 const FONT_SOURCE_RELATIVE_PATH: &str = "assets/fonts/FONT_SOURCE.txt";

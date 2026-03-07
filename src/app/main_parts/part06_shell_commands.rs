@@ -109,6 +109,7 @@ impl CodexShellApp {
             return false;
         }
         match command {
+            ui_tool::INPUT_SEND => !self.codex_exec_in_progress,
             ui_tool::MODE_PROJECT_DEBUG_RUN => self
                 .selected_project_declaration_path()
                 .is_some_and(|declaration_path| {

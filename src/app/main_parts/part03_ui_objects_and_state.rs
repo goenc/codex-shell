@@ -384,6 +384,8 @@ struct CodexShellApp {
     resize_enabled: bool,
     voice_input_active: bool,
     pending_input_focus: bool,
+    codex_exec_in_progress: bool,
+    codex_exec_result_rx: Option<Receiver<CodexExecResult>>,
     ui_resize_locked_by_save: bool,
     project_runtime_active: bool,
     target_project_dir_path: Option<PathBuf>,
@@ -401,4 +403,12 @@ struct RenderObjCtx<'a> {
     object_size: egui::Vec2,
     text_font: &'a egui::FontId,
     controls_enabled: bool,
+}
+
+struct CodexExecResult {
+    input: String,
+    status_code: Option<i32>,
+    stdout: String,
+    stderr: String,
+    launch_error: Option<String>,
 }

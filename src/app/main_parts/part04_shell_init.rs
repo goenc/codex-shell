@@ -47,6 +47,8 @@ impl CodexShellApp {
             resize_enabled: true,
             voice_input_active: false,
             pending_input_focus: false,
+            codex_exec_in_progress: false,
+            codex_exec_result_rx: None,
             ui_resize_locked_by_save: false,
             project_runtime_active: false,
             target_project_dir_path: None,
@@ -142,6 +144,10 @@ impl CodexShellApp {
     }
 
     fn send_input_command_by_button(&mut self) {
+        if self.codex_exec_in_progress {
+            self.update_status("Codex実行中のため送信を受け付けできません");
+            return;
+        }
         let command = self.input_command_without_trailing_newlines();
         if command.is_empty() {
             self.update_status("入力欄が空のため送信しません");
@@ -149,10 +155,94 @@ impl CodexShellApp {
             return;
         }
         self.input_command.clear();
-        self.update_status("入力を送信しました");
-        self.push_history(format!("入力送信: {command}"));
-        let _ = BUTTON_COMMAND_DELAY_MS;
+        self.start_codex_exec(command);
         self.pending_input_focus = true;
+    }
+
+    fn start_codex_exec(&mut self, input: String) {
+        let working_dir = self.config.working_dir.trim().to_string();
+        let (result_tx, result_rx) = mpsc::channel::<CodexExecResult>();
+        self.codex_exec_result_rx = Some(result_rx);
+        self.codex_exec_in_progress = true;
+        self.update_status("Codex単発実行中...");
+        self.push_history(format!("Codex実行開始: {input}"));
+
+        thread::spawn(move || {
+            let mut command = Command::new("codex");
+            command
+                .arg("exec")
+                .arg(&input)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped());
+            if !working_dir.is_empty() {
+                command.current_dir(working_dir);
+            }
+
+            let result = match command.output() {
+                Ok(output) => CodexExecResult {
+                    input,
+                    status_code: output.status.code(),
+                    stdout: String::from_utf8_lossy(&output.stdout).trim().to_string(),
+                    stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
+                    launch_error: None,
+                },
+                Err(err) => {
+                    let message = if err.kind() == std::io::ErrorKind::NotFound {
+                        "codex コマンドが見つかりません。PATH を確認してください。".to_string()
+                    } else {
+                        format!("codex 実行起動に失敗しました: {err}")
+                    };
+                    CodexExecResult {
+                        input,
+                        status_code: None,
+                        stdout: String::new(),
+                        stderr: String::new(),
+                        launch_error: Some(message),
+                    }
+                }
+            };
+            let _ = result_tx.send(result);
+        });
+    }
+
+    fn drain_codex_exec_result(&mut self) {
+        let Some(rx) = self.codex_exec_result_rx.as_ref() else {
+            return;
+        };
+        match rx.try_recv() {
+            Ok(result) => {
+                self.codex_exec_in_progress = false;
+                self.codex_exec_result_rx = None;
+                if let Some(error) = result.launch_error {
+                    self.update_status(error.clone());
+                    self.push_history(format!("Codex実行失敗: {error}"));
+                    return;
+                }
+
+                let code = result.status_code.unwrap_or(-1);
+                if code == 0 {
+                    self.update_status("Codex単発実行が完了しました");
+                    self.push_history(format!("Codex実行成功 code={code}: {}", result.input));
+                } else {
+                    self.update_status(format!("Codex単発実行が失敗しました code={code}"));
+                    self.push_history(format!("Codex実行失敗 code={code}: {}", result.input));
+                }
+
+                if !result.stdout.is_empty() {
+                    self.push_history(format!("stdout: {}", result.stdout));
+                }
+                if !result.stderr.is_empty() {
+                    self.push_history(format!("stderr: {}", result.stderr));
+                }
+            }
+            Err(TryRecvError::Empty) => {}
+            Err(TryRecvError::Disconnected) => {
+                self.codex_exec_in_progress = false;
+                self.codex_exec_result_rx = None;
+                self.update_status("Codex実行結果の受信に失敗しました");
+                self.push_history("Codex実行結果受信チャネルが切断されました");
+            }
+        }
     }
 
 }

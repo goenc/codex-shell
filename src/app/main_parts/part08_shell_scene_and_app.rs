@@ -428,6 +428,7 @@ impl eframe::App for CodexShellApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.apply_window_resize_policy(ctx);
+        self.drain_codex_exec_result();
         self.reload_ui_definition_if_changed(ctx);
         let next_window_size = ctx.content_rect().size();
         if self.ui_edit_mode {
