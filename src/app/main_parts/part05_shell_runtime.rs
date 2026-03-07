@@ -252,6 +252,25 @@ impl CodexShellApp {
             "相談/実装の作業フォルダを移動しました: {}",
             target_dir.display()
         ));
+        let startup_executables = vec![
+            self.config.startup_exe_1.clone(),
+            self.config.startup_exe_2.clone(),
+            self.config.startup_exe_3.clone(),
+            self.config.startup_exe_4.clone(),
+        ];
+        match save_selected_repo_path_from_startup_executables(&startup_executables, &target_dir) {
+            Ok(output_file) => {
+                self.push_history(format!(
+                    "selected_repo_path.txt を更新しました: {} <= {}",
+                    output_file.display(),
+                    target_dir.display()
+                ));
+            }
+            Err(err) => {
+                self.update_status(format!("selected_repo_path.txt 更新失敗: {err}"));
+                self.push_history(format!("selected_repo_path.txt 更新に失敗しました: {err}"));
+            }
+        }
     }
 
     fn browse_startup_executable(&mut self, slot: usize) {

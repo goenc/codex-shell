@@ -56,6 +56,85 @@ fn read_project_name_from_declaration(path: &Path) -> Option<String> {
     }
 }
 
+fn resolve_selected_repo_path_output_file(startup_executables: &[String]) -> Option<PathBuf> {
+    #[derive(Clone)]
+    struct Candidate {
+        output_file: PathBuf,
+        priority: u8,
+    }
+
+    let mut candidates = Vec::new();
+    for raw in startup_executables {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let exe_path = PathBuf::from(trimmed.trim_matches('"'));
+        let Some(parent) = exe_path.parent() else {
+            continue;
+        };
+        let runtime_dir = parent.join("runtime");
+        let output_file = runtime_dir.join("selected_repo_path.txt");
+        let exe_lower = exe_path.to_string_lossy().to_ascii_lowercase();
+        let priority = if exe_lower.contains("codex_rollback_bridge") {
+            0
+        } else if output_file.is_file() {
+            1
+        } else if runtime_dir.is_dir() {
+            2
+        } else {
+            3
+        };
+        candidates.push(Candidate {
+            output_file,
+            priority,
+        });
+    }
+
+    candidates.sort_by(|left, right| {
+        left.priority.cmp(&right.priority).then_with(|| {
+            left.output_file
+                .to_string_lossy()
+                .cmp(&right.output_file.to_string_lossy())
+        })
+    });
+    candidates
+        .into_iter()
+        .find(|candidate| candidate.priority <= 2)
+        .map(|candidate| candidate.output_file)
+}
+
+fn save_selected_repo_path_from_startup_executables(
+    startup_executables: &[String],
+    target_project_dir_path: &Path,
+) -> Result<PathBuf> {
+    let output_file = resolve_selected_repo_path_output_file(startup_executables)
+        .ok_or_else(|| anyhow!("selected_repo_path.txt の書き込み先を解決できませんでした"))?;
+    let runtime_dir = output_file
+        .parent()
+        .ok_or_else(|| anyhow!("selected_repo_path.txt の親ディレクトリを解決できませんでした"))?;
+    fs::create_dir_all(runtime_dir).with_context(|| {
+        format!(
+            "selected_repo_path.txt 用 runtime ディレクトリ作成に失敗: {}",
+            runtime_dir.display()
+        )
+    })?;
+    let repo_path = if target_project_dir_path.is_absolute() {
+        target_project_dir_path.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .context("カレントディレクトリ取得に失敗しました")?
+            .join(target_project_dir_path)
+    };
+    fs::write(&output_file, format!("{}\n", repo_path.display())).with_context(|| {
+        format!(
+            "selected_repo_path.txt への書き込みに失敗: {}",
+            output_file.display()
+        )
+    })?;
+    Ok(output_file)
+}
+
 fn resolve_project_debug_executable_path(declaration_path: &Path) -> Result<PathBuf> {
     let body = fs::read_to_string(declaration_path)
         .with_context(|| format!("宣言ファイル読み込みに失敗: {}", declaration_path.display()))?;
