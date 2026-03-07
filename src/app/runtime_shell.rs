@@ -1266,6 +1266,51 @@ impl CodexShellApp {
             .cloned()
     }
 
+    fn selected_project_dir_path(&self) -> Option<PathBuf> {
+        self.project_selected_index
+            .and_then(|index| self.project_declarations.get(index))
+            .and_then(|entry| entry.path.as_ref())
+            .and_then(|path| path.parent().map(Path::to_path_buf))
+    }
+
+    fn sync_selected_project_path_bridge_file(&mut self) {
+        let Some(project_dir_path) = self.selected_project_dir_path() else {
+            return;
+        };
+        let target_file_path = match selected_repo_bridge_file_path(&self.config.auto_start_exe_1) {
+            Ok(path) => path,
+            Err(err) => {
+                self.push_history(format!(
+                    "selected_repo_path.txt の保存先を解決できないため連携をスキップしました: {err}"
+                ));
+                return;
+            }
+        };
+        if let Some(parent) = target_file_path.parent()
+            && let Err(err) = fs::create_dir_all(parent)
+        {
+            self.update_status(format!("連携先ディレクトリ作成失敗: {err}"));
+            self.push_history(format!(
+                "selected_repo_path.txt の親ディレクトリ作成に失敗しました: {} ({err})",
+                parent.display()
+            ));
+            return;
+        }
+        let body = project_dir_path.to_string_lossy().into_owned();
+        if let Err(err) = fs::write(&target_file_path, body.as_bytes()) {
+            self.update_status(format!("連携ファイル保存失敗: {err}"));
+            self.push_history(format!(
+                "selected_repo_path.txt の保存に失敗しました: {} ({err})",
+                target_file_path.display()
+            ));
+            return;
+        }
+        self.push_history(format!(
+            "selected_repo_path.txt を更新しました: {}",
+            target_file_path.display()
+        ));
+    }
+
     fn refresh_project_declarations(&mut self) {
         let base = self.config.working_dir.trim();
         if base.is_empty() {
@@ -2118,6 +2163,7 @@ impl CodexShellApp {
         if selected_index != self.project_selected_index {
             self.project_selected_index = selected_index;
             self.sync_selected_project_target_dir();
+            self.sync_selected_project_path_bridge_file();
         }
     }
 
@@ -2843,6 +2889,18 @@ fn try_spawn_auto_start_executable(path: &Path) -> Result<()> {
         .spawn()
         .with_context(|| format!("自動起動失敗: {}", path.display()))?;
     Ok(())
+}
+
+fn selected_repo_bridge_file_path(auto_start_exe_path: &str) -> Result<PathBuf> {
+    let trimmed = auto_start_exe_path.trim();
+    if trimmed.is_empty() {
+        return Err(anyhow!("自動起動設定1が未設定です"));
+    }
+    let exe_path = Path::new(trimmed);
+    let exe_dir = exe_path
+        .parent()
+        .ok_or_else(|| anyhow!("自動起動設定1の親ディレクトリを解決できません: {}", exe_path.display()))?;
+    Ok(exe_dir.join("runtime").join("selected_repo_path.txt"))
 }
 
 fn load_config() -> Result<AppConfig> {
