@@ -58,6 +58,10 @@ const FIXED_WINDOW_HEIGHT: f32 = 400.0;
 const INPUT_FONT_SIZE: f32 = 15.0;
 const FIXED_INPUT_HEIGHT_PADDING: f32 = 12.0;
 const INPUT_COMMAND_ID_SALT: &str = "input_command_text_edit";
+const CODEX_OUTPUT_TEXT_EDIT_ID_SALT: &str = "codex_output_text_edit";
+const CODEX_OUTPUT_LINE_COUNT: usize = 5;
+const CODEX_OUTPUT_EVENT_END_PATH: &str = r"C:\Users\gonec\.codex\runtime\agent_event_end.md";
+const CODEX_OUTPUT_RELOAD_CHECK_INTERVAL_MS: u64 = 250;
 const VOICE_INPUT_HOTKEY_LABEL: &str = "Ctrl+Alt+Right";
 const POWERSHELL_EXECUTABLE: &str = "pwsh.exe";
 const AUTO_START_SLOT_COUNT: usize = 4;
@@ -248,6 +252,7 @@ impl UiDefinition {
         }
         self.ensure_input_send_button();
         self.ensure_codex_exec_controls_in_main();
+        self.ensure_codex_output_view_in_main();
         self.ensure_auto_start_controls_in_settings();
         ensure_project_target_move_button(self);
         self.objects.clear();
@@ -376,6 +381,84 @@ impl UiDefinition {
             !legacy_remove_ids.contains(&object.id.as_str())
                 && !reasoning_commands.contains(&object.bind.command.trim())
         });
+    }
+
+    fn ensure_codex_output_view_in_main(&mut self) {
+        let Some(main_objects) = self.screen_objects_mut(UI_MAIN_SCREEN_ID) else {
+            return;
+        };
+
+        let input_rect = main_objects
+            .iter()
+            .find(|object| object.id == "input_command")
+            .map(|object| (object.position.x, object.position.y, object.size.w, object.size.h))
+            .unwrap_or((37.0, 149.0, 763.0, 220.0));
+        let (input_x, input_y, input_w, input_h) = input_rect;
+        let input_bottom = input_y + input_h;
+        let output_label_y = input_bottom + UI_BASE_COMPONENT_GAP;
+        let output_y = output_label_y + 28.0;
+        let output_h = 104.0;
+        let model_y = output_y + output_h + UI_BASE_COMPONENT_GAP;
+
+        if let Some(label) = main_objects.iter_mut().find(|object| object.id == "lbl_codex_output") {
+            label.position.x = input_x;
+            label.position.y = output_label_y;
+            label.size.w = input_w;
+            label.size.h = 24.0;
+            label.z_index = 100;
+        } else {
+            main_objects.push(create_label_object(
+                "lbl_codex_output",
+                "Codex出力",
+                100,
+                input_x,
+                output_label_y,
+                input_w,
+                24.0,
+                "left",
+            ));
+        }
+
+        if let Some(output) = main_objects
+            .iter_mut()
+            .find(|object| object.id == "input_codex_output")
+        {
+            output.position.x = input_x;
+            output.position.y = output_y;
+            output.size.w = input_w;
+            output.size.h = output_h;
+            output.z_index = 105;
+            output.bind.command.clear();
+        } else {
+            main_objects.push(create_input_object(
+                "input_codex_output",
+                "",
+                105,
+                input_x,
+                output_y,
+                input_w,
+                output_h,
+            ));
+        }
+
+        if let Some(label) = main_objects.iter_mut().find(|object| object.id == "lbl_main_model") {
+            label.position.y = model_y;
+        }
+        if let Some(combo) = main_objects.iter_mut().find(|object| object.id == "cmb_main_model") {
+            combo.position.y = model_y;
+        }
+        if let Some(label) = main_objects
+            .iter_mut()
+            .find(|object| object.id == "lbl_main_reasoning_effort")
+        {
+            label.position.y = model_y;
+        }
+        if let Some(combo) = main_objects
+            .iter_mut()
+            .find(|object| object.id == "cmb_main_reasoning_effort")
+        {
+            combo.position.y = model_y;
+        }
     }
 
     fn ensure_auto_start_controls_in_settings(&mut self) {
@@ -1022,6 +1105,7 @@ struct CodexShellApp {
     selected_model: String,
     selected_reasoning_effort: String,
     input_command: String,
+    codex_output_text: String,
     status_message: String,
     history: Vec<String>,
     window_size: egui::Vec2,
@@ -1036,6 +1120,8 @@ struct CodexShellApp {
     project_declarations: Vec<ProjectDeclarationEntry>,
     project_selected_index: Option<usize>,
     moved_project_highlight_key: Option<String>,
+    codex_output_event_last_modified: Option<SystemTime>,
+    codex_output_last_reload_check: Instant,
 }
 
 struct RenderObjCtx<'a> {
@@ -1096,6 +1182,7 @@ impl CodexShellApp {
             selected_model,
             selected_reasoning_effort,
             input_command: String::new(),
+            codex_output_text: String::new(),
             status_message: "待機中".to_string(),
             history: Vec::new(),
             window_size: egui::vec2(0.0, 0.0),
@@ -1110,6 +1197,8 @@ impl CodexShellApp {
             project_declarations: Vec::new(),
             project_selected_index: None,
             moved_project_highlight_key: None,
+            codex_output_event_last_modified: None,
+            codex_output_last_reload_check: Instant::now(),
         };
 
         app.push_history(format!(
@@ -1120,6 +1209,7 @@ impl CodexShellApp {
         app.launch_configured_auto_start_executables();
         app.refresh_project_declarations();
         app.start_powershell_session();
+        app.reload_codex_output_from_event_end_file(true);
         app.save_config();
         Ok(app)
     }
@@ -2084,6 +2174,10 @@ impl CodexShellApp {
     }
 
     fn render_obj_input(&mut self, ctx: &mut RenderObjCtx<'_>, state_changed: &mut bool) {
+        if ctx.object_id == "input_codex_output" {
+            self.render_codex_output_view(ctx);
+            return;
+        }
         let enabled = ctx.controls_enabled && ctx.object.enabled;
         if let Some(bound_input) = self.config.bound_input_mut(ctx.object_command) {
             let response = ctx.ui.add_enabled_ui(enabled, |ui| {
@@ -2172,6 +2266,73 @@ impl CodexShellApp {
             self.pending_input_focus = false;
         }
         self.input_area_size = input_response.response.rect.size();
+    }
+
+    fn render_codex_output_view(&mut self, ctx: &mut RenderObjCtx<'_>) {
+        let output_font_id = egui::FontId::monospace(INPUT_FONT_SIZE);
+        let row_height = ctx.ui.fonts_mut(|fonts| fonts.row_height(&output_font_id));
+        let visible_height =
+            row_height * CODEX_OUTPUT_LINE_COUNT as f32 + FIXED_INPUT_HEIGHT_PADDING;
+        let output_line_count = self.codex_output_text.chars().filter(|ch| *ch == '\n').count() + 1;
+        let editor_height = (output_line_count.max(CODEX_OUTPUT_LINE_COUNT) as f32 * row_height)
+            + FIXED_INPUT_HEIGHT_PADDING;
+
+        egui::Frame::default()
+            .fill(Color32::from_gray(242))
+            .stroke(egui::Stroke::new(1.0, Color32::BLACK))
+            .inner_margin(egui::Margin::same(4))
+            .show(ctx.ui, |ui| {
+                egui::ScrollArea::vertical()
+                    .id_salt("codex_output_vertical_scroll")
+                    .auto_shrink([false, false])
+                    .max_height(visible_height)
+                    .show(ui, |ui| {
+                        ui.add_sized(
+                            [(ctx.object_size.x - 8.0).max(1.0), editor_height.max(visible_height)],
+                            TextEdit::multiline(&mut self.codex_output_text)
+                                .id_source(CODEX_OUTPUT_TEXT_EDIT_ID_SALT)
+                                .font(output_font_id)
+                                .interactive(false)
+                                .desired_width(f32::INFINITY)
+                                .desired_rows(CODEX_OUTPUT_LINE_COUNT)
+                                .frame(false),
+                        )
+                    });
+            });
+    }
+
+    fn reload_codex_output_from_event_end_file(&mut self, force: bool) {
+        if !force
+            && self.codex_output_last_reload_check.elapsed()
+                < Duration::from_millis(CODEX_OUTPUT_RELOAD_CHECK_INTERVAL_MS)
+        {
+            return;
+        }
+        self.codex_output_last_reload_check = Instant::now();
+        let path = Path::new(CODEX_OUTPUT_EVENT_END_PATH);
+        let Ok(metadata) = fs::metadata(path) else {
+            return;
+        };
+        let Ok(modified) = metadata.modified() else {
+            return;
+        };
+        if !force && self.codex_output_event_last_modified == Some(modified) {
+            return;
+        }
+        let Ok(body) = fs::read_to_string(path) else {
+            return;
+        };
+        self.codex_output_event_last_modified = Some(modified);
+        let filtered = body
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .filter(|line| !is_codex_output_noise_line(line))
+            .collect::<Vec<_>>()
+            .join("\n");
+        if !filtered.is_empty() {
+            self.codex_output_text = filtered;
+        }
     }
 
     fn render_obj_image(&self, ctx: &mut RenderObjCtx<'_>) {
@@ -2907,6 +3068,7 @@ impl eframe::App for CodexShellApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.apply_window_resize_policy(ctx);
         self.refresh_powershell_session();
+        self.reload_codex_output_from_event_end_file(false);
         self.reload_ui_definition_if_changed(ctx);
         let next_window_size = ctx.content_rect().size();
         if self.ui_edit_mode {
@@ -2928,6 +3090,19 @@ impl eframe::App for CodexShellApp {
         ctx.request_repaint_after(Duration::from_millis(UI_RELOAD_CHECK_INTERVAL_MS));
     }
 
+}
+
+fn is_codex_output_noise_line(line: &str) -> bool {
+    let lowered = line.trim().to_ascii_lowercase();
+    lowered.contains("tokens used")
+        || lowered.contains("token usage")
+        || lowered.contains("input tokens")
+        || lowered.contains("output tokens")
+        || lowered.contains("total tokens")
+        || lowered.contains("latency")
+        || lowered.contains("elapsed")
+        || lowered.starts_with("stdout")
+        || lowered.starts_with("stderr")
 }
 
 
