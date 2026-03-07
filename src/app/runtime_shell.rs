@@ -1220,8 +1220,8 @@ impl CodexShellApp {
             return;
         };
         let target_dir_text = target_dir.display().to_string();
-        let escaped = target_dir_text.replace('\'', "''");
-        let command = format!("Set-Location '{escaped}'");
+        let escaped = target_dir_text.replace('"', "\"\"");
+        let command = format!("cd \"{escaped}\"");
         if self.send_text_to_powershell(&command) {
             self.moved_project_highlight_key = self.selected_project_highlight_key();
             self.update_status(format!("PowerShell作業フォルダを移動しました: {target_dir_text}"));
