@@ -4,17 +4,7 @@ impl CodexShellApp {
             .context("同梱フォント読み込みに失敗しました。assets/fonts を確認してください")?;
         apply_visual_fix(&cc.egui_ctx);
 
-        let mut config = load_config().unwrap_or_default();
-        if config.codex_command_a.trim().is_empty() {
-            config.codex_command_a = if config.codex_command.trim().is_empty() {
-                DEFAULT_CODEX_COMMAND.to_string()
-            } else {
-                config.codex_command.clone()
-            };
-        }
-        if config.codex_command_b.trim().is_empty() {
-            config.codex_command_b = config.codex_command_a.clone();
-        }
+        let config = load_config().unwrap_or_default();
         let ui_live_path = ensure_live_ui_file()?;
         let mut ui_definition = load_ui_definition(&ui_live_path)?;
         ui_definition.normalize_screens();
@@ -68,7 +58,6 @@ impl CodexShellApp {
             resize_enabled: true,
             voice_input_active: false,
             pending_input_focus: false,
-            build_confirm_open: false,
             ui_resize_locked_by_save: false,
             project_runtime_active: false,
             active_project_declaration_path: None,
@@ -85,7 +74,6 @@ impl CodexShellApp {
         app.push_history(format!("UI定義を読み込みました: {}", app.ui_live_path.display()));
         app.refresh_project_declarations();
         app.save_config();
-        app.start_listener();
         app.launch_startup_executables();
         Ok(app)
     }
@@ -190,99 +178,6 @@ impl CodexShellApp {
         self.set_codex_runtime_state_b(CodexRuntimeState::Stopped);
     }
 
-    fn start_listener(&mut self) {
-        self.stop_listener_process();
-        self.stop_build_shell_process();
-
-        let working_dir = self.config.working_dir.trim().to_string();
-        let (main_pipe_name, build_pipe_name) = self.runtime_pipe_names();
-        let mut started_any = false;
-        if self.config.open_consultation_window_on_startup {
-            if self.start_main_shell_process(&main_pipe_name, &working_dir) {
-                started_any = true;
-            }
-        } else {
-            self.push_history("設定により相談ウィンドウの起動をスキップしました");
-        }
-
-        if self.config.open_implementation_window_on_startup {
-            if self.start_build_shell_process(&build_pipe_name, &working_dir) {
-                started_any = true;
-            }
-        } else {
-            self.push_history("設定により実装ウィンドウの起動をスキップしました");
-        }
-
-        if !started_any {
-            self.update_status("設定により相談/実装ウィンドウの起動をスキップしました");
-        }
-    }
-
-    fn start_main_shell_process(&mut self, main_pipe_name: &str, working_dir: &str) -> bool {
-        match spawn_listener_process(main_pipe_name, working_dir, "相談") {
-            Ok(child) => {
-                let pid = child.id();
-                self.powershell_child = Some(child);
-                self.active_main_pipe_name = main_pipe_name.to_string();
-                self.update_status(format!("ConPTY待ち受け起動中 PID={pid}"));
-                self.push_history(format!("ConPTY待ち受けを起動しました PID={pid}"));
-                true
-            }
-            Err(err) => {
-                self.update_status(format!("ConPTY待ち受け起動失敗: {err}"));
-                self.push_history(format!("ConPTY待ち受け起動に失敗しました: {err}"));
-                false
-            }
-        }
-    }
-
-    fn start_build_shell_process(&mut self, build_pipe_name: &str, working_dir: &str) -> bool {
-        match spawn_listener_process(build_pipe_name, working_dir, "実装") {
-            Ok(child) => {
-                let pid = child.id();
-                self.build_powershell_child = Some(child);
-                self.active_build_pipe_name = build_pipe_name.to_string();
-                self.push_history(format!(
-                    "ビルド用ConPTY待ち受けを起動しました PID={pid} pipe={build_pipe_name}"
-                ));
-                true
-            }
-            Err(err) => {
-                self.update_status(format!("ビルド用ConPTY起動失敗: {err}"));
-                self.push_history(format!("ビルド用ConPTY待ち受けの起動に失敗しました: {err}"));
-                false
-            }
-        }
-    }
-
-    fn ensure_main_shell_process_started(&mut self) -> bool {
-        if self.powershell_child.is_some() {
-            return true;
-        }
-        let working_dir = self.config.working_dir.trim().to_string();
-        let (main_pipe_name, _) = self.runtime_pipe_names();
-        self.start_main_shell_process(&main_pipe_name, &working_dir)
-    }
-
-    fn ensure_build_shell_process_started(&mut self) -> bool {
-        if self.build_powershell_child.is_some() {
-            return true;
-        }
-        let working_dir = self.config.working_dir.trim().to_string();
-        let (_, build_pipe_name) = self.runtime_pipe_names();
-        self.start_build_shell_process(&build_pipe_name, &working_dir)
-    }
-
-    fn runtime_pipe_names(&self) -> (String, String) {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_millis())
-            .unwrap_or(0);
-        let main_pipe_name = format!("{DEFAULT_PIPE_NAME}_main_{nonce}");
-        let build_pipe_name = format!("{DEFAULT_PIPE_NAME}_build_{nonce}");
-        (main_pipe_name, build_pipe_name)
-    }
-
     fn main_pipe_name(&self) -> String {
         if self.active_main_pipe_name.trim().is_empty() {
             DEFAULT_PIPE_NAME.to_string()
@@ -343,43 +238,10 @@ impl CodexShellApp {
     }
 
     fn send_input_command_by_button(&mut self) {
-        let input_body = self.input_command_without_trailing_newlines();
-        let command = if input_body.is_empty() {
-            String::new()
-        } else if self.config.input_prefix.trim().is_empty() {
-            input_body
-        } else {
-            format!("{}{}", self.config.input_prefix, input_body)
-        };
+        let command = self.input_command_without_trailing_newlines();
         self.input_command.clear();
         self.send_command(command, "入力", BUTTON_COMMAND_DELAY_MS);
         self.pending_input_focus = true;
-    }
-
-    fn send_build_command(&mut self) {
-        if !self.ensure_build_shell_process_started() {
-            return;
-        }
-        let build_input = self.input_command_without_trailing_newlines();
-        if build_input.is_empty() {
-            self.cancel_build_when_empty();
-            return;
-        }
-        let command = if self.config.build_command.trim().is_empty() {
-            build_input
-        } else {
-            format!("{} {}", self.config.build_command.trim_end(), build_input)
-        };
-        self.input_command.clear();
-        let build_pipe_name = self.build_pipe_name();
-        self.send_command_to_pipe(command, "ビルド", BUTTON_COMMAND_DELAY_MS, build_pipe_name);
-        self.pending_input_focus = true;
-    }
-
-    fn cancel_build_when_empty(&mut self) {
-        self.update_status("入力欄が未入力のためビルドを送信しません");
-        self.push_history("ビルド送信を中止しました: 入力欄未入力");
-        self.build_confirm_open = false;
     }
 
 }

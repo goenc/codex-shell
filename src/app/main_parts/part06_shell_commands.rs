@@ -99,9 +99,7 @@ impl CodexShellApp {
     fn is_project_launch_command(command: &str) -> bool {
         matches!(
             command.trim(),
-            ui_tool::MODE_CODEX_START
-                | ui_tool::MODE_CODEX_START_B
-                | ui_tool::MODE_PROJECT_DEBUG_RUN
+            ui_tool::MODE_PROJECT_DEBUG_RUN
         )
     }
 
@@ -111,12 +109,6 @@ impl CodexShellApp {
             return false;
         }
         match command {
-            ui_tool::MODE_CODEX_START => self.codex_runtime_state != CodexRuntimeState::Calculating,
-            ui_tool::MODE_CODEX_START_B => {
-                self.codex_runtime_state_b != CodexRuntimeState::Calculating
-            }
-            ui_tool::MODE_STOP => self.codex_runtime_state == CodexRuntimeState::Calculating,
-            ui_tool::MODE_STOP_B => self.codex_runtime_state_b == CodexRuntimeState::Calculating,
             ui_tool::MODE_PROJECT_DEBUG_RUN => self
                 .selected_project_declaration_path()
                 .is_some_and(|declaration_path| {
@@ -138,12 +130,6 @@ impl CodexShellApp {
             ui_tool::REASONING_HIGH => Some(self.selected_reasoning_effort == "high"),
             ui_tool::REASONING_XHIGH => Some(self.selected_reasoning_effort == "xhigh"),
             ui_tool::CONFIG_SHOW_SIZE_OVERLAY => Some(self.config.show_size_overlay),
-            ui_tool::CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP => {
-                Some(self.config.open_consultation_window_on_startup)
-            }
-            ui_tool::CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP => {
-                Some(self.config.open_implementation_window_on_startup)
-            }
             _ => None,
         }
     }
@@ -165,12 +151,6 @@ impl CodexShellApp {
                 ui_tool::REASONING_HIGH => Some(selected_reasoning_effort == "high"),
                 ui_tool::REASONING_XHIGH => Some(selected_reasoning_effort == "xhigh"),
                 ui_tool::CONFIG_SHOW_SIZE_OVERLAY => Some(self.config.show_size_overlay),
-                ui_tool::CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP => {
-                    Some(self.config.open_consultation_window_on_startup)
-                }
-                ui_tool::CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP => {
-                    Some(self.config.open_implementation_window_on_startup)
-                }
                 _ => None,
             };
             if let Some(desired_checked) = desired && object.checked != desired_checked {
@@ -242,70 +222,10 @@ impl CodexShellApp {
         if !object.visible {
             return false;
         }
-        let consult_window_is_running = self.powershell_child.is_some();
-        let implement_window_is_running = self.build_powershell_child.is_some();
-        let consult_visible = consult_window_is_running;
-        let implement_visible = implement_window_is_running;
-        let project_select_visible = consult_window_is_running || implement_window_is_running;
-
-        if !consult_visible {
-            let is_consult_object = matches!(
-                object.bind.command.trim(),
-                ui_tool::MODE_CODEX_START | ui_tool::MODE_STOP
-            ) || object.id == "btn_input_send";
-            if is_consult_object {
-                return false;
-            }
-        }
-
-        if !implement_visible
-            && matches!(
-                object.bind.command.trim(),
-                ui_tool::MODE_CODEX_START_B
-                    | ui_tool::MODE_STOP_B
-                    | ui_tool::MODE_BUILD
-                    | ui_tool::MODE_PROJECT_DEBUG_RUN
-            )
-        {
-            return false;
-        }
-
-        if !project_select_visible
-            && (object.id == "cmb_project_selector" || object.id == "btn_project_target_move")
-        {
-            return false;
-        }
-
         match object.bind.command.trim() {
             ui_tool::UI_EDIT_LOCKED_HINT => self.ui_edit_mode,
             _ => true,
         }
-    }
-
-    fn handle_mode_codex_start(&mut self) {
-        self.send_codex_command_a();
-    }
-
-    fn handle_mode_codex_start_b(&mut self) {
-        self.send_codex_command_b();
-    }
-
-    fn handle_mode_stop(&mut self) {
-        self.request_interrupt_a();
-    }
-
-    fn handle_mode_stop_b(&mut self) {
-        self.request_interrupt_b();
-    }
-
-    fn handle_mode_build(&mut self) {
-        if self.input_command_without_trailing_newlines().is_empty() {
-            self.cancel_build_when_empty();
-            return;
-        }
-        self.build_confirm_open = true;
-        self.update_status("ビルド確認待ち");
-        self.push_history("ビルド確認ダイアログを表示しました");
     }
 
     fn handle_mode_project_debug_run(&mut self) {
@@ -341,11 +261,6 @@ impl CodexShellApp {
 
     fn handle_config_save(&mut self) {
         self.save_config();
-    }
-
-    fn handle_config_restart_listener(&mut self) {
-        self.save_config();
-        self.start_listener();
     }
 
     fn handle_browse_startup_exe(&mut self, slot: usize) {
@@ -430,11 +345,6 @@ impl CodexShellApp {
 
         match command {
             "" => {}
-            MODE_CODEX_START => self.handle_mode_codex_start(),
-            MODE_CODEX_START_B => self.handle_mode_codex_start_b(),
-            MODE_STOP => self.handle_mode_stop(),
-            MODE_STOP_B => self.handle_mode_stop_b(),
-            MODE_BUILD => self.handle_mode_build(),
             MODE_PROJECT_DEBUG_RUN => self.handle_mode_project_debug_run(),
             MODE_PROJECT_TARGET_MOVE => self.handle_mode_project_target_move(),
             INPUT_SEND => self.handle_input_send(),
@@ -442,7 +352,6 @@ impl CodexShellApp {
             UI_SETTINGS => self.handle_ui_settings(),
             NAV_BACK_MAIN => self.handle_nav_back_main(),
             CONFIG_SAVE => self.handle_config_save(),
-            CONFIG_RESTART_LISTENER => self.handle_config_restart_listener(),
             CONFIG_STARTUP_EXE_1_BROWSE => self.handle_browse_startup_exe(1),
             CONFIG_STARTUP_EXE_2_BROWSE => self.handle_browse_startup_exe(2),
             CONFIG_STARTUP_EXE_3_BROWSE => self.handle_browse_startup_exe(3),

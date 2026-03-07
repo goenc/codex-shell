@@ -5,8 +5,6 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::sync::Arc;
@@ -16,20 +14,16 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tools::ui_edit::api as ui_tool;
 
 use ui_tool::{
-    CODEX_STATE_B, CONFIG_BUILD_ROOT_DIR_BROWSE, CONFIG_RESTART_LISTENER, CONFIG_SAVE, CONFIG_STARTUP_EXE_1_BROWSE,
+    CODEX_STATE_B, CONFIG_BUILD_ROOT_DIR_BROWSE, CONFIG_SAVE, CONFIG_STARTUP_EXE_1_BROWSE,
     CONFIG_STARTUP_EXE_2_BROWSE, CONFIG_STARTUP_EXE_3_BROWSE, CONFIG_STARTUP_EXE_4_BROWSE,
-    INPUT_SEND, INPUT_VOICE_TOGGLE, MODE_BUILD, MODE_CODEX_START, MODE_CODEX_START_B,
-    MODE_PROJECT_DEBUG_RUN, MODE_PROJECT_TARGET_MOVE, MODE_STOP, MODE_STOP_B, NAV_BACK_MAIN, REASONING_HIGH,
+    INPUT_SEND, INPUT_VOICE_TOGGLE, MODE_PROJECT_DEBUG_RUN, MODE_PROJECT_TARGET_MOVE, NAV_BACK_MAIN, REASONING_HIGH,
     REASONING_MEDIUM, REASONING_XHIGH, UI_EDIT_TOGGLE,
     UI_SETTINGS, is_known_ui_command,
 };
 
 const DEFAULT_PIPE_NAME: &str = "codex_shell_pipe";
 const DEFAULT_BUILD_COMMAND: &str = "cargo build";
-const DEFAULT_CODEX_COMMAND: &str = "codex --ask-for-approval on-request --sandbox read-only";
 const LISTENER_FILE_NAME: &str = "ps_pipe_listener.ps1";
-#[cfg(windows)]
-const CREATE_NEW_CONSOLE_FLAG: u32 = 0x0000_0010;
 const CONNECT_RETRY_COUNT: usize = 20;
 const CONNECT_RETRY_DELAY_MS: u64 = 120;
 const MAX_HISTORY: usize = 200;

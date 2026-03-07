@@ -3,51 +3,6 @@ impl CodexShellApp {
     fn render_runtime_header(&mut self, _ctx: &egui::Context) {
     }
 
-    fn render_build_confirm_dialog(&mut self, ctx: &egui::Context) {
-        if !self.build_confirm_open {
-            return;
-        }
-        if self.input_command_without_trailing_newlines().is_empty() {
-            self.cancel_build_when_empty();
-            return;
-        }
-
-        let mut open = true;
-        egui::Window::new("ビルド確認")
-            .collapsible(false)
-            .resizable(false)
-            .order(egui::Order::Tooltip)
-            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-            .fixed_size(egui::vec2(360.0, 132.0))
-            .open(&mut open)
-            .show(ctx, |ui| {
-                ui.label(RichText::new("ビルドを実行しますか？").color(Color32::BLACK));
-                ui.add_space(10.0);
-                ui.horizontal(|ui| {
-                    if ui.button("はい").clicked() {
-                        if self.input_command_without_trailing_newlines().is_empty() {
-                            self.cancel_build_when_empty();
-                        } else {
-                            self.build_confirm_open = false;
-                            self.push_history("ビルド確認: はい");
-                            self.send_build_command();
-                        }
-                    }
-                    if ui.button("いいえ").clicked() {
-                        self.build_confirm_open = false;
-                        self.update_status("ビルドをキャンセルしました");
-                        self.push_history("ビルド確認: いいえ");
-                    }
-                });
-            });
-
-        if !open && self.build_confirm_open {
-            self.build_confirm_open = false;
-            self.update_status("ビルドをキャンセルしました");
-            self.push_history("ビルド確認ダイアログを閉じました");
-        }
-    }
-
     fn set_primary_selected_object(&mut self, object_id: String) {
         self.ui_selected_object_id = object_id.clone();
         self.ui_selected_object_ids.clear();
@@ -171,39 +126,6 @@ impl CodexShellApp {
                     ui.add_sized(
                         [ctx.object_size.x, ctx.object_size.y],
                         TextEdit::singleline(&mut self.config.build_root_dir).return_key(None),
-                    )
-                });
-                if response.inner.changed() {
-                    *state_changed = true;
-                }
-            }
-            ui_tool::CONFIG_CODEX_COMMAND | ui_tool::CONFIG_CODEX_COMMAND_A => {
-                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
-                    ui.add_sized(
-                        [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.codex_command_a).return_key(None),
-                    )
-                });
-                if response.inner.changed() {
-                    *state_changed = true;
-                }
-            }
-            ui_tool::CONFIG_CODEX_COMMAND_B => {
-                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
-                    ui.add_sized(
-                        [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.codex_command_b).return_key(None),
-                    )
-                });
-                if response.inner.changed() {
-                    *state_changed = true;
-                }
-            }
-            ui_tool::CONFIG_INPUT_PREFIX => {
-                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
-                    ui.add_sized(
-                        [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.input_prefix).return_key(None),
                     )
                 });
                 if response.inner.changed() {
@@ -486,11 +408,6 @@ impl CodexShellApp {
         let text = self.resolve_object_text(ctx.object);
         let disabled_for_selected_project = ctx.object_id == "btn_project_target_move"
             && self.is_selected_project_highlighted();
-        let codex_a_running = ctx.object_command == ui_tool::MODE_CODEX_START
-            && self.codex_runtime_state == CodexRuntimeState::Calculating;
-        let codex_b_running = ctx.object_command == ui_tool::MODE_CODEX_START_B
-            && self.codex_runtime_state_b == CodexRuntimeState::Calculating;
-        let highlight_orange = codex_a_running || codex_b_running;
         let enabled = ctx.controls_enabled
             && ctx.object.enabled
             && self.is_bind_command_enabled(ctx.object_command)
@@ -502,25 +419,10 @@ impl CodexShellApp {
         if ctx.object.visual.text.italic {
             rich = rich.italics();
         }
-        if !enabled && !highlight_orange {
+        if !enabled {
             rich = rich.color(Color32::from_gray(140));
         }
         let response = ctx.ui.scope(|ui| {
-            if highlight_orange {
-                let orange = Color32::from_rgb(255, 192, 120);
-                let orange_active = Color32::from_rgb(247, 176, 92);
-                let visuals = &mut ui.style_mut().visuals;
-                visuals.widgets.noninteractive.weak_bg_fill = orange;
-                visuals.widgets.noninteractive.bg_fill = orange;
-                visuals.widgets.inactive.weak_bg_fill = orange;
-                visuals.widgets.inactive.bg_fill = orange;
-                visuals.widgets.hovered.weak_bg_fill = orange;
-                visuals.widgets.hovered.bg_fill = orange;
-                visuals.widgets.active.weak_bg_fill = orange_active;
-                visuals.widgets.active.bg_fill = orange_active;
-                visuals.widgets.open.weak_bg_fill = orange_active;
-                visuals.widgets.open.bg_fill = orange_active;
-            }
             ui.add_enabled_ui(enabled, |ui| {
                 ui.add_sized([ctx.object_size.x, ctx.object_size.y], egui::Button::new(rich))
             })

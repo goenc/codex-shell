@@ -22,10 +22,6 @@ fn spawn_send_worker(send_rx: Receiver<SendRequest>, result_tx: Sender<SendResul
     app::pipe_ops::spawn_send_worker(send_rx, result_tx);
 }
 
-fn maybe_run_conpty_listener_mode() -> Result<bool> {
-    app::conpty_listener::maybe_run_from_args()
-}
-
 fn load_reasoning_effort() -> String {
     let config_path = Path::new(CODEX_CONFIG_PATH);
     let Ok(current) = fs::read_to_string(config_path) else {
@@ -132,10 +128,6 @@ fn update_reasoning_effort(selected: &str) -> Result<(), String> {
 }
 
 fn main() -> Result<()> {
-    if maybe_run_conpty_listener_mode()? {
-        return Ok(());
-    }
-
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([FIXED_WINDOW_WIDTH, FIXED_WINDOW_HEIGHT])

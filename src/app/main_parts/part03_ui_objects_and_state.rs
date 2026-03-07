@@ -404,7 +404,6 @@ struct CodexShellApp {
     resize_enabled: bool,
     voice_input_active: bool,
     pending_input_focus: bool,
-    build_confirm_open: bool,
     ui_resize_locked_by_save: bool,
     project_runtime_active: bool,
     active_project_declaration_path: Option<PathBuf>,

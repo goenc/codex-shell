@@ -4,7 +4,7 @@ impl CodexShellApp {
         let mut clicked_commands = Vec::new();
         let mut position_changed = false;
         let mut state_changed = self.sync_runtime_bound_states();
-        let controls_enabled = !self.ui_edit_mode && !self.build_confirm_open;
+        let controls_enabled = !self.ui_edit_mode;
         let object_layer_order = egui::Order::Foreground;
         let mut rendered_layers = Vec::new();
         let current_screen_id = self.ui_current_screen_id.clone();
@@ -159,14 +159,6 @@ impl CodexShellApp {
                     state_changed = true;
                     if object_command == ui_tool::CONFIG_SHOW_SIZE_OVERLAY {
                         self.config.show_size_overlay = next_checked;
-                    } else if object_command
-                        == ui_tool::CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP
-                    {
-                        self.config.open_consultation_window_on_startup = next_checked;
-                    } else if object_command
-                        == ui_tool::CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP
-                    {
-                        self.config.open_implementation_window_on_startup = next_checked;
                     } else if !object_command.is_empty() {
                         clicked_commands.push(object_command.clone());
                     }
@@ -456,7 +448,6 @@ impl eframe::App for CodexShellApp {
         });
         self.render_runtime_header(ctx);
         self.render_runtime_ui_objects(ctx);
-        self.render_build_confirm_dialog(ctx);
 
         self.render_ui_editor(ctx);
         ctx.request_repaint_after(Duration::from_millis(UI_RELOAD_CHECK_INTERVAL_MS));

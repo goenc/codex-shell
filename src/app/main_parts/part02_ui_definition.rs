@@ -4,17 +4,11 @@ struct AppConfig {
     working_dir: String,
     build_command: String,
     build_root_dir: String,
-    codex_command: String,
-    codex_command_a: String,
-    codex_command_b: String,
-    input_prefix: String,
     startup_exe_1: String,
     startup_exe_2: String,
     startup_exe_3: String,
     startup_exe_4: String,
     show_size_overlay: bool,
-    open_consultation_window_on_startup: bool,
-    open_implementation_window_on_startup: bool,
     main_window_width: f32,
     main_window_height: f32,
 }
@@ -29,17 +23,11 @@ impl Default for AppConfig {
             build_root_dir: std::env::current_dir()
                 .map(|path| path.to_string_lossy().into_owned())
                 .unwrap_or_else(|_| ".".to_string()),
-            codex_command: DEFAULT_CODEX_COMMAND.to_string(),
-            codex_command_a: DEFAULT_CODEX_COMMAND.to_string(),
-            codex_command_b: DEFAULT_CODEX_COMMAND.to_string(),
-            input_prefix: String::new(),
             startup_exe_1: String::new(),
             startup_exe_2: String::new(),
             startup_exe_3: String::new(),
             startup_exe_4: String::new(),
             show_size_overlay: true,
-            open_consultation_window_on_startup: true,
-            open_implementation_window_on_startup: true,
             main_window_width: FIXED_WINDOW_WIDTH,
             main_window_height: FIXED_WINDOW_HEIGHT,
         }
@@ -99,14 +87,52 @@ impl UiDefinition {
         if self.screen(UI_SETTINGS_SCREEN_ID).is_none() {
             self.screens.push(default_settings_screen());
         }
+        self.remove_deprecated_persistent_shell_objects();
         self.remove_legacy_pipe_settings_objects();
         self.remove_legacy_runtime_status_labels();
         self.ensure_settings_build_root_field();
-        self.ensure_settings_codex_command_fields();
-        self.ensure_settings_startup_window_checkboxes();
         self.relocate_reasoning_controls_to_settings();
         ensure_project_target_move_button(self);
         self.objects.clear();
+    }
+
+    fn remove_deprecated_persistent_shell_objects(&mut self) {
+        const DEPRECATED_COMMANDS: &[&str] = &[
+            ui_tool::MODE_CODEX_START,
+            ui_tool::MODE_CODEX_START_B,
+            ui_tool::MODE_STOP,
+            ui_tool::MODE_STOP_B,
+            ui_tool::MODE_BUILD,
+            ui_tool::CONFIG_CODEX_COMMAND,
+            ui_tool::CONFIG_CODEX_COMMAND_A,
+            ui_tool::CONFIG_CODEX_COMMAND_B,
+            ui_tool::CONFIG_INPUT_PREFIX,
+            ui_tool::CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP,
+            ui_tool::CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP,
+            ui_tool::CONFIG_RESTART_LISTENER,
+        ];
+        const DEPRECATED_IDS: &[&str] = &[
+            "btn_codex_start",
+            "btn_codex_start_b",
+            "btn_stop",
+            "btn_stop_b",
+            "btn_build",
+            "lbl_settings_codex",
+            "input_settings_codex",
+            "lbl_settings_codex_b",
+            "input_settings_codex_b",
+            "lbl_settings_input_prefix",
+            "input_settings_input_prefix",
+            "chk_settings_open_consultation_window_on_startup",
+            "chk_settings_open_implementation_window_on_startup",
+            "btn_settings_restart",
+        ];
+        for screen in &mut self.screens {
+            screen.objects.retain(|object| {
+                !DEPRECATED_IDS.contains(&object.id.as_str())
+                    && !DEPRECATED_COMMANDS.contains(&object.bind.command.trim())
+            });
+        }
     }
 
     fn remove_legacy_pipe_settings_objects(&mut self) {
@@ -177,119 +203,6 @@ impl UiDefinition {
             72.0,
             input_h,
         ));
-    }
-
-    fn ensure_settings_codex_command_fields(&mut self) {
-        let Some(settings_objects) = self.screen_objects_mut(UI_SETTINGS_SCREEN_ID) else {
-            return;
-        };
-        let mut codex_label_rect: Option<(f32, f32, f32, f32)> = None;
-        let mut codex_input_rect: Option<(f32, f32, f32, f32, i32)> = None;
-
-        for object in settings_objects.iter_mut() {
-            if object.id == "lbl_settings_codex" {
-                object.visual.text.value = "起動AコマンドA".to_string();
-                codex_label_rect = Some((
-                    object.position.x,
-                    object.position.y,
-                    object.size.w,
-                    object.size.h,
-                ));
-            }
-            if object.id == "input_settings_codex" {
-                if object.bind.command.trim() == ui_tool::CONFIG_CODEX_COMMAND {
-                    object.bind.command = ui_tool::CONFIG_CODEX_COMMAND_A.to_string();
-                }
-                codex_input_rect = Some((
-                    object.position.x,
-                    object.position.y,
-                    object.size.w,
-                    object.size.h,
-                    object.z_index,
-                ));
-            }
-        }
-
-        let has_label_b = settings_objects
-            .iter()
-            .any(|object| object.id == "lbl_settings_codex_b");
-        let has_input_b = settings_objects
-            .iter()
-            .any(|object| object.id == "input_settings_codex_b");
-        if has_label_b && has_input_b {
-            return;
-        }
-
-        let (label_x, label_y, label_w, label_h) =
-            codex_label_rect.unwrap_or((24.0, 160.0, 120.0, 24.0));
-        let (input_x, input_y, input_w, input_h, input_z) =
-            codex_input_rect.unwrap_or((156.0, 160.0, 640.0, 24.0, 110));
-        let b_y = (label_y.max(input_y) + 32.0).round();
-
-        if !has_label_b {
-            settings_objects.push(create_label_object(
-                "lbl_settings_codex_b",
-                "起動AコマンドB",
-                100,
-                label_x,
-                b_y,
-                label_w,
-                label_h,
-                "left",
-            ));
-        }
-        if !has_input_b {
-            settings_objects.push(create_input_object(
-                "input_settings_codex_b",
-                ui_tool::CONFIG_CODEX_COMMAND_B,
-                input_z,
-                input_x,
-                b_y,
-                input_w,
-                input_h,
-            ));
-        }
-    }
-
-    fn ensure_settings_startup_window_checkboxes(&mut self) {
-        let Some(settings_objects) = self.screen_objects_mut(UI_SETTINGS_SCREEN_ID) else {
-            return;
-        };
-        let has_consultation = settings_objects.iter().any(|object| {
-            object.id == "chk_settings_open_consultation_window_on_startup"
-                || object.bind.command.trim()
-                    == ui_tool::CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP
-        });
-        let has_implementation = settings_objects.iter().any(|object| {
-            object.id == "chk_settings_open_implementation_window_on_startup"
-                || object.bind.command.trim()
-                    == ui_tool::CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP
-        });
-
-        if !has_consultation {
-            settings_objects.push(create_checkbox_object(
-                "chk_settings_open_consultation_window_on_startup",
-                "起動時に相談ウィンドウを開く",
-                ui_tool::CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP,
-                110,
-                312.0,
-                336.0,
-                272.0,
-                28.0,
-            ));
-        }
-        if !has_implementation {
-            settings_objects.push(create_checkbox_object(
-                "chk_settings_open_implementation_window_on_startup",
-                "起動時に実装ウィンドウを開く",
-                ui_tool::CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP,
-                110,
-                592.0,
-                336.0,
-                284.0,
-                28.0,
-            ));
-        }
     }
 
     fn relocate_reasoning_controls_to_settings(&mut self) {
@@ -521,68 +434,11 @@ fn default_settings_screen() -> UiScreen {
             24.0,
         ),
         create_label_object(
-            "lbl_settings_codex",
-            "起動AコマンドA",
-            100,
-            24.0,
-            128.0,
-            120.0,
-            24.0,
-            "left",
-        ),
-        create_input_object(
-            "input_settings_codex",
-            ui_tool::CONFIG_CODEX_COMMAND_A,
-            110,
-            156.0,
-            128.0,
-            640.0,
-            24.0,
-        ),
-        create_label_object(
-            "lbl_settings_codex_b",
-            "起動AコマンドB",
-            100,
-            24.0,
-            160.0,
-            120.0,
-            24.0,
-            "left",
-        ),
-        create_input_object(
-            "input_settings_codex_b",
-            ui_tool::CONFIG_CODEX_COMMAND_B,
-            110,
-            156.0,
-            160.0,
-            640.0,
-            24.0,
-        ),
-        create_label_object(
-            "lbl_settings_input_prefix",
-            "入力先頭付加",
-            100,
-            24.0,
-            192.0,
-            120.0,
-            24.0,
-            "left",
-        ),
-        create_input_object(
-            "input_settings_input_prefix",
-            ui_tool::CONFIG_INPUT_PREFIX,
-            110,
-            156.0,
-            192.0,
-            640.0,
-            24.0,
-        ),
-        create_label_object(
             "lbl_settings_startup_exe_1",
             "自動起動EXE1",
             100,
             24.0,
-            224.0,
+            128.0,
             120.0,
             24.0,
             "left",
@@ -592,7 +448,7 @@ fn default_settings_screen() -> UiScreen {
             ui_tool::CONFIG_STARTUP_EXE_1,
             110,
             156.0,
-            224.0,
+            128.0,
             640.0,
             24.0,
         ),
@@ -602,7 +458,7 @@ fn default_settings_screen() -> UiScreen {
             ui_tool::CONFIG_STARTUP_EXE_1_BROWSE,
             120,
             804.0,
-            224.0,
+            128.0,
             72.0,
             24.0,
         ),
@@ -611,7 +467,7 @@ fn default_settings_screen() -> UiScreen {
             "自動起動EXE2",
             100,
             24.0,
-            252.0,
+            156.0,
             120.0,
             24.0,
             "left",
@@ -621,7 +477,7 @@ fn default_settings_screen() -> UiScreen {
             ui_tool::CONFIG_STARTUP_EXE_2,
             110,
             156.0,
-            252.0,
+            156.0,
             640.0,
             24.0,
         ),
@@ -631,7 +487,7 @@ fn default_settings_screen() -> UiScreen {
             ui_tool::CONFIG_STARTUP_EXE_2_BROWSE,
             120,
             804.0,
-            252.0,
+            156.0,
             72.0,
             24.0,
         ),
@@ -640,7 +496,7 @@ fn default_settings_screen() -> UiScreen {
             "自動起動EXE3",
             100,
             24.0,
-            280.0,
+            184.0,
             120.0,
             24.0,
             "left",
@@ -650,7 +506,7 @@ fn default_settings_screen() -> UiScreen {
             ui_tool::CONFIG_STARTUP_EXE_3,
             110,
             156.0,
-            280.0,
+            184.0,
             640.0,
             24.0,
         ),
@@ -660,7 +516,7 @@ fn default_settings_screen() -> UiScreen {
             ui_tool::CONFIG_STARTUP_EXE_3_BROWSE,
             120,
             804.0,
-            280.0,
+            184.0,
             72.0,
             24.0,
         ),
@@ -669,7 +525,7 @@ fn default_settings_screen() -> UiScreen {
             "自動起動EXE4",
             100,
             24.0,
-            308.0,
+            212.0,
             120.0,
             24.0,
             "left",
@@ -679,7 +535,7 @@ fn default_settings_screen() -> UiScreen {
             ui_tool::CONFIG_STARTUP_EXE_4,
             110,
             156.0,
-            308.0,
+            212.0,
             640.0,
             24.0,
         ),
@@ -689,7 +545,7 @@ fn default_settings_screen() -> UiScreen {
             ui_tool::CONFIG_STARTUP_EXE_4_BROWSE,
             120,
             804.0,
-            308.0,
+            212.0,
             72.0,
             24.0,
         ),
@@ -699,28 +555,8 @@ fn default_settings_screen() -> UiScreen {
             ui_tool::CONFIG_SHOW_SIZE_OVERLAY,
             110,
             24.0,
-            336.0,
+            248.0,
             280.0,
-            28.0,
-        ),
-        create_checkbox_object(
-            "chk_settings_open_consultation_window_on_startup",
-            "起動時に相談ウィンドウを開く",
-            ui_tool::CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP,
-            110,
-            312.0,
-            336.0,
-            272.0,
-            28.0,
-        ),
-        create_checkbox_object(
-            "chk_settings_open_implementation_window_on_startup",
-            "起動時に実装ウィンドウを開く",
-            ui_tool::CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP,
-            110,
-            592.0,
-            336.0,
-            284.0,
             28.0,
         ),
         create_button_object(
@@ -729,18 +565,8 @@ fn default_settings_screen() -> UiScreen {
             ui_tool::CONFIG_SAVE,
             120,
             24.0,
-            368.0,
+            288.0,
             120.0,
-            28.0,
-        ),
-        create_button_object(
-            "btn_settings_restart",
-            "PowerShell再起動",
-            ui_tool::CONFIG_RESTART_LISTENER,
-            120,
-            152.0,
-            368.0,
-            180.0,
             28.0,
         ),
         create_button_object(
@@ -748,8 +574,8 @@ fn default_settings_screen() -> UiScreen {
             "閉じる",
             ui_tool::NAV_BACK_MAIN,
             120,
-            340.0,
-            368.0,
+            152.0,
+            288.0,
             120.0,
             28.0,
         ),
@@ -758,8 +584,8 @@ fn default_settings_screen() -> UiScreen {
             "UI編集",
             ui_tool::UI_EDIT_TOGGLE,
             130,
-            468.0,
-            368.0,
+            280.0,
+            288.0,
             120.0,
             28.0,
         ),

@@ -665,38 +665,6 @@ fn write_listener_script(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn spawn_listener_process(
-    pipe_name: &str,
-    working_dir: &str,
-    window_title: &str,
-) -> Result<Child> {
-    let current_exe =
-        std::env::current_exe().context("自身の実行ファイルパス取得に失敗しました")?;
-    let mut command = Command::new(&current_exe);
-    command
-        .arg("--conpty-listener")
-        .arg("--pipe-name")
-        .arg(pipe_name.trim())
-        .arg("--working-directory")
-        .arg(working_dir.trim())
-        .arg("--window-title")
-        .arg(window_title);
-    #[cfg(windows)]
-    {
-        command.creation_flags(CREATE_NEW_CONSOLE_FLAG);
-    }
-    let child = command
-        .spawn()
-        .with_context(|| {
-            format!(
-                "ConPTY待ち受け起動に失敗: exe={} pipe={}",
-                current_exe.display(),
-                pipe_name.trim()
-            )
-    })?;
-    Ok(child)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
