@@ -1,5 +1,4 @@
 #![windows_subsystem = "windows"]
-
 mod app;
 mod tools;
 
