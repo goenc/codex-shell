@@ -90,6 +90,7 @@ impl UiDefinition {
         self.remove_deprecated_persistent_shell_objects();
         self.remove_legacy_runtime_status_labels();
         self.ensure_settings_build_root_field();
+        self.ensure_input_send_button();
         self.relocate_reasoning_controls_to_settings();
         ensure_project_target_move_button(self);
         self.objects.clear();
@@ -115,7 +116,6 @@ impl UiDefinition {
             "btn_stop",
             "btn_stop_b",
             "btn_build",
-            "btn_input_send",
             "lbl_settings_codex",
             "input_settings_codex",
             "lbl_settings_codex_b",
@@ -130,9 +130,38 @@ impl UiDefinition {
             screen.objects.retain(|object| {
                 !DEPRECATED_IDS.contains(&object.id.as_str())
                     && !DEPRECATED_COMMANDS.contains(&object.bind.command.trim())
-                    && object.bind.command.trim() != "input.send"
             });
         }
+    }
+
+    fn ensure_input_send_button(&mut self) {
+        let Some(main_objects) = self.screen_objects_mut(UI_MAIN_SCREEN_ID) else {
+            return;
+        };
+        if main_objects
+            .iter()
+            .any(|object| {
+                object.id == "btn_input_send"
+                    || object.bind.command.trim() == ui_tool::INPUT_SEND
+            })
+        {
+            return;
+        }
+        let input_rect = main_objects
+            .iter()
+            .find(|object| object.id == "input_command")
+            .map(|object| (object.position.x, object.position.y, object.size.w, object.size.h));
+        let (input_x, input_y, input_w, input_h) = input_rect.unwrap_or((37.0, 103.0, 763.0, 220.0));
+        main_objects.push(create_button_object(
+            "btn_input_send",
+            "送信",
+            ui_tool::INPUT_SEND,
+            70,
+            input_x + input_w + 8.0,
+            input_y,
+            96.0,
+            input_h.min(50.0).max(40.0),
+        ));
     }
 
     fn remove_legacy_runtime_status_labels(&mut self) {

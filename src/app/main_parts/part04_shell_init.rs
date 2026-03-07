@@ -135,4 +135,24 @@ impl CodexShellApp {
         });
     }
 
+    fn input_command_without_trailing_newlines(&self) -> String {
+        self.input_command
+            .trim_end_matches(['\r', '\n'])
+            .to_string()
+    }
+
+    fn send_input_command_by_button(&mut self) {
+        let command = self.input_command_without_trailing_newlines();
+        if command.is_empty() {
+            self.update_status("入力欄が空のため送信しません");
+            self.pending_input_focus = true;
+            return;
+        }
+        self.input_command.clear();
+        self.update_status("入力を送信しました");
+        self.push_history(format!("入力送信: {command}"));
+        let _ = BUTTON_COMMAND_DELAY_MS;
+        self.pending_input_focus = true;
+    }
+
 }
