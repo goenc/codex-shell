@@ -185,12 +185,16 @@ impl UiDefinition {
         let Some(main_objects) = self.screen_objects_mut(UI_MAIN_SCREEN_ID) else {
             return;
         };
-        if let Some(button) = main_objects.iter_mut().find(|object| {
-            object.id == "btn_input_send" || object.bind.command.trim() == ui_tool::INPUT_SEND
-        }) {
-            button.id = "btn_input_send".to_string();
-            button.bind.command = ui_tool::INPUT_SEND.to_string();
-            button.visual.text.value = "送信".to_string();
+        if let Some(button) = main_objects.iter_mut().find(|object| object.id == "btn_input_send") {
+            if button.bind.command.trim().is_empty() {
+                button.bind.command = ui_tool::INPUT_SEND.to_string();
+            }
+            return;
+        }
+        if main_objects
+            .iter()
+            .any(|object| object.bind.command.trim() == ui_tool::INPUT_SEND)
+        {
             return;
         }
         let input_rect = main_objects
@@ -405,7 +409,9 @@ fn ensure_project_target_move_button(definition: &mut UiDefinition) {
         return;
     };
     let combo_rect = objects.iter_mut().find(|object| object.id == "cmb_project_selector");
-    if let Some(combo) = combo_rect {
+    if let Some(combo) = combo_rect
+        && combo.bind.command.trim().is_empty()
+    {
         combo.bind.command = ui_tool::MODE_PROJECT_TARGET_MOVE.to_string();
     }
     let combo_rect = objects
