@@ -53,7 +53,7 @@ const VOICE_INPUT_HOTKEY_LABEL: &str = "Ctrl+Alt+Right";
 const POWERSHELL_EXECUTABLE: &str = "pwsh.exe";
 const AUTO_START_SLOT_COUNT: usize = 4;
 const MODEL_CANDIDATES: [&str; 3] = ["gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.4"];
-const REASONING_EFFORT_CANDIDATES: [&str; 3] = ["low", "medium", "high"];
+const REASONING_EFFORT_CANDIDATES: [&str; 4] = ["low", "medium", "high", "xhigh"];
 #[cfg(windows)]
 const CREATE_NEW_CONSOLE_FLAG: u32 = 0x0000_0010;
 
@@ -1660,7 +1660,7 @@ impl CodexShellApp {
             ui_tool::REASONING_LOW => Some(self.selected_reasoning_effort == "low"),
             ui_tool::REASONING_MEDIUM => Some(self.selected_reasoning_effort == "medium"),
             ui_tool::REASONING_HIGH => Some(self.selected_reasoning_effort == "high"),
-            ui_tool::REASONING_XHIGH => Some(self.selected_reasoning_effort == "high"),
+            ui_tool::REASONING_XHIGH => Some(self.selected_reasoning_effort == "xhigh"),
             _ => None,
         }
     }
@@ -1681,7 +1681,7 @@ impl CodexShellApp {
                 ui_tool::REASONING_LOW => Some(selected_reasoning_effort == "low"),
                 ui_tool::REASONING_MEDIUM => Some(selected_reasoning_effort == "medium"),
                 ui_tool::REASONING_HIGH => Some(selected_reasoning_effort == "high"),
-                ui_tool::REASONING_XHIGH => Some(selected_reasoning_effort == "high"),
+                ui_tool::REASONING_XHIGH => Some(selected_reasoning_effort == "xhigh"),
                 _ => None,
             };
             if let Some(desired_checked) = desired && object.checked != desired_checked {
@@ -1887,7 +1887,7 @@ impl CodexShellApp {
             REASONING_LOW => self.handle_reasoning_effort("low"),
             REASONING_MEDIUM => self.handle_reasoning_effort("medium"),
             REASONING_HIGH => self.handle_reasoning_effort("high"),
-            REASONING_XHIGH => self.handle_reasoning_effort("high"),
+            REASONING_XHIGH => self.handle_reasoning_effort("xhigh"),
             UI_EDIT_TOGGLE => self.handle_ui_edit_toggle(),
             other => self.handle_unknown_ui_command(other),
         }
@@ -3320,8 +3320,6 @@ fn load_reasoning_effort() -> String {
     };
     if is_valid_reasoning_effort(&effort) {
         effort
-    } else if effort == "xhigh" {
-        "high".to_string()
     } else {
         "medium".to_string()
     }
