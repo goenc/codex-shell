@@ -16,11 +16,9 @@ use crate::tools::ui_edit::api as ui_tool;
 use super::process_runtime;
 
 use ui_tool::{
-    CONFIG_BUILD_ROOT_DIR_BROWSE, CONFIG_SAVE, CONFIG_STARTUP_EXE_1_BROWSE,
-    CONFIG_STARTUP_EXE_2_BROWSE, CONFIG_STARTUP_EXE_3_BROWSE, CONFIG_STARTUP_EXE_4_BROWSE,
-    INPUT_SEND, INPUT_VOICE_TOGGLE, MODE_PROJECT_DEBUG_RUN, MODE_PROJECT_TARGET_MOVE,
-    NAV_BACK_MAIN, REASONING_HIGH, REASONING_MEDIUM, REASONING_XHIGH, UI_EDIT_TOGGLE,
-    UI_SETTINGS, is_known_ui_command,
+    CONFIG_SAVE, INPUT_SEND, INPUT_VOICE_TOGGLE, MODE_PROJECT_DEBUG_RUN,
+    MODE_PROJECT_TARGET_MOVE, NAV_BACK_MAIN, REASONING_HIGH, REASONING_MEDIUM,
+    REASONING_XHIGH, UI_EDIT_TOGGLE, UI_SETTINGS, is_known_ui_command,
 };
 
 const MAX_HISTORY: usize = 200;
@@ -58,12 +56,6 @@ const VOICE_INPUT_HOTKEY_LABEL: &str = "Ctrl+Alt+Right";
 #[serde(default)]
 pub(crate) struct AppConfig {
     pub(crate) working_dir: String,
-    pub(crate) build_root_dir: String,
-    pub(crate) startup_exe_1: String,
-    pub(crate) startup_exe_2: String,
-    pub(crate) startup_exe_3: String,
-    pub(crate) startup_exe_4: String,
-    pub(crate) show_size_overlay: bool,
     pub(crate) main_window_width: f32,
     pub(crate) main_window_height: f32,
 }
@@ -74,14 +66,6 @@ impl Default for AppConfig {
             working_dir: std::env::current_dir()
                 .map(|path| path.to_string_lossy().into_owned())
                 .unwrap_or_else(|_| ".".to_string()),
-            build_root_dir: std::env::current_dir()
-                .map(|path| path.to_string_lossy().into_owned())
-                .unwrap_or_else(|_| ".".to_string()),
-            startup_exe_1: String::new(),
-            startup_exe_2: String::new(),
-            startup_exe_3: String::new(),
-            startup_exe_4: String::new(),
-            show_size_overlay: true,
             main_window_width: FIXED_WINDOW_WIDTH,
             main_window_height: FIXED_WINDOW_HEIGHT,
         }
@@ -141,7 +125,6 @@ impl UiDefinition {
         if self.screen(UI_SETTINGS_SCREEN_ID).is_none() {
             self.screens.push(default_settings_screen());
         }
-        self.ensure_settings_build_root_field();
         self.ensure_input_send_button();
         self.relocate_reasoning_controls_to_settings();
         ensure_project_target_move_button(self);
@@ -175,54 +158,6 @@ impl UiDefinition {
             input_y,
             96.0,
             input_h.min(50.0).max(40.0),
-        ));
-    }
-
-    fn ensure_settings_build_root_field(&mut self) {
-        let Some(settings_objects) = self.screen_objects_mut(UI_SETTINGS_SCREEN_ID) else {
-            return;
-        };
-        let mut input_rect: Option<(f32, f32, f32, f32, i32)> = None;
-        let mut has_browse = false;
-        for object in settings_objects.iter_mut() {
-            if object.id == "lbl_settings_build" || object.id == "lbl_settings_build_root" {
-                object.id = "lbl_settings_build_root".to_string();
-                object.visual.text.value = "ビルルート".to_string();
-            }
-            if object.id == "input_settings_build" || object.id == "input_settings_build_root" {
-                object.id = "input_settings_build_root".to_string();
-                object.bind.command = ui_tool::CONFIG_BUILD_ROOT_DIR.to_string();
-                input_rect = Some((
-                    object.position.x,
-                    object.position.y,
-                    object.size.w,
-                    object.size.h,
-                    object.z_index,
-                ));
-            }
-            if object.id == "btn_settings_build_root_browse"
-                || object.bind.command.trim() == ui_tool::CONFIG_BUILD_ROOT_DIR_BROWSE
-            {
-                object.id = "btn_settings_build_root_browse".to_string();
-                object.bind.command = ui_tool::CONFIG_BUILD_ROOT_DIR_BROWSE.to_string();
-                object.visual.text.value = "参照".to_string();
-                has_browse = true;
-            }
-        }
-        if has_browse {
-            return;
-        }
-        let (input_x, input_y, input_w, input_h, input_z) =
-            input_rect.unwrap_or((156.0, 96.0, 640.0, 24.0, 110));
-        settings_objects.push(create_button_object(
-            "btn_settings_build_root_browse",
-            "参照",
-            ui_tool::CONFIG_BUILD_ROOT_DIR_BROWSE,
-            input_z + 10,
-            input_x + input_w + 8.0,
-            input_y,
-            72.0,
-            input_h,
         ));
     }
 
@@ -434,159 +369,13 @@ fn default_settings_screen() -> UiScreen {
             640.0,
             24.0,
         ),
-        create_label_object("lbl_settings_build_root", "ビルルート", 100, 24.0, 96.0, 120.0, 24.0, "left"),
-        create_input_object(
-            "input_settings_build_root",
-            ui_tool::CONFIG_BUILD_ROOT_DIR,
-            110,
-            156.0,
-            96.0,
-            640.0,
-            24.0,
-        ),
-        create_button_object(
-            "btn_settings_build_root_browse",
-            "参照",
-            ui_tool::CONFIG_BUILD_ROOT_DIR_BROWSE,
-            120,
-            804.0,
-            96.0,
-            72.0,
-            24.0,
-        ),
-        create_label_object(
-            "lbl_settings_startup_exe_1",
-            "自動起動EXE1",
-            100,
-            24.0,
-            128.0,
-            120.0,
-            24.0,
-            "left",
-        ),
-        create_input_object(
-            "input_settings_startup_exe_1",
-            ui_tool::CONFIG_STARTUP_EXE_1,
-            110,
-            156.0,
-            128.0,
-            640.0,
-            24.0,
-        ),
-        create_button_object(
-            "btn_settings_startup_exe_1_browse",
-            "参照",
-            ui_tool::CONFIG_STARTUP_EXE_1_BROWSE,
-            120,
-            804.0,
-            128.0,
-            72.0,
-            24.0,
-        ),
-        create_label_object(
-            "lbl_settings_startup_exe_2",
-            "自動起動EXE2",
-            100,
-            24.0,
-            156.0,
-            120.0,
-            24.0,
-            "left",
-        ),
-        create_input_object(
-            "input_settings_startup_exe_2",
-            ui_tool::CONFIG_STARTUP_EXE_2,
-            110,
-            156.0,
-            156.0,
-            640.0,
-            24.0,
-        ),
-        create_button_object(
-            "btn_settings_startup_exe_2_browse",
-            "参照",
-            ui_tool::CONFIG_STARTUP_EXE_2_BROWSE,
-            120,
-            804.0,
-            156.0,
-            72.0,
-            24.0,
-        ),
-        create_label_object(
-            "lbl_settings_startup_exe_3",
-            "自動起動EXE3",
-            100,
-            24.0,
-            184.0,
-            120.0,
-            24.0,
-            "left",
-        ),
-        create_input_object(
-            "input_settings_startup_exe_3",
-            ui_tool::CONFIG_STARTUP_EXE_3,
-            110,
-            156.0,
-            184.0,
-            640.0,
-            24.0,
-        ),
-        create_button_object(
-            "btn_settings_startup_exe_3_browse",
-            "参照",
-            ui_tool::CONFIG_STARTUP_EXE_3_BROWSE,
-            120,
-            804.0,
-            184.0,
-            72.0,
-            24.0,
-        ),
-        create_label_object(
-            "lbl_settings_startup_exe_4",
-            "自動起動EXE4",
-            100,
-            24.0,
-            212.0,
-            120.0,
-            24.0,
-            "left",
-        ),
-        create_input_object(
-            "input_settings_startup_exe_4",
-            ui_tool::CONFIG_STARTUP_EXE_4,
-            110,
-            156.0,
-            212.0,
-            640.0,
-            24.0,
-        ),
-        create_button_object(
-            "btn_settings_startup_exe_4_browse",
-            "参照",
-            ui_tool::CONFIG_STARTUP_EXE_4_BROWSE,
-            120,
-            804.0,
-            212.0,
-            72.0,
-            24.0,
-        ),
-        create_checkbox_object(
-            "chk_settings_show_size_overlay",
-            "サイズ表示を表示",
-            ui_tool::CONFIG_SHOW_SIZE_OVERLAY,
-            110,
-            24.0,
-            248.0,
-            280.0,
-            28.0,
-        ),
         create_button_object(
             "btn_settings_save",
             "設定保存",
             ui_tool::CONFIG_SAVE,
             120,
             24.0,
-            288.0,
+            96.0,
             120.0,
             28.0,
         ),
@@ -596,7 +385,7 @@ fn default_settings_screen() -> UiScreen {
             ui_tool::NAV_BACK_MAIN,
             120,
             152.0,
-            288.0,
+            96.0,
             120.0,
             28.0,
         ),
@@ -606,7 +395,7 @@ fn default_settings_screen() -> UiScreen {
             ui_tool::UI_EDIT_TOGGLE,
             130,
             280.0,
-            288.0,
+            96.0,
             120.0,
             28.0,
         ),
@@ -1084,7 +873,6 @@ impl CodexShellApp {
         app.push_history(format!("UI定義を読み込みました: {}", app.ui_live_path.display()));
         app.refresh_project_declarations();
         app.save_config();
-        app.launch_startup_executables();
         Ok(app)
     }
 
@@ -1302,62 +1090,6 @@ impl CodexShellApp {
             .cloned()
     }
 
-    fn launch_startup_executables(&mut self) {
-        let startup_entries = [
-            ("自動起動EXE1", self.config.startup_exe_1.clone()),
-            ("自動起動EXE2", self.config.startup_exe_2.clone()),
-            ("自動起動EXE3", self.config.startup_exe_3.clone()),
-            ("自動起動EXE4", self.config.startup_exe_4.clone()),
-        ];
-        let mut seen_paths = HashSet::new();
-        for (label, raw) in startup_entries {
-            let trimmed = raw.trim();
-            if trimmed.is_empty() {
-                continue;
-            }
-            let path = trimmed.trim_matches('"');
-            let normalized = process_runtime::normalize_path_for_dedup(Path::new(path));
-            if !seen_paths.insert(normalized) {
-                self.push_history(format!(
-                    "{label} は同一パスが既に登録済みのため起動をスキップしました: {path}"
-                ));
-                continue;
-            }
-            match process_runtime::count_running_executable(path) {
-                Ok(running) => {
-                    if running > 0 {
-                        self.push_history(format!(
-                            "{label} は既に起動中のため自動起動をスキップしました 件数={running}: {path}"
-                        ));
-                        continue;
-                    }
-                }
-                Err(err) => {
-                    self.update_status(format!("{label} 起動確認失敗: {err}"));
-                    self.push_history(format!(
-                        "{label} の起動確認に失敗したため自動起動を中止しました: {path} ({err})"
-                    ));
-                    continue;
-                }
-            }
-            let mut command = Command::new(path);
-            let working_dir = self.config.working_dir.trim();
-            if !working_dir.is_empty() {
-                command.current_dir(working_dir);
-            }
-            match command.spawn() {
-                Ok(child) => {
-                    let pid = child.id();
-                    self.push_history(format!("{label} を自動起動しました PID={pid}: {path}"));
-                }
-                Err(err) => {
-                    self.update_status(format!("{label} 起動失敗: {err}"));
-                    self.push_history(format!("{label} の自動起動に失敗しました: {path} ({err})"));
-                }
-            }
-        }
-    }
-
     fn refresh_project_declarations(&mut self) {
         let base = self.config.working_dir.trim();
         if base.is_empty() {
@@ -1491,70 +1223,6 @@ impl CodexShellApp {
             "作業フォルダ移動コマンドは無効です: {}",
             target_dir.display()
         ));
-        let startup_executables = vec![
-            self.config.startup_exe_1.clone(),
-            self.config.startup_exe_2.clone(),
-            self.config.startup_exe_3.clone(),
-            self.config.startup_exe_4.clone(),
-        ];
-        match save_selected_repo_path_from_startup_executables(&startup_executables, &target_dir) {
-            Ok(report) => {
-                self.push_history(format!(
-                    "selected_repo_path.txt を更新しました: {} <= {} (採用={}, exe={}, 理由={}, 候補数={}, 不採用要約={})",
-                    report.output_file.display(),
-                    target_dir.display(),
-                    report.selected_startup_exe,
-                    report.selected_exe_path.display(),
-                    report.decision_summary,
-                    report.candidate_count,
-                    report.rejected_summary
-                ));
-            }
-            Err(err) => {
-                self.update_status(format!("selected_repo_path.txt 更新失敗: {err}"));
-                self.push_history(format!("selected_repo_path.txt 更新に失敗しました: {err}"));
-            }
-        }
-    }
-
-    fn browse_startup_executable(&mut self, slot: usize) {
-        match process_runtime::select_executable_file_path() {
-            Ok(Some(path)) => {
-                match slot {
-                    1 => self.config.startup_exe_1 = path.clone(),
-                    2 => self.config.startup_exe_2 = path.clone(),
-                    3 => self.config.startup_exe_3 = path.clone(),
-                    4 => self.config.startup_exe_4 = path.clone(),
-                    _ => return,
-                }
-                self.update_status(format!("自動起動EXE{slot} を設定しました"));
-                self.push_history(format!("自動起動EXE{slot} を参照設定しました: {path}"));
-            }
-            Ok(None) => {
-                self.update_status(format!("自動起動EXE{slot} の参照をキャンセルしました"));
-            }
-            Err(err) => {
-                self.update_status(format!("自動起動EXE{slot} 参照に失敗: {err}"));
-                self.push_history(format!("自動起動EXE{slot} 参照に失敗しました: {err}"));
-            }
-        }
-    }
-
-    fn browse_build_root_dir(&mut self) {
-        match process_runtime::select_folder_path() {
-            Ok(Some(path)) => {
-                self.config.build_root_dir = path.clone();
-                self.update_status("ビルルートを設定しました");
-                self.push_history(format!("ビルルートを参照設定しました: {path}"));
-            }
-            Ok(None) => {
-                self.update_status("ビルルートの参照をキャンセルしました");
-            }
-            Err(err) => {
-                self.update_status(format!("ビルルート参照に失敗: {err}"));
-                self.push_history(format!("ビルルート参照に失敗しました: {err}"));
-            }
-        }
     }
 
     fn toggle_voice_input(&mut self) {
@@ -1713,7 +1381,6 @@ impl CodexShellApp {
             ui_tool::REASONING_MEDIUM => Some(self.selected_reasoning_effort == "medium"),
             ui_tool::REASONING_HIGH => Some(self.selected_reasoning_effort == "high"),
             ui_tool::REASONING_XHIGH => Some(self.selected_reasoning_effort == "xhigh"),
-            ui_tool::CONFIG_SHOW_SIZE_OVERLAY => Some(self.config.show_size_overlay),
             _ => None,
         }
     }
@@ -1734,7 +1401,6 @@ impl CodexShellApp {
                 ui_tool::REASONING_MEDIUM => Some(selected_reasoning_effort == "medium"),
                 ui_tool::REASONING_HIGH => Some(selected_reasoning_effort == "high"),
                 ui_tool::REASONING_XHIGH => Some(selected_reasoning_effort == "xhigh"),
-                ui_tool::CONFIG_SHOW_SIZE_OVERLAY => Some(self.config.show_size_overlay),
                 _ => None,
             };
             if let Some(desired_checked) = desired && object.checked != desired_checked {
@@ -1835,14 +1501,6 @@ impl CodexShellApp {
         self.save_config();
     }
 
-    fn handle_browse_startup_exe(&mut self, slot: usize) {
-        self.browse_startup_executable(slot);
-    }
-
-    fn handle_browse_build_root_dir(&mut self) {
-        self.browse_build_root_dir();
-    }
-
     fn handle_reasoning_effort(&mut self, effort: &str) {
         if self.selected_reasoning_effort == effort {
             return;
@@ -1924,11 +1582,6 @@ impl CodexShellApp {
             UI_SETTINGS => self.handle_ui_settings(),
             NAV_BACK_MAIN => self.handle_nav_back_main(),
             CONFIG_SAVE => self.handle_config_save(),
-            CONFIG_STARTUP_EXE_1_BROWSE => self.handle_browse_startup_exe(1),
-            CONFIG_STARTUP_EXE_2_BROWSE => self.handle_browse_startup_exe(2),
-            CONFIG_STARTUP_EXE_3_BROWSE => self.handle_browse_startup_exe(3),
-            CONFIG_STARTUP_EXE_4_BROWSE => self.handle_browse_startup_exe(4),
-            CONFIG_BUILD_ROOT_DIR_BROWSE => self.handle_browse_build_root_dir(),
             REASONING_MEDIUM => self.handle_reasoning_effort("medium"),
             REASONING_HIGH => self.handle_reasoning_effort("high"),
             REASONING_XHIGH => self.handle_reasoning_effort("xhigh"),
@@ -2043,61 +1696,6 @@ impl CodexShellApp {
                     ui.add_sized(
                         [ctx.object_size.x, ctx.object_size.y],
                         TextEdit::singleline(&mut self.config.working_dir).return_key(None),
-                    )
-                });
-                if response.inner.changed() {
-                    *state_changed = true;
-                }
-            }
-            ui_tool::CONFIG_BUILD_ROOT_DIR => {
-                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
-                    ui.add_sized(
-                        [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.build_root_dir).return_key(None),
-                    )
-                });
-                if response.inner.changed() {
-                    *state_changed = true;
-                }
-            }
-            ui_tool::CONFIG_STARTUP_EXE_1 => {
-                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
-                    ui.add_sized(
-                        [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.startup_exe_1).return_key(None),
-                    )
-                });
-                if response.inner.changed() {
-                    *state_changed = true;
-                }
-            }
-            ui_tool::CONFIG_STARTUP_EXE_2 => {
-                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
-                    ui.add_sized(
-                        [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.startup_exe_2).return_key(None),
-                    )
-                });
-                if response.inner.changed() {
-                    *state_changed = true;
-                }
-            }
-            ui_tool::CONFIG_STARTUP_EXE_3 => {
-                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
-                    ui.add_sized(
-                        [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.startup_exe_3).return_key(None),
-                    )
-                });
-                if response.inner.changed() {
-                    *state_changed = true;
-                }
-            }
-            ui_tool::CONFIG_STARTUP_EXE_4 => {
-                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
-                    ui.add_sized(
-                        [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.startup_exe_4).return_key(None),
                     )
                 });
                 if response.inner.changed() {
@@ -2548,9 +2146,7 @@ impl CodexShellApp {
                 if target.checked != next_checked {
                     target.checked = next_checked;
                     state_changed = true;
-                    if object_command == ui_tool::CONFIG_SHOW_SIZE_OVERLAY {
-                        self.config.show_size_overlay = next_checked;
-                    } else if !object_command.is_empty() {
+                    if !object_command.is_empty() {
                         clicked_commands.push(object_command.clone());
                     }
                 }
@@ -2687,7 +2283,7 @@ impl CodexShellApp {
             &mut self.ui_selected_object_ids,
             &mut self.ui_edit_grid_visible,
             &self.ui_font_names,
-            self.config.show_size_overlay,
+            true,
             self.window_size,
             self.ui_has_unsaved_changes,
         );
@@ -2897,245 +2493,6 @@ fn read_project_name_from_declaration(path: &Path) -> Option<String> {
     } else {
         Some(first_line.to_string())
     }
-}
-
-#[derive(Clone, Debug)]
-struct SelectedRepoPathCandidate {
-    source_slot: usize,
-    source_startup_exe: String,
-    resolved_exe_path: PathBuf,
-    runtime_dir: PathBuf,
-    output_file: PathBuf,
-    output_exists: bool,
-    runtime_exists: bool,
-    score: u32,
-    score_reason: String,
-}
-
-#[derive(Clone, Debug)]
-struct SelectedRepoPathSaveReport {
-    selected_startup_exe: String,
-    selected_exe_path: PathBuf,
-    output_file: PathBuf,
-    decision_summary: String,
-    candidate_count: usize,
-    rejected_summary: String,
-}
-
-fn resolve_startup_executable_path(raw: &str, current_dir: &Path) -> Result<PathBuf, String> {
-    let trimmed = raw.trim().trim_matches('"');
-    if trimmed.is_empty() {
-        return Err("空のパスです".to_string());
-    }
-    let parsed = PathBuf::from(trimmed);
-    let resolved = if parsed.is_absolute() {
-        parsed
-    } else {
-        current_dir.join(parsed)
-    };
-    Ok(resolved)
-}
-
-fn collect_selected_repo_path_candidates(
-    startup_executables: &[String],
-) -> (Vec<SelectedRepoPathCandidate>, Vec<String>) {
-    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let mut candidates = Vec::new();
-    let mut rejected = Vec::new();
-
-    for (index, raw) in startup_executables.iter().enumerate() {
-        let slot = index + 1;
-        let resolved_exe_path = match resolve_startup_executable_path(raw, &current_dir) {
-            Ok(path) => path,
-            Err(reason) => {
-                rejected.push(format!("startup_exe_{slot}: {reason}"));
-                continue;
-            }
-        };
-        let Some(exe_parent) = resolved_exe_path.parent() else {
-            rejected.push(format!(
-                "startup_exe_{slot}: EXE親ディレクトリを解決できません ({})",
-                resolved_exe_path.display()
-            ));
-            continue;
-        };
-        let runtime_dir = exe_parent.join("runtime");
-        let output_file = runtime_dir.join("selected_repo_path.txt");
-        let output_exists = output_file.is_file();
-        let runtime_exists = runtime_dir.is_dir();
-        let name_hint = resolved_exe_path
-            .to_string_lossy()
-            .to_ascii_lowercase()
-            .contains("codex_rollback_bridge");
-        if !output_exists && !runtime_exists {
-            rejected.push(format!(
-                "startup_exe_{slot}: runtime/selected_repo_path.txt が存在しません ({})",
-                resolved_exe_path.display()
-            ));
-            continue;
-        }
-
-        let mut score = 0_u32;
-        let mut reasons = Vec::new();
-        if output_exists {
-            score += 100;
-            reasons.push("selected_repo_path.txt 既存");
-        }
-        if runtime_exists {
-            score += 10;
-            reasons.push("runtime 既存");
-        }
-        if name_hint {
-            score += 1;
-            reasons.push("exe名ヒント一致");
-        }
-        if reasons.is_empty() {
-            reasons.push("補助情報なし");
-        }
-
-        candidates.push(SelectedRepoPathCandidate {
-            source_slot: slot,
-            source_startup_exe: raw.trim().to_string(),
-            resolved_exe_path,
-            runtime_dir,
-            output_file,
-            output_exists,
-            runtime_exists,
-            score,
-            score_reason: reasons.join(", "),
-        });
-    }
-
-    candidates.sort_by(|left, right| {
-        right
-            .score
-            .cmp(&left.score)
-            .then_with(|| right.output_exists.cmp(&left.output_exists))
-            .then_with(|| right.runtime_exists.cmp(&left.runtime_exists))
-            .then_with(|| left.source_slot.cmp(&right.source_slot))
-    });
-    (candidates, rejected)
-}
-
-fn summarize_rejected_selected_repo_candidates(rejected: &[String]) -> String {
-    if rejected.is_empty() {
-        return "不採用理由なし".to_string();
-    }
-    const MAX_ITEMS: usize = 3;
-    let mut parts = rejected
-        .iter()
-        .take(MAX_ITEMS)
-        .cloned()
-        .collect::<Vec<_>>();
-    if rejected.len() > MAX_ITEMS {
-        parts.push(format!("他{}件", rejected.len() - MAX_ITEMS));
-    }
-    parts.join(" / ")
-}
-
-fn choose_selected_repo_path_candidate(
-    candidates: &[SelectedRepoPathCandidate],
-) -> Option<SelectedRepoPathCandidate> {
-    candidates.first().cloned()
-}
-
-fn validate_selected_repo_write_target(
-    candidate: &SelectedRepoPathCandidate,
-    target_project_dir_path: &Path,
-) -> Result<PathBuf> {
-    if target_project_dir_path.as_os_str().is_empty() {
-        return Err(anyhow!("target_project_dir_path が空です"));
-    }
-
-    let repo_path = if target_project_dir_path.is_absolute() {
-        target_project_dir_path.to_path_buf()
-    } else {
-        std::env::current_dir()
-            .context("カレントディレクトリ取得に失敗しました")?
-            .join(target_project_dir_path)
-    };
-    if repo_path.as_os_str().is_empty() {
-        return Err(anyhow!("書き込み対象のプロジェクトパス解決後に空になりました"));
-    }
-    if candidate
-        .output_file
-        .file_name()
-        .and_then(|name| name.to_str())
-        != Some("selected_repo_path.txt")
-    {
-        return Err(anyhow!(
-            "書き込み先ファイル名が不正です: {}",
-            candidate.output_file.display()
-        ));
-    }
-    let parent = candidate.output_file.parent().ok_or_else(|| {
-        anyhow!(
-            "selected_repo_path.txt の親ディレクトリを解決できません: {}",
-            candidate.output_file.display()
-        )
-    })?;
-    if parent.as_os_str().is_empty() {
-        return Err(anyhow!(
-            "selected_repo_path.txt の親ディレクトリが空です: {}",
-            candidate.output_file.display()
-        ));
-    }
-    fs::create_dir_all(parent).with_context(|| {
-        format!(
-            "selected_repo_path.txt 用 runtime ディレクトリ作成に失敗: {}",
-            parent.display()
-        )
-    })?;
-    let metadata = fs::metadata(parent).with_context(|| {
-        format!(
-            "selected_repo_path.txt 用 runtime ディレクトリ確認に失敗: {}",
-            parent.display()
-        )
-    })?;
-    if !metadata.is_dir() {
-        return Err(anyhow!(
-            "selected_repo_path.txt の親がディレクトリではありません: {}",
-            parent.display()
-        ));
-    }
-    Ok(repo_path)
-}
-
-fn save_selected_repo_path_from_startup_executables(
-    startup_executables: &[String],
-    target_project_dir_path: &Path,
-) -> Result<SelectedRepoPathSaveReport> {
-    let (candidates, rejected) = collect_selected_repo_path_candidates(startup_executables);
-    let rejected_summary = summarize_rejected_selected_repo_candidates(&rejected);
-    let candidate_count = candidates.len();
-    let candidate = choose_selected_repo_path_candidate(&candidates).ok_or_else(|| {
-        anyhow!(
-            "selected_repo_path.txt の候補が見つかりません 候補数=0 不採用: {}",
-            rejected_summary
-        )
-    })?;
-    let repo_path = validate_selected_repo_write_target(&candidate, target_project_dir_path)?;
-
-    fs::write(&candidate.output_file, format!("{}\n", repo_path.display())).with_context(|| {
-        format!(
-            "selected_repo_path.txt への書き込みに失敗: {}",
-            candidate.output_file.display()
-        )
-    })?;
-
-    Ok(SelectedRepoPathSaveReport {
-        selected_startup_exe: format!("startup_exe_{}={}", candidate.source_slot, candidate.source_startup_exe),
-        selected_exe_path: candidate.resolved_exe_path,
-        output_file: candidate.output_file,
-        decision_summary: format!(
-            "score={} [{}] runtime={}",
-            candidate.score,
-            candidate.score_reason,
-            candidate.runtime_dir.display()
-        ),
-        candidate_count,
-        rejected_summary,
-    })
 }
 
 fn resolve_project_debug_executable_path(declaration_path: &Path) -> Result<PathBuf> {
@@ -3490,138 +2847,6 @@ fn apply_visual_fix(ctx: &egui::Context) {
         style.visuals.widgets.open.corner_radius = egui::CornerRadius::same(4);
     });
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::sync::{Mutex, OnceLock};
-
-    fn test_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
-
-    fn test_dir(prefix: &str) -> PathBuf {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0);
-        std::env::temp_dir().join(format!("codex_shell_{prefix}_{nanos}"))
-    }
-
-    #[test]
-    fn save_selected_repo_path_single_runtime_candidate() {
-        let root = test_dir("single");
-        let exe_dir = root.join("tool").join("target").join("debug");
-        let runtime_dir = exe_dir.join("runtime");
-        fs::create_dir_all(&runtime_dir).expect("runtime dir");
-        let exe_path = exe_dir.join("tool.exe");
-        fs::write(&exe_path, "").expect("exe file");
-        let target_dir = root.join("project_a");
-        fs::create_dir_all(&target_dir).expect("target dir");
-
-        let report = save_selected_repo_path_from_startup_executables(
-            &[exe_path.to_string_lossy().into_owned()],
-            &target_dir,
-        )
-        .expect("save report");
-        assert_eq!(report.output_file, runtime_dir.join("selected_repo_path.txt"));
-        let body = fs::read_to_string(&report.output_file).expect("output body");
-        assert_eq!(body, format!("{}\n", target_dir.display()));
-    }
-
-    #[test]
-    fn prefer_candidate_with_existing_selected_repo_file() {
-        let root = test_dir("prefer_existing");
-        let exe_a_dir = root.join("a").join("target").join("debug");
-        let exe_b_dir = root.join("b").join("target").join("debug");
-        fs::create_dir_all(exe_a_dir.join("runtime")).expect("runtime a");
-        fs::create_dir_all(exe_b_dir.join("runtime")).expect("runtime b");
-        let exe_a = exe_a_dir.join("app_a.exe");
-        let exe_b = exe_b_dir.join("app_b.exe");
-        fs::write(&exe_a, "").expect("exe a");
-        fs::write(&exe_b, "").expect("exe b");
-        let b_output = exe_b_dir.join("runtime").join("selected_repo_path.txt");
-        fs::write(&b_output, "previous\n").expect("existing output");
-        let target_dir = root.join("project_b");
-        fs::create_dir_all(&target_dir).expect("target dir");
-
-        let report = save_selected_repo_path_from_startup_executables(
-            &[
-                exe_a.to_string_lossy().into_owned(),
-                exe_b.to_string_lossy().into_owned(),
-            ],
-            &target_dir,
-        )
-        .expect("save report");
-        assert_eq!(report.output_file, b_output);
-        assert!(report.decision_summary.contains("selected_repo_path.txt 既存"));
-    }
-
-    #[test]
-    fn reject_bridge_name_without_runtime() {
-        let root = test_dir("bridge_no_runtime");
-        let exe_dir = root
-            .join("codex_rollback_bridge")
-            .join("target")
-            .join("debug");
-        fs::create_dir_all(&exe_dir).expect("exe dir");
-        let exe_path = exe_dir.join("codex_rollback_bridge.exe");
-        fs::write(&exe_path, "").expect("exe file");
-        let target_dir = root.join("project_c");
-        fs::create_dir_all(&target_dir).expect("target dir");
-
-        let err = save_selected_repo_path_from_startup_executables(
-            &[exe_path.to_string_lossy().into_owned()],
-            &target_dir,
-        )
-        .expect_err("must fail");
-        assert!(
-            err.to_string().contains("候補が見つかりません"),
-            "unexpected error: {err}"
-        );
-    }
-
-    #[test]
-    fn support_relative_startup_executable_path() {
-        let _guard = test_lock().lock().expect("lock");
-        let root = test_dir("relative");
-        let old_dir = std::env::current_dir().expect("current dir");
-        fs::create_dir_all(root.join("tools").join("runtime")).expect("runtime dir");
-        fs::write(root.join("tools").join("relative_tool.exe"), "").expect("exe file");
-        let target_dir = root.join("project_d");
-        fs::create_dir_all(&target_dir).expect("target dir");
-        std::env::set_current_dir(&root).expect("set current dir");
-
-        let result = save_selected_repo_path_from_startup_executables(
-            &[r"tools\relative_tool.exe".to_string()],
-            &target_dir,
-        );
-        std::env::set_current_dir(old_dir).expect("restore current dir");
-        let report = result.expect("save report");
-        assert_eq!(
-            report.output_file,
-            root.join("tools").join("runtime").join("selected_repo_path.txt")
-        );
-    }
-
-    #[test]
-    fn fail_with_rejection_summary_when_all_candidates_invalid() {
-        let root = test_dir("all_invalid");
-        let target_dir = root.join("project_e");
-        fs::create_dir_all(&target_dir).expect("target dir");
-        let err = save_selected_repo_path_from_startup_executables(
-            &["".to_string(), r".\missing\tool.exe".to_string()],
-            &target_dir,
-        )
-        .expect_err("must fail");
-        let text = err.to_string();
-        assert!(text.contains("候補数=0"), "unexpected error: {text}");
-        assert!(text.contains("不採用"), "unexpected error: {text}");
-    }
-}
-
-
 
 fn load_reasoning_effort() -> String {
     let config_path = Path::new(CODEX_CONFIG_PATH);

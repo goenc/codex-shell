@@ -11,17 +11,6 @@ pub const REASONING_MEDIUM: &str = "reasoning.medium";
 pub const REASONING_HIGH: &str = "reasoning.high";
 pub const REASONING_XHIGH: &str = "reasoning.xhigh";
 pub const CONFIG_WORKING_DIR: &str = "config.working_dir";
-pub const CONFIG_BUILD_ROOT_DIR: &str = "config.build_root_dir";
-pub const CONFIG_STARTUP_EXE_1: &str = "config.startup_exe_1";
-pub const CONFIG_STARTUP_EXE_2: &str = "config.startup_exe_2";
-pub const CONFIG_STARTUP_EXE_3: &str = "config.startup_exe_3";
-pub const CONFIG_STARTUP_EXE_4: &str = "config.startup_exe_4";
-pub const CONFIG_STARTUP_EXE_1_BROWSE: &str = "config.startup_exe_1.browse";
-pub const CONFIG_STARTUP_EXE_2_BROWSE: &str = "config.startup_exe_2.browse";
-pub const CONFIG_STARTUP_EXE_3_BROWSE: &str = "config.startup_exe_3.browse";
-pub const CONFIG_STARTUP_EXE_4_BROWSE: &str = "config.startup_exe_4.browse";
-pub const CONFIG_BUILD_ROOT_DIR_BROWSE: &str = "config.build_root_dir.browse";
-pub const CONFIG_SHOW_SIZE_OVERLAY: &str = "config.show_size_overlay";
 pub const CONFIG_SAVE: &str = "config.save";
  
 pub const ALL_UI_COMMANDS: &[&str] = &[
@@ -38,17 +27,6 @@ pub const ALL_UI_COMMANDS: &[&str] = &[
     REASONING_HIGH,
     REASONING_XHIGH,
     CONFIG_WORKING_DIR,
-    CONFIG_BUILD_ROOT_DIR,
-    CONFIG_STARTUP_EXE_1,
-    CONFIG_STARTUP_EXE_2,
-    CONFIG_STARTUP_EXE_3,
-    CONFIG_STARTUP_EXE_4,
-    CONFIG_STARTUP_EXE_1_BROWSE,
-    CONFIG_STARTUP_EXE_2_BROWSE,
-    CONFIG_STARTUP_EXE_3_BROWSE,
-    CONFIG_STARTUP_EXE_4_BROWSE,
-    CONFIG_BUILD_ROOT_DIR_BROWSE,
-    CONFIG_SHOW_SIZE_OVERLAY,
     CONFIG_SAVE,
 ];
 

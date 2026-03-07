@@ -1,7 +1,6 @@
 use anyhow::{Context, Result, anyhow};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::thread;
 use std::time::Duration;
 use windows::core::PWSTR;
@@ -149,78 +148,4 @@ pub(crate) fn terminate_running_executable(path: &str) -> Result<usize> {
         }
     }
     Ok(process_ids.len())
-}
-
-pub(crate) fn count_running_executable(path: &str) -> Result<usize> {
-    let process_ids = find_process_ids_by_executable(Path::new(path))
-        .with_context(|| format!("実行中プロセス検索に失敗: {path}"))?;
-    Ok(process_ids.len())
-}
-
-pub(crate) fn select_executable_file_path() -> Result<Option<String>> {
-    let script = r#"
-Add-Type -AssemblyName System.Windows.Forms
-$dialog = New-Object System.Windows.Forms.OpenFileDialog
-$dialog.Filter = 'Executable Files (*.exe)|*.exe|All Files (*.*)|*.*'
-$dialog.CheckFileExists = $true
-$dialog.Multiselect = $false
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-    Write-Output $dialog.FileName
-}
-"#;
-    let output = Command::new("powershell.exe")
-        .arg("-NoProfile")
-        .arg("-ExecutionPolicy")
-        .arg("Bypass")
-        .arg("-STA")
-        .arg("-Command")
-        .arg(script)
-        .output()
-        .context("実行ファイル参照ダイアログ起動に失敗")?;
-    if !output.status.success() {
-        return Err(anyhow!(
-            "実行ファイル参照ダイアログ実行に失敗: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-    let selected = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if selected.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(selected))
-    }
-}
-
-pub(crate) fn select_folder_path() -> Result<Option<String>> {
-    let script = r#"
-Add-Type -AssemblyName System.Windows.Forms
-$dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-$dialog.ShowNewFolderButton = $true
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-    Write-Output $dialog.SelectedPath
-}
-"#;
-    let output = Command::new("powershell.exe")
-        .arg("-NoProfile")
-        .arg("-ExecutionPolicy")
-        .arg("Bypass")
-        .arg("-STA")
-        .arg("-Command")
-        .arg(script)
-        .output()
-        .context("フォルダ参照ダイアログ起動に失敗")?;
-    if !output.status.success() {
-        return Err(anyhow!(
-            "フォルダ参照ダイアログ実行に失敗: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-    let selected = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if selected.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(selected))
-    }
 }
