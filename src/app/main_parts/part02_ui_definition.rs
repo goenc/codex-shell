@@ -1,16 +1,15 @@
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
-struct AppConfig {
-    working_dir: String,
-    build_command: String,
-    build_root_dir: String,
-    startup_exe_1: String,
-    startup_exe_2: String,
-    startup_exe_3: String,
-    startup_exe_4: String,
-    show_size_overlay: bool,
-    main_window_width: f32,
-    main_window_height: f32,
+pub(crate) struct AppConfig {
+    pub(crate) working_dir: String,
+    pub(crate) build_root_dir: String,
+    pub(crate) startup_exe_1: String,
+    pub(crate) startup_exe_2: String,
+    pub(crate) startup_exe_3: String,
+    pub(crate) startup_exe_4: String,
+    pub(crate) show_size_overlay: bool,
+    pub(crate) main_window_width: f32,
+    pub(crate) main_window_height: f32,
 }
 
 impl Default for AppConfig {
@@ -19,7 +18,6 @@ impl Default for AppConfig {
             working_dir: std::env::current_dir()
                 .map(|path| path.to_string_lossy().into_owned())
                 .unwrap_or_else(|_| ".".to_string()),
-            build_command: DEFAULT_BUILD_COMMAND.to_string(),
             build_root_dir: std::env::current_dir()
                 .map(|path| path.to_string_lossy().into_owned())
                 .unwrap_or_else(|_| ".".to_string()),
@@ -36,12 +34,12 @@ impl Default for AppConfig {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
-struct UiDefinition {
-    version: u32,
-    assets: UiAssets,
+pub(crate) struct UiDefinition {
+    pub(crate) version: u32,
+    pub(crate) assets: UiAssets,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    objects: Vec<UiObject>,
-    screens: Vec<UiScreen>,
+    pub(crate) objects: Vec<UiObject>,
+    pub(crate) screens: Vec<UiScreen>,
 }
 
 impl Default for UiDefinition {
@@ -87,51 +85,11 @@ impl UiDefinition {
         if self.screen(UI_SETTINGS_SCREEN_ID).is_none() {
             self.screens.push(default_settings_screen());
         }
-        self.remove_deprecated_persistent_shell_objects();
-        self.remove_legacy_runtime_status_labels();
         self.ensure_settings_build_root_field();
         self.ensure_input_send_button();
         self.relocate_reasoning_controls_to_settings();
         ensure_project_target_move_button(self);
         self.objects.clear();
-    }
-
-    fn remove_deprecated_persistent_shell_objects(&mut self) {
-        const DEPRECATED_COMMANDS: &[&str] = &[
-            ui_tool::MODE_CODEX_START,
-            ui_tool::MODE_CODEX_START_B,
-            ui_tool::MODE_STOP,
-            ui_tool::MODE_STOP_B,
-            ui_tool::MODE_BUILD,
-            ui_tool::CONFIG_CODEX_COMMAND,
-            ui_tool::CONFIG_CODEX_COMMAND_A,
-            ui_tool::CONFIG_CODEX_COMMAND_B,
-            ui_tool::CONFIG_INPUT_PREFIX,
-            ui_tool::CONFIG_OPEN_CONSULTATION_WINDOW_ON_STARTUP,
-            ui_tool::CONFIG_OPEN_IMPLEMENTATION_WINDOW_ON_STARTUP,
-        ];
-        const DEPRECATED_IDS: &[&str] = &[
-            "btn_codex_start",
-            "btn_codex_start_b",
-            "btn_stop",
-            "btn_stop_b",
-            "btn_build",
-            "lbl_settings_codex",
-            "input_settings_codex",
-            "lbl_settings_codex_b",
-            "input_settings_codex_b",
-            "lbl_settings_input_prefix",
-            "input_settings_input_prefix",
-            "chk_settings_open_consultation_window_on_startup",
-            "chk_settings_open_implementation_window_on_startup",
-            "btn_settings_restart",
-        ];
-        for screen in &mut self.screens {
-            screen.objects.retain(|object| {
-                !DEPRECATED_IDS.contains(&object.id.as_str())
-                    && !DEPRECATED_COMMANDS.contains(&object.bind.command.trim())
-            });
-        }
     }
 
     fn ensure_input_send_button(&mut self) {
@@ -162,17 +120,6 @@ impl UiDefinition {
             96.0,
             input_h.min(50.0).max(40.0),
         ));
-    }
-
-    fn remove_legacy_runtime_status_labels(&mut self) {
-        let Some(main_objects) = self.screen_objects_mut(UI_MAIN_SCREEN_ID) else {
-            return;
-        };
-        main_objects.retain(|object| {
-            object.id != "lbl_codex_state"
-                && object.id != "lbl_codex_state_b"
-                && object.id != "lbl_project_target"
-        });
     }
 
     fn ensure_settings_build_root_field(&mut self) {
@@ -318,11 +265,11 @@ impl UiDefinition {
         }
     }
 
-    fn screen_ids(&self) -> Vec<String> {
+    pub(crate) fn screen_ids(&self) -> Vec<String> {
         self.screens.iter().map(|screen| screen.id.clone()).collect()
     }
 
-    fn screen(&self, screen_id: &str) -> Option<&UiScreen> {
+    pub(crate) fn screen(&self, screen_id: &str) -> Option<&UiScreen> {
         self.screens.iter().find(|screen| screen.id == screen_id)
     }
 
@@ -336,27 +283,27 @@ impl UiDefinition {
             .find(|screen| screen.id == screen_id)
     }
 
-    fn object_index_in_screen(&self, screen_id: &str, object_id: &str) -> Option<usize> {
+    pub(crate) fn object_index_in_screen(&self, screen_id: &str, object_id: &str) -> Option<usize> {
         self.screen(screen_id)?
             .objects
             .iter()
             .position(|object| object.id == object_id)
     }
 
-    fn screen_objects(&self, screen_id: &str) -> Option<&Vec<UiObject>> {
+    pub(crate) fn screen_objects(&self, screen_id: &str) -> Option<&Vec<UiObject>> {
         Some(&self.screen(screen_id)?.objects)
     }
 
-    fn screen_objects_mut(&mut self, screen_id: &str) -> Option<&mut Vec<UiObject>> {
+    pub(crate) fn screen_objects_mut(&mut self, screen_id: &str) -> Option<&mut Vec<UiObject>> {
         Some(&mut self.screen_mut(screen_id)?.objects)
     }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
-struct UiScreen {
-    id: String,
-    objects: Vec<UiObject>,
+pub(crate) struct UiScreen {
+    pub(crate) id: String,
+    pub(crate) objects: Vec<UiObject>,
 }
 
 impl Default for UiScreen {

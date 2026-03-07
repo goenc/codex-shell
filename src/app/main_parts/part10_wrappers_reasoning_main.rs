@@ -1,21 +1,21 @@
 fn normalize_path_for_dedup(path: &Path) -> String {
-    app::process_ops::normalize_path_for_dedup(path)
+    process_ops::normalize_path_for_dedup(path)
 }
 
 fn terminate_running_executable(path: &str) -> Result<usize> {
-    app::process_ops::terminate_running_executable(path)
+    process_ops::terminate_running_executable(path)
 }
 
 fn count_running_executable(path: &str) -> Result<usize> {
-    app::process_ops::count_running_executable(path)
+    process_ops::count_running_executable(path)
 }
 
 fn select_executable_file_path() -> Result<Option<String>> {
-    app::process_ops::select_executable_file_path()
+    process_ops::select_executable_file_path()
 }
 
 fn select_folder_path() -> Result<Option<String>> {
-    app::process_ops::select_folder_path()
+    process_ops::select_folder_path()
 }
 
 fn load_reasoning_effort() -> String {
@@ -123,7 +123,7 @@ fn update_reasoning_effort(selected: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn main() -> Result<()> {
+pub(crate) fn run() -> Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([FIXED_WINDOW_WIDTH, FIXED_WINDOW_HEIGHT])

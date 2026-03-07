@@ -1,2 +1,4 @@
 /target
-runtime/
+/runtime/commit_details.md
+/runtime/commit_message.md
+/runtime/ui/live/

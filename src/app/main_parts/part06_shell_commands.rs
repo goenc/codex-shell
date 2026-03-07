@@ -115,11 +115,7 @@ impl CodexShellApp {
                 .is_some_and(|declaration_path| {
                     resolve_project_debug_executable_path(&declaration_path).is_ok()
                 }),
-            ui_tool::MODE_PROJECT_TARGET_MOVE => {
-                self.target_project_dir_path.is_some()
-                    && self.codex_runtime_state != CodexRuntimeState::Calculating
-                    && self.codex_runtime_state_b != CodexRuntimeState::Calculating
-            }
+            ui_tool::MODE_PROJECT_TARGET_MOVE => self.target_project_dir_path.is_some(),
             _ => true,
         }
     }
@@ -178,14 +174,6 @@ impl CodexShellApp {
     fn resolve_object_text(&self, object: &UiObject) -> String {
         match object.bind.command.trim() {
             ui_tool::STATUS_MESSAGE => format!("状態: {}", self.status_message),
-            ui_tool::CODEX_STATE => format!("Codex状態: {}", self.codex_runtime_state.label()),
-            CODEX_STATE_B => format!("Codex状態B: {}", self.codex_runtime_state_b.label()),
-            ui_tool::PROJECT_TARGET_STATE => self
-                .project_selected_index
-                .and_then(|index| self.project_declarations.get(index))
-                .map(|entry| entry.name.clone())
-                .filter(|name| !name.trim().is_empty())
-                .unwrap_or_else(|| "プロジェクト未選択".to_string()),
             ui_tool::UI_EDIT_LOCKED_HINT => "編集モード中のため操作は無効".to_string(),
             ui_tool::INPUT_VOICE_TOGGLE => {
                 if self.voice_input_active {
@@ -211,12 +199,8 @@ impl CodexShellApp {
     }
 
     fn resolve_label_color(&self, object: &UiObject) -> Color32 {
-        match object.bind.command.trim() {
-            ui_tool::PROJECT_TARGET_STATE if self.target_project_dir_path.is_some() => {
-                Color32::from_rgb(255, 140, 0)
-            }
-            _ => Color32::BLACK,
-        }
+        let _ = object;
+        Color32::BLACK
     }
 
     fn is_object_runtime_visible(&self, object: &UiObject) -> bool {

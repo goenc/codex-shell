@@ -423,9 +423,6 @@ impl eframe::App for CodexShellApp {
         });
     }
 
-    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-    }
-
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.apply_window_resize_policy(ctx);
         self.drain_codex_exec_result();
@@ -444,7 +441,6 @@ impl eframe::App for CodexShellApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.allocate_space(egui::Vec2::ZERO);
         });
-        self.render_runtime_header(ctx);
         self.render_runtime_ui_objects(ctx);
 
         self.render_ui_editor(ctx);

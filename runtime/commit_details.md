@@ -1,23 +1,22 @@
-日時: 2026-03-07 02:03:37 JST
-対象: codex-shell 不要ファイル削除
-summary: ルートの不要一時ファイル二件を参照確認後に削除した
+日時: 2026-03-07 21:14:08 JST
+対象: codex-shell
+summary: 既存のプロジェクト選択結果をCodex単発実行の作業フォルダとして利用するように変更
 code_changes:
-・_tmp_inject.cs を削除した
-・_tmp_vk.cs を削除した
+・送信処理で target_project_dir_path を参照し未選択時は実行を中止して状態表示と履歴に理由を記録
+・Codex実行処理の引数に作業フォルダを追加し Command::new("codex").current_dir(selected_path) を常時設定
+・実行開始ステータスと履歴に実行フォルダを表示して確認可能に変更
 verification:
-・git grep と rg で対象名の参照が存在しないことを確認した
-・cargo build が dev プロファイルで成功した
-日時: 2026-03-07 16:40:00 JST
-対象: codex-shell 常駐PowerShell前提UI設定と依存分岐の整理削除
-summary: 常駐PowerShell前提の起動停止UIと設定項目とイベント分岐を削除し単発起動化の前段整理を行った
+・cargo build が dev プロファイルで成功
+日時: 2026-03-07 21:34:53 JST
+対象: codex-shell
+summary: 未使用機能削除とモジュール整理を実施しruntimeのinit/live分離を明確化
 code_changes:
-・AppConfig から codex_command 系と input_prefix と起動時ウィンドウ設定を削除した
-・設定画面定義から起動AコマンドA/B 入力先頭付加 ウィンドウ自動起動 PowerShell再起動を削除した
-・メイン画面の実装起動 停止 実装ボタンを旧UI定義読み込み時に除去する正規化処理を追加した
-・コマンド分岐から mode.codex_start mode.stop mode.build config.restart_listener を削除した
-・ConPTYリスナーモードの入口を削除し conpty_listener.rs とモジュール公開を削除した
-・ビルド確認ダイアログと関連状態を削除した
+・src/main.rs の include! 依存を撤廃し app::run() 呼び出しの通常モジュール構成へ変更
+・未使用コマンドIDと互換専用設定キー、旧ランタイム状態分岐、未使用設定 build_command をコードと参照元から削除
+・runtime/ui は init/ui.json をGit雛形、live/ui.json を起動時生成に変更し .gitignore で生成物を除外
+・未使用依存クレートを Cargo.toml から削除し windows feature を使用分へ縮小
 verification:
-・cargo build が dev プロファイルで成功した
-・削除対象の設定項目参照が src/app/main_parts から除去されていることを rg で確認した
-・git status で対象外ファイルの変更が含まれていないことを確認した
+・cargo build が dev プロファイルで成功
+・cargo test が 5件成功
+・rg で削除対象の定数名と設定キー名の残存参照が無いことを確認
+

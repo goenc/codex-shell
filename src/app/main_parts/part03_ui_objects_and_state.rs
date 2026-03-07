@@ -173,9 +173,9 @@ fn create_radio_object(
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
-struct UiAssets {
-    base_dir: String,
-    images: HashMap<String, String>,
+pub(crate) struct UiAssets {
+    pub(crate) base_dir: String,
+    pub(crate) images: HashMap<String, String>,
 }
 
 impl Default for UiAssets {
@@ -189,18 +189,18 @@ impl Default for UiAssets {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
-struct UiObject {
-    id: String,
+pub(crate) struct UiObject {
+    pub(crate) id: String,
     #[serde(rename = "type")]
-    object_type: String,
-    z_index: i32,
-    checked: bool,
-    position: UiPosition,
-    size: UiSize,
-    visible: bool,
-    enabled: bool,
-    bind: UiBind,
-    visual: UiVisual,
+    pub(crate) object_type: String,
+    pub(crate) z_index: i32,
+    pub(crate) checked: bool,
+    pub(crate) position: UiPosition,
+    pub(crate) size: UiSize,
+    pub(crate) visible: bool,
+    pub(crate) enabled: bool,
+    pub(crate) bind: UiBind,
+    pub(crate) visual: UiVisual,
 }
 
 impl Default for UiObject {
@@ -222,9 +222,9 @@ impl Default for UiObject {
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(default)]
-struct UiPosition {
-    x: f32,
-    y: f32,
+pub(crate) struct UiPosition {
+    pub(crate) x: f32,
+    pub(crate) y: f32,
 }
 
 impl Default for UiPosition {
@@ -235,9 +235,9 @@ impl Default for UiPosition {
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(default)]
-struct UiSize {
-    w: f32,
-    h: f32,
+pub(crate) struct UiSize {
+    pub(crate) w: f32,
+    pub(crate) h: f32,
 }
 
 impl Default for UiSize {
@@ -248,18 +248,18 @@ impl Default for UiSize {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(default)]
-struct UiBind {
-    command: String,
-    group: String,
+pub(crate) struct UiBind {
+    pub(crate) command: String,
+    pub(crate) group: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
-struct UiVisual {
-    background: UiBackground,
-    icon: UiIcon,
-    text: UiText,
-    states: UiStates,
+pub(crate) struct UiVisual {
+    pub(crate) background: UiBackground,
+    pub(crate) icon: UiIcon,
+    pub(crate) text: UiText,
+    pub(crate) states: UiStates,
 }
 
 impl Default for UiVisual {
@@ -275,18 +275,18 @@ impl Default for UiVisual {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(default)]
-struct UiBackground {
-    image: String,
-    fit: String,
+pub(crate) struct UiBackground {
+    pub(crate) image: String,
+    pub(crate) fit: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
-struct UiIcon {
-    image: String,
-    anchor: String,
-    offset: UiPosition,
-    size: UiSize,
+pub(crate) struct UiIcon {
+    pub(crate) image: String,
+    pub(crate) anchor: String,
+    pub(crate) offset: UiPosition,
+    pub(crate) size: UiSize,
 }
 
 impl Default for UiIcon {
@@ -302,13 +302,13 @@ impl Default for UiIcon {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
-struct UiText {
-    value: String,
-    align: String,
-    font_size: f32,
-    font_family: String,
-    bold: bool,
-    italic: bool,
+pub(crate) struct UiText {
+    pub(crate) value: String,
+    pub(crate) align: String,
+    pub(crate) font_size: f32,
+    pub(crate) font_family: String,
+    pub(crate) bold: bool,
+    pub(crate) italic: bool,
 }
 
 impl Default for UiText {
@@ -326,37 +326,22 @@ impl Default for UiText {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(default)]
-struct UiStates {
-    hover: UiStateVisual,
-    pressed: UiStateVisual,
-    disabled: UiStateVisual,
+pub(crate) struct UiStates {
+    pub(crate) hover: UiStateVisual,
+    pub(crate) pressed: UiStateVisual,
+    pub(crate) disabled: UiStateVisual,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(default)]
-struct UiStateVisual {
-    background: UiBackground,
+pub(crate) struct UiStateVisual {
+    pub(crate) background: UiBackground,
 }
 
 #[derive(Clone, Debug)]
 struct ProjectDeclarationEntry {
     name: String,
     path: Option<PathBuf>,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum CodexRuntimeState {
-    Calculating,
-    Stopped,
-}
-
-impl CodexRuntimeState {
-    fn label(self) -> &'static str {
-        match self {
-            Self::Calculating => "計算中",
-            Self::Stopped => "停止中",
-        }
-    }
 }
 
 struct CodexShellApp {
@@ -375,8 +360,6 @@ struct CodexShellApp {
     selected_reasoning_effort: String,
     input_command: String,
     status_message: String,
-    codex_runtime_state: CodexRuntimeState,
-    codex_runtime_state_b: CodexRuntimeState,
     history: Vec<String>,
     window_size: egui::Vec2,
     input_area_size: egui::Vec2,
@@ -387,7 +370,6 @@ struct CodexShellApp {
     codex_exec_in_progress: bool,
     codex_exec_result_rx: Option<Receiver<CodexExecResult>>,
     ui_resize_locked_by_save: bool,
-    project_runtime_active: bool,
     target_project_dir_path: Option<PathBuf>,
     project_declarations: Vec<ProjectDeclarationEntry>,
     project_selected_index: Option<usize>,

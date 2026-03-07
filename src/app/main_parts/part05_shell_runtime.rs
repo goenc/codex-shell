@@ -220,14 +220,6 @@ impl CodexShellApp {
             self.push_history("プロジェクトフォルダ移動を中止しました: 未選択");
             return;
         };
-        if self.codex_runtime_state == CodexRuntimeState::Calculating
-            || self.codex_runtime_state_b == CodexRuntimeState::Calculating
-        {
-            self.update_status("Codex実行中のためプロジェクトフォルダへ移動できません");
-            self.push_history("プロジェクトフォルダ移動を中止しました: Codex実行中");
-            return;
-        }
-
         self.moved_project_highlight_key = self.selected_project_highlight_key();
         self.update_status("通信機能削除のため作業フォルダ移動コマンドは実行しません");
         self.push_history(format!(

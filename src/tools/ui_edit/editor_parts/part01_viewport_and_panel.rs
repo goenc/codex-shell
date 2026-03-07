@@ -1,4 +1,4 @@
-use crate::{UI_MAIN_SCREEN_ID, UI_RELOAD_CHECK_INTERVAL_MS, UiDefinition, UiObject};
+use crate::app::{UI_MAIN_SCREEN_ID, UI_RELOAD_CHECK_INTERVAL_MS, UiDefinition, UiObject};
 use eframe::egui::{self, Color32, RichText};
 use std::cmp::Ordering;
 use std::collections::HashSet;

@@ -1,8 +1,5 @@
 impl CodexShellApp {
 
-    fn render_runtime_header(&mut self, _ctx: &egui::Context) {
-    }
-
     fn set_primary_selected_object(&mut self, object_id: String) {
         self.ui_selected_object_id = object_id.clone();
         self.ui_selected_object_ids.clear();
@@ -104,17 +101,6 @@ impl CodexShellApp {
                     ui.add_sized(
                         [ctx.object_size.x, ctx.object_size.y],
                         TextEdit::singleline(&mut self.config.working_dir).return_key(None),
-                    )
-                });
-                if response.inner.changed() {
-                    *state_changed = true;
-                }
-            }
-            ui_tool::CONFIG_BUILD_COMMAND => {
-                let response = ctx.ui.add_enabled_ui(enabled, |ui| {
-                    ui.add_sized(
-                        [ctx.object_size.x, ctx.object_size.y],
-                        TextEdit::singleline(&mut self.config.build_command).return_key(None),
                     )
                 });
                 if response.inner.changed() {

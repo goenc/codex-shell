@@ -38,8 +38,6 @@ impl CodexShellApp {
             selected_reasoning_effort,
             input_command: String::new(),
             status_message: "待機中".to_string(),
-            codex_runtime_state: CodexRuntimeState::Stopped,
-            codex_runtime_state_b: CodexRuntimeState::Stopped,
             history: Vec::new(),
             window_size: egui::vec2(0.0, 0.0),
             input_area_size: egui::vec2(0.0, 0.0),
@@ -50,7 +48,6 @@ impl CodexShellApp {
             codex_exec_in_progress: false,
             codex_exec_result_rx: None,
             ui_resize_locked_by_save: false,
-            project_runtime_active: false,
             target_project_dir_path: None,
             project_declarations: Vec::new(),
             project_selected_index: None,
@@ -116,16 +113,7 @@ impl CodexShellApp {
     }
 
     fn runtime_background_color(&self) -> Color32 {
-        let codex_a_active = self.codex_runtime_state == CodexRuntimeState::Calculating;
-        let codex_b_active = self.codex_runtime_state_b == CodexRuntimeState::Calculating;
-        if !codex_a_active && !codex_b_active {
-            return Color32::from_rgb(224, 224, 224);
-        }
-        if self.project_runtime_active {
-            Color32::from_rgb(225, 244, 225)
-        } else {
-            Color32::from_rgb(255, 248, 228)
-        }
+        Color32::from_rgb(224, 224, 224)
     }
 
     fn apply_runtime_background(&self, ctx: &egui::Context) {
@@ -154,18 +142,24 @@ impl CodexShellApp {
             self.pending_input_focus = true;
             return;
         }
+        let Some(working_dir) = self.target_project_dir_path.clone() else {
+            self.update_status("実行フォルダ未選択のため送信できません");
+            self.push_history("Codex実行を中止しました: 実行フォルダ未選択");
+            self.pending_input_focus = true;
+            return;
+        };
         self.input_command.clear();
-        self.start_codex_exec(command);
+        self.start_codex_exec(command, working_dir);
         self.pending_input_focus = true;
     }
 
-    fn start_codex_exec(&mut self, input: String) {
-        let working_dir = self.config.working_dir.trim().to_string();
+    fn start_codex_exec(&mut self, input: String, working_dir: PathBuf) {
+        let working_dir_text = working_dir.display().to_string();
         let (result_tx, result_rx) = mpsc::channel::<CodexExecResult>();
         self.codex_exec_result_rx = Some(result_rx);
         self.codex_exec_in_progress = true;
-        self.update_status("Codex単発実行中...");
-        self.push_history(format!("Codex実行開始: {input}"));
+        self.update_status(format!("Codex単発実行中... ({working_dir_text})"));
+        self.push_history(format!("Codex実行開始: {input} (cwd: {working_dir_text})"));
 
         thread::spawn(move || {
             let mut command = Command::new("codex");
@@ -174,9 +168,7 @@ impl CodexShellApp {
                 .arg(&input)
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped());
-            if !working_dir.is_empty() {
-                command.current_dir(working_dir);
-            }
+            command.current_dir(working_dir);
 
             let result = match command.output() {
                 Ok(output) => CodexExecResult {

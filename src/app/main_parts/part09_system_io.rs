@@ -6,7 +6,7 @@ fn unix_timestamp() -> String {
 }
 
 fn send_voice_input_hotkey() -> Result<()> {
-    app::process_ops::send_voice_input_hotkey()
+    process_ops::send_voice_input_hotkey()
 }
 
 fn find_project_declaration_files(base_dir: &Path) -> Result<Vec<PathBuf>> {
@@ -465,10 +465,18 @@ fn ui_live_file_path() -> PathBuf {
 
 fn ensure_live_ui_file() -> Result<PathBuf> {
     let live_path = ui_live_file_path();
-
-    if !live_path.is_file() {
-        return Err(anyhow!("live UI定義が見つかりません: {}", live_path.display()));
+    if live_path.is_file() {
+        return Ok(live_path);
     }
+    let init_path = ui_runtime_base_dir().join(UI_INIT_RELATIVE_PATH);
+    let body = fs::read_to_string(&init_path)
+        .with_context(|| format!("init UI定義読み込みに失敗: {}", init_path.display()))?;
+    if let Some(parent) = live_path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("live UIディレクトリ作成に失敗: {}", parent.display()))?;
+    }
+    fs::write(&live_path, body)
+        .with_context(|| format!("live UI定義生成に失敗: {}", live_path.display()))?;
 
     Ok(live_path)
 }
