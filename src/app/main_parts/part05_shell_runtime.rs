@@ -259,11 +259,16 @@ impl CodexShellApp {
             self.config.startup_exe_4.clone(),
         ];
         match save_selected_repo_path_from_startup_executables(&startup_executables, &target_dir) {
-            Ok(output_file) => {
+            Ok(report) => {
                 self.push_history(format!(
-                    "selected_repo_path.txt を更新しました: {} <= {}",
-                    output_file.display(),
-                    target_dir.display()
+                    "selected_repo_path.txt を更新しました: {} <= {} (採用={}, exe={}, 理由={}, 候補数={}, 不採用要約={})",
+                    report.output_file.display(),
+                    target_dir.display(),
+                    report.selected_startup_exe,
+                    report.selected_exe_path.display(),
+                    report.decision_summary,
+                    report.candidate_count,
+                    report.rejected_summary
                 ));
             }
             Err(err) => {

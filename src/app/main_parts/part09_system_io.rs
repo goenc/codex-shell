@@ -56,69 +56,154 @@ fn read_project_name_from_declaration(path: &Path) -> Option<String> {
     }
 }
 
-fn resolve_selected_repo_path_output_file(startup_executables: &[String]) -> Option<PathBuf> {
-    #[derive(Clone)]
-    struct Candidate {
-        output_file: PathBuf,
-        priority: u8,
-    }
+#[derive(Clone, Debug)]
+struct SelectedRepoPathCandidate {
+    source_slot: usize,
+    source_startup_exe: String,
+    resolved_exe_path: PathBuf,
+    runtime_dir: PathBuf,
+    output_file: PathBuf,
+    output_exists: bool,
+    runtime_exists: bool,
+    score: u32,
+    score_reason: String,
+}
 
+#[derive(Clone, Debug)]
+struct SelectedRepoPathSaveReport {
+    selected_startup_exe: String,
+    selected_exe_path: PathBuf,
+    output_file: PathBuf,
+    decision_summary: String,
+    candidate_count: usize,
+    rejected_summary: String,
+}
+
+fn resolve_startup_executable_path(raw: &str, current_dir: &Path) -> Result<PathBuf, String> {
+    let trimmed = raw.trim().trim_matches('"');
+    if trimmed.is_empty() {
+        return Err("空のパスです".to_string());
+    }
+    let parsed = PathBuf::from(trimmed);
+    let resolved = if parsed.is_absolute() {
+        parsed
+    } else {
+        current_dir.join(parsed)
+    };
+    Ok(resolved)
+}
+
+fn collect_selected_repo_path_candidates(
+    startup_executables: &[String],
+) -> (Vec<SelectedRepoPathCandidate>, Vec<String>) {
+    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let mut candidates = Vec::new();
-    for raw in startup_executables {
-        let trimmed = raw.trim();
-        if trimmed.is_empty() {
+    let mut rejected = Vec::new();
+
+    for (index, raw) in startup_executables.iter().enumerate() {
+        let slot = index + 1;
+        let resolved_exe_path = match resolve_startup_executable_path(raw, &current_dir) {
+            Ok(path) => path,
+            Err(reason) => {
+                rejected.push(format!("startup_exe_{slot}: {reason}"));
+                continue;
+            }
+        };
+        let Some(exe_parent) = resolved_exe_path.parent() else {
+            rejected.push(format!(
+                "startup_exe_{slot}: EXE親ディレクトリを解決できません ({})",
+                resolved_exe_path.display()
+            ));
+            continue;
+        };
+        let runtime_dir = exe_parent.join("runtime");
+        let output_file = runtime_dir.join("selected_repo_path.txt");
+        let output_exists = output_file.is_file();
+        let runtime_exists = runtime_dir.is_dir();
+        let name_hint = resolved_exe_path
+            .to_string_lossy()
+            .to_ascii_lowercase()
+            .contains("codex_rollback_bridge");
+        if !output_exists && !runtime_exists {
+            rejected.push(format!(
+                "startup_exe_{slot}: runtime/selected_repo_path.txt が存在しません ({})",
+                resolved_exe_path.display()
+            ));
             continue;
         }
-        let exe_path = PathBuf::from(trimmed.trim_matches('"'));
-        let Some(parent) = exe_path.parent() else {
-            continue;
-        };
-        let runtime_dir = parent.join("runtime");
-        let output_file = runtime_dir.join("selected_repo_path.txt");
-        let exe_lower = exe_path.to_string_lossy().to_ascii_lowercase();
-        let priority = if exe_lower.contains("codex_rollback_bridge") {
-            0
-        } else if output_file.is_file() {
-            1
-        } else if runtime_dir.is_dir() {
-            2
-        } else {
-            3
-        };
-        candidates.push(Candidate {
+
+        let mut score = 0_u32;
+        let mut reasons = Vec::new();
+        if output_exists {
+            score += 100;
+            reasons.push("selected_repo_path.txt 既存");
+        }
+        if runtime_exists {
+            score += 10;
+            reasons.push("runtime 既存");
+        }
+        if name_hint {
+            score += 1;
+            reasons.push("exe名ヒント一致");
+        }
+        if reasons.is_empty() {
+            reasons.push("補助情報なし");
+        }
+
+        candidates.push(SelectedRepoPathCandidate {
+            source_slot: slot,
+            source_startup_exe: raw.trim().to_string(),
+            resolved_exe_path,
+            runtime_dir,
             output_file,
-            priority,
+            output_exists,
+            runtime_exists,
+            score,
+            score_reason: reasons.join(", "),
         });
     }
 
     candidates.sort_by(|left, right| {
-        left.priority.cmp(&right.priority).then_with(|| {
-            left.output_file
-                .to_string_lossy()
-                .cmp(&right.output_file.to_string_lossy())
-        })
+        right
+            .score
+            .cmp(&left.score)
+            .then_with(|| right.output_exists.cmp(&left.output_exists))
+            .then_with(|| right.runtime_exists.cmp(&left.runtime_exists))
+            .then_with(|| left.source_slot.cmp(&right.source_slot))
     });
-    candidates
-        .into_iter()
-        .find(|candidate| candidate.priority <= 2)
-        .map(|candidate| candidate.output_file)
+    (candidates, rejected)
 }
 
-fn save_selected_repo_path_from_startup_executables(
-    startup_executables: &[String],
+fn summarize_rejected_selected_repo_candidates(rejected: &[String]) -> String {
+    if rejected.is_empty() {
+        return "不採用理由なし".to_string();
+    }
+    const MAX_ITEMS: usize = 3;
+    let mut parts = rejected
+        .iter()
+        .take(MAX_ITEMS)
+        .cloned()
+        .collect::<Vec<_>>();
+    if rejected.len() > MAX_ITEMS {
+        parts.push(format!("他{}件", rejected.len() - MAX_ITEMS));
+    }
+    parts.join(" / ")
+}
+
+fn choose_selected_repo_path_candidate(
+    candidates: &[SelectedRepoPathCandidate],
+) -> Option<SelectedRepoPathCandidate> {
+    candidates.first().cloned()
+}
+
+fn validate_selected_repo_write_target(
+    candidate: &SelectedRepoPathCandidate,
     target_project_dir_path: &Path,
 ) -> Result<PathBuf> {
-    let output_file = resolve_selected_repo_path_output_file(startup_executables)
-        .ok_or_else(|| anyhow!("selected_repo_path.txt の書き込み先を解決できませんでした"))?;
-    let runtime_dir = output_file
-        .parent()
-        .ok_or_else(|| anyhow!("selected_repo_path.txt の親ディレクトリを解決できませんでした"))?;
-    fs::create_dir_all(runtime_dir).with_context(|| {
-        format!(
-            "selected_repo_path.txt 用 runtime ディレクトリ作成に失敗: {}",
-            runtime_dir.display()
-        )
-    })?;
+    if target_project_dir_path.as_os_str().is_empty() {
+        return Err(anyhow!("target_project_dir_path が空です"));
+    }
+
     let repo_path = if target_project_dir_path.is_absolute() {
         target_project_dir_path.to_path_buf()
     } else {
@@ -126,13 +211,88 @@ fn save_selected_repo_path_from_startup_executables(
             .context("カレントディレクトリ取得に失敗しました")?
             .join(target_project_dir_path)
     };
-    fs::write(&output_file, format!("{}\n", repo_path.display())).with_context(|| {
-        format!(
-            "selected_repo_path.txt への書き込みに失敗: {}",
-            output_file.display()
+    if repo_path.as_os_str().is_empty() {
+        return Err(anyhow!("書き込み対象のプロジェクトパス解決後に空になりました"));
+    }
+    if candidate
+        .output_file
+        .file_name()
+        .and_then(|name| name.to_str())
+        != Some("selected_repo_path.txt")
+    {
+        return Err(anyhow!(
+            "書き込み先ファイル名が不正です: {}",
+            candidate.output_file.display()
+        ));
+    }
+    let parent = candidate.output_file.parent().ok_or_else(|| {
+        anyhow!(
+            "selected_repo_path.txt の親ディレクトリを解決できません: {}",
+            candidate.output_file.display()
         )
     })?;
-    Ok(output_file)
+    if parent.as_os_str().is_empty() {
+        return Err(anyhow!(
+            "selected_repo_path.txt の親ディレクトリが空です: {}",
+            candidate.output_file.display()
+        ));
+    }
+    fs::create_dir_all(parent).with_context(|| {
+        format!(
+            "selected_repo_path.txt 用 runtime ディレクトリ作成に失敗: {}",
+            parent.display()
+        )
+    })?;
+    let metadata = fs::metadata(parent).with_context(|| {
+        format!(
+            "selected_repo_path.txt 用 runtime ディレクトリ確認に失敗: {}",
+            parent.display()
+        )
+    })?;
+    if !metadata.is_dir() {
+        return Err(anyhow!(
+            "selected_repo_path.txt の親がディレクトリではありません: {}",
+            parent.display()
+        ));
+    }
+    Ok(repo_path)
+}
+
+fn save_selected_repo_path_from_startup_executables(
+    startup_executables: &[String],
+    target_project_dir_path: &Path,
+) -> Result<SelectedRepoPathSaveReport> {
+    let (candidates, rejected) = collect_selected_repo_path_candidates(startup_executables);
+    let rejected_summary = summarize_rejected_selected_repo_candidates(&rejected);
+    let candidate_count = candidates.len();
+    let candidate = choose_selected_repo_path_candidate(&candidates).ok_or_else(|| {
+        anyhow!(
+            "selected_repo_path.txt の候補が見つかりません 候補数=0 不採用: {}",
+            rejected_summary
+        )
+    })?;
+    let repo_path = validate_selected_repo_write_target(&candidate, target_project_dir_path)?;
+
+    fs::write(&candidate.output_file, format!("{}\n", repo_path.display())).with_context(|| {
+        format!(
+            "selected_repo_path.txt への書き込みに失敗: {}",
+            candidate.output_file.display()
+        )
+    })?;
+
+    Ok(SelectedRepoPathSaveReport {
+        selected_startup_exe: format!("startup_exe_{}={}", candidate.source_slot, candidate.source_startup_exe),
+        selected_exe_path: candidate.resolved_exe_path,
+        output_file: candidate.output_file,
+        decision_summary: format!(
+            "score={} [{}] runtime={}",
+            candidate.score,
+            candidate.score_reason,
+            candidate.runtime_dir.display()
+        ),
+        candidate_count,
+        rejected_summary,
+    })
 }
 
 fn resolve_project_debug_executable_path(declaration_path: &Path) -> Result<PathBuf> {
@@ -533,7 +693,137 @@ fn spawn_listener_process(
                 current_exe.display(),
                 pipe_name.trim()
             )
-        })?;
+    })?;
     Ok(child)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn test_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn test_dir(prefix: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        std::env::temp_dir().join(format!("codex_shell_{prefix}_{nanos}"))
+    }
+
+    #[test]
+    fn save_selected_repo_path_single_runtime_candidate() {
+        let root = test_dir("single");
+        let exe_dir = root.join("tool").join("target").join("debug");
+        let runtime_dir = exe_dir.join("runtime");
+        fs::create_dir_all(&runtime_dir).expect("runtime dir");
+        let exe_path = exe_dir.join("tool.exe");
+        fs::write(&exe_path, "").expect("exe file");
+        let target_dir = root.join("project_a");
+        fs::create_dir_all(&target_dir).expect("target dir");
+
+        let report = save_selected_repo_path_from_startup_executables(
+            &[exe_path.to_string_lossy().into_owned()],
+            &target_dir,
+        )
+        .expect("save report");
+        assert_eq!(report.output_file, runtime_dir.join("selected_repo_path.txt"));
+        let body = fs::read_to_string(&report.output_file).expect("output body");
+        assert_eq!(body, format!("{}\n", target_dir.display()));
+    }
+
+    #[test]
+    fn prefer_candidate_with_existing_selected_repo_file() {
+        let root = test_dir("prefer_existing");
+        let exe_a_dir = root.join("a").join("target").join("debug");
+        let exe_b_dir = root.join("b").join("target").join("debug");
+        fs::create_dir_all(exe_a_dir.join("runtime")).expect("runtime a");
+        fs::create_dir_all(exe_b_dir.join("runtime")).expect("runtime b");
+        let exe_a = exe_a_dir.join("app_a.exe");
+        let exe_b = exe_b_dir.join("app_b.exe");
+        fs::write(&exe_a, "").expect("exe a");
+        fs::write(&exe_b, "").expect("exe b");
+        let b_output = exe_b_dir.join("runtime").join("selected_repo_path.txt");
+        fs::write(&b_output, "previous\n").expect("existing output");
+        let target_dir = root.join("project_b");
+        fs::create_dir_all(&target_dir).expect("target dir");
+
+        let report = save_selected_repo_path_from_startup_executables(
+            &[
+                exe_a.to_string_lossy().into_owned(),
+                exe_b.to_string_lossy().into_owned(),
+            ],
+            &target_dir,
+        )
+        .expect("save report");
+        assert_eq!(report.output_file, b_output);
+        assert!(report.decision_summary.contains("selected_repo_path.txt 既存"));
+    }
+
+    #[test]
+    fn reject_bridge_name_without_runtime() {
+        let root = test_dir("bridge_no_runtime");
+        let exe_dir = root
+            .join("codex_rollback_bridge")
+            .join("target")
+            .join("debug");
+        fs::create_dir_all(&exe_dir).expect("exe dir");
+        let exe_path = exe_dir.join("codex_rollback_bridge.exe");
+        fs::write(&exe_path, "").expect("exe file");
+        let target_dir = root.join("project_c");
+        fs::create_dir_all(&target_dir).expect("target dir");
+
+        let err = save_selected_repo_path_from_startup_executables(
+            &[exe_path.to_string_lossy().into_owned()],
+            &target_dir,
+        )
+        .expect_err("must fail");
+        assert!(
+            err.to_string().contains("候補が見つかりません"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn support_relative_startup_executable_path() {
+        let _guard = test_lock().lock().expect("lock");
+        let root = test_dir("relative");
+        let old_dir = std::env::current_dir().expect("current dir");
+        fs::create_dir_all(root.join("tools").join("runtime")).expect("runtime dir");
+        fs::write(root.join("tools").join("relative_tool.exe"), "").expect("exe file");
+        let target_dir = root.join("project_d");
+        fs::create_dir_all(&target_dir).expect("target dir");
+        std::env::set_current_dir(&root).expect("set current dir");
+
+        let result = save_selected_repo_path_from_startup_executables(
+            &[r"tools\relative_tool.exe".to_string()],
+            &target_dir,
+        );
+        std::env::set_current_dir(old_dir).expect("restore current dir");
+        let report = result.expect("save report");
+        assert_eq!(
+            report.output_file,
+            root.join("tools").join("runtime").join("selected_repo_path.txt")
+        );
+    }
+
+    #[test]
+    fn fail_with_rejection_summary_when_all_candidates_invalid() {
+        let root = test_dir("all_invalid");
+        let target_dir = root.join("project_e");
+        fs::create_dir_all(&target_dir).expect("target dir");
+        let err = save_selected_repo_path_from_startup_executables(
+            &["".to_string(), r".\missing\tool.exe".to_string()],
+            &target_dir,
+        )
+        .expect_err("must fail");
+        let text = err.to_string();
+        assert!(text.contains("候補数=0"), "unexpected error: {text}");
+        assert!(text.contains("不採用"), "unexpected error: {text}");
+    }
 }
 
