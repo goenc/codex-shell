@@ -308,10 +308,23 @@ impl UiDefinition {
             return;
         };
         for (slot, y) in auto_start_slot_layouts() {
+            let label_id = format!("lbl_settings_auto_start_exe_{}", slot + 1);
             let input_id = format!("input_settings_auto_start_exe_{}", slot + 1);
             let button_id = format!("btn_settings_auto_start_exe_{}_browse", slot + 1);
             let command = auto_start_input_command(slot);
             let browse_command = auto_start_browse_command(slot);
+            if !settings_objects.iter().any(|object| object.id == label_id) {
+                settings_objects.push(create_label_object(
+                    label_id.as_str(),
+                    auto_start_label_text(slot),
+                    100,
+                    24.0,
+                    y,
+                    120.0,
+                    24.0,
+                    "left",
+                ));
+            }
             if !settings_objects.iter().any(|object| object.id == input_id) {
                 settings_objects.push(create_input_object(
                     input_id.as_str(),
@@ -498,8 +511,19 @@ fn default_settings_screen() -> UiScreen {
         }
     }
     for (slot, y) in auto_start_slot_layouts() {
+        let label_id = format!("lbl_settings_auto_start_exe_{}", slot + 1);
         let input_id = format!("input_settings_auto_start_exe_{}", slot + 1);
         let button_id = format!("btn_settings_auto_start_exe_{}_browse", slot + 1);
+        objects.push(create_label_object(
+            label_id.as_str(),
+            auto_start_label_text(slot),
+            100,
+            24.0,
+            y,
+            120.0,
+            24.0,
+            "left",
+        ));
         objects.push(create_input_object(
             input_id.as_str(),
             auto_start_input_command(slot),
@@ -546,6 +570,16 @@ fn auto_start_browse_command(slot: usize) -> &'static str {
         1 => ui_tool::CONFIG_AUTO_START_EXE_2_BROWSE,
         2 => ui_tool::CONFIG_AUTO_START_EXE_3_BROWSE,
         3 => ui_tool::CONFIG_AUTO_START_EXE_4_BROWSE,
+        _ => "",
+    }
+}
+
+fn auto_start_label_text(slot: usize) -> &'static str {
+    match slot {
+        0 => "起動A",
+        1 => "起動B",
+        2 => "起動C",
+        3 => "起動D",
         _ => "",
     }
 }
