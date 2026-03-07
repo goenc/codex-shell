@@ -175,7 +175,7 @@ impl UiDefinition {
             self.screens.push(default_settings_screen());
         }
         self.ensure_input_send_button();
-        self.ensure_codex_exec_controls_in_settings();
+        self.ensure_codex_exec_controls_in_main();
         self.ensure_auto_start_controls_in_settings();
         ensure_project_target_move_button(self);
         self.objects.clear();
@@ -210,7 +210,7 @@ impl UiDefinition {
         ));
     }
 
-    fn ensure_codex_exec_controls_in_settings(&mut self) {
+    fn ensure_codex_exec_controls_in_main(&mut self) {
         let reasoning_commands = [
             ui_tool::REASONING_LOW,
             ui_tool::REASONING_MEDIUM,
@@ -218,6 +218,10 @@ impl UiDefinition {
             ui_tool::REASONING_XHIGH,
         ];
         let remove_ids = [
+            "lbl_main_model",
+            "cmb_main_model",
+            "lbl_main_reasoning_effort",
+            "cmb_main_reasoning_effort",
             "lbl_settings_model",
             "cmb_settings_model",
             "lbl_reasoning_effort",
@@ -237,6 +241,46 @@ impl UiDefinition {
                 !remove_ids.contains(&object.id.as_str())
                     && !reasoning_commands.contains(&object.bind.command.trim())
             });
+            main_objects.push(create_label_object(
+                "lbl_main_model",
+                "モデル",
+                100,
+                24.0,
+                18.0,
+                72.0,
+                28.0,
+                "left",
+            ));
+            main_objects.push(create_combo_object(
+                "cmb_main_model",
+                "モデルを選択",
+                ui_tool::CONFIG_MODEL,
+                110,
+                100.0,
+                18.0,
+                184.0,
+                28.0,
+            ));
+            main_objects.push(create_label_object(
+                "lbl_main_reasoning_effort",
+                "思考深度",
+                100,
+                300.0,
+                18.0,
+                96.0,
+                28.0,
+                "left",
+            ));
+            main_objects.push(create_combo_object(
+                "cmb_main_reasoning_effort",
+                "思考深度を選択",
+                ui_tool::CONFIG_MODEL_REASONING_EFFORT,
+                110,
+                396.0,
+                18.0,
+                104.0,
+                28.0,
+            ));
         }
 
         let Some(settings_objects) = self.screen_objects_mut(UI_SETTINGS_SCREEN_ID) else {
@@ -246,46 +290,6 @@ impl UiDefinition {
             !remove_ids.contains(&object.id.as_str())
                 && !reasoning_commands.contains(&object.bind.command.trim())
         });
-        settings_objects.push(create_label_object(
-            "lbl_settings_model",
-            "モデル",
-            100,
-            320.0,
-            18.0,
-            72.0,
-            28.0,
-            "left",
-        ));
-        settings_objects.push(create_combo_object(
-            "cmb_settings_model",
-            "モデルを選択",
-            ui_tool::CONFIG_MODEL,
-            110,
-            396.0,
-            18.0,
-            184.0,
-            28.0,
-        ));
-        settings_objects.push(create_label_object(
-            "lbl_settings_reasoning_effort",
-            "思考深度",
-            100,
-            596.0,
-            18.0,
-            96.0,
-            28.0,
-            "left",
-        ));
-        settings_objects.push(create_combo_object(
-            "cmb_settings_reasoning_effort",
-            "思考深度を選択",
-            ui_tool::CONFIG_MODEL_REASONING_EFFORT,
-            110,
-            692.0,
-            18.0,
-            104.0,
-            28.0,
-        ));
     }
 
     fn ensure_auto_start_controls_in_settings(&mut self) {
