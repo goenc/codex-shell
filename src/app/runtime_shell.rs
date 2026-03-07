@@ -18,8 +18,8 @@ use super::process_runtime;
 
 use ui_tool::{
     CONFIG_SAVE, INPUT_SEND, INPUT_VOICE_TOGGLE, MODE_PROJECT_DEBUG_RUN,
-    MODE_PROJECT_TARGET_MOVE, NAV_BACK_MAIN, REASONING_HIGH, REASONING_MEDIUM,
-    REASONING_XHIGH, UI_EDIT_TOGGLE, UI_SETTINGS, is_known_ui_command,
+    MODE_PROJECT_TARGET_MOVE, NAV_BACK_MAIN, REASONING_HIGH, REASONING_LOW,
+    REASONING_MEDIUM, REASONING_XHIGH, UI_EDIT_TOGGLE, UI_SETTINGS, is_known_ui_command,
 };
 
 const MAX_HISTORY: usize = 200;
@@ -52,6 +52,8 @@ const INPUT_COMMAND_ID_SALT: &str = "input_command_text_edit";
 const VOICE_INPUT_HOTKEY_LABEL: &str = "Ctrl+Alt+Right";
 const POWERSHELL_EXECUTABLE: &str = "pwsh.exe";
 const AUTO_START_SLOT_COUNT: usize = 4;
+const MODEL_CANDIDATES: [&str; 3] = ["gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.4"];
+const REASONING_EFFORT_CANDIDATES: [&str; 3] = ["low", "medium", "high"];
 #[cfg(windows)]
 const CREATE_NEW_CONSOLE_FLAG: u32 = 0x0000_0010;
 
@@ -173,7 +175,7 @@ impl UiDefinition {
             self.screens.push(default_settings_screen());
         }
         self.ensure_input_send_button();
-        self.relocate_reasoning_controls_to_settings();
+        self.ensure_codex_exec_controls_in_settings();
         self.ensure_auto_start_controls_in_settings();
         ensure_project_target_move_button(self);
         self.objects.clear();
@@ -208,25 +210,31 @@ impl UiDefinition {
         ));
     }
 
-    fn relocate_reasoning_controls_to_settings(&mut self) {
+    fn ensure_codex_exec_controls_in_settings(&mut self) {
         let reasoning_commands = [
+            ui_tool::REASONING_LOW,
             ui_tool::REASONING_MEDIUM,
             ui_tool::REASONING_HIGH,
             ui_tool::REASONING_XHIGH,
         ];
-        let reasoning_ids = [
+        let remove_ids = [
+            "lbl_settings_model",
+            "cmb_settings_model",
             "lbl_reasoning_effort",
             "lbl_settings_reasoning_effort",
+            "cmb_settings_reasoning_effort",
             "radio_reasoning_medium",
             "radio_reasoning_high",
             "radio_reasoning_xhigh",
+            "radio_reasoning_low",
             "radio_settings_reasoning_medium",
             "radio_settings_reasoning_high",
             "radio_settings_reasoning_xhigh",
+            "radio_settings_reasoning_low",
         ];
         if let Some(main_objects) = self.screen_objects_mut(UI_MAIN_SCREEN_ID) {
             main_objects.retain(|object| {
-                !reasoning_ids.contains(&object.id.as_str())
+                !remove_ids.contains(&object.id.as_str())
                     && !reasoning_commands.contains(&object.bind.command.trim())
             });
         }
@@ -234,73 +242,50 @@ impl UiDefinition {
         let Some(settings_objects) = self.screen_objects_mut(UI_SETTINGS_SCREEN_ID) else {
             return;
         };
-        let has_label = settings_objects.iter().any(|object| {
-            object.id == "lbl_settings_reasoning_effort" || object.id == "lbl_reasoning_effort"
+        settings_objects.retain(|object| {
+            !remove_ids.contains(&object.id.as_str())
+                && !reasoning_commands.contains(&object.bind.command.trim())
         });
-        let has_medium = settings_objects
-            .iter()
-            .any(|object| object.bind.command.trim() == ui_tool::REASONING_MEDIUM);
-        let has_high = settings_objects
-            .iter()
-            .any(|object| object.bind.command.trim() == ui_tool::REASONING_HIGH);
-        let has_xhigh = settings_objects
-            .iter()
-            .any(|object| object.bind.command.trim() == ui_tool::REASONING_XHIGH);
-
-        if !has_label {
-            settings_objects.push(create_label_object(
-                "lbl_settings_reasoning_effort",
-                "思考深度",
-                100,
-                320.0,
-                18.0,
-                72.0,
-                28.0,
-                "left",
-            ));
-        }
-        if !has_medium {
-            settings_objects.push(create_radio_object(
-                "radio_settings_reasoning_medium",
-                "medium",
-                ui_tool::REASONING_MEDIUM,
-                "reasoning_effort",
-                true,
-                110,
-                396.0,
-                18.0,
-                78.0,
-                28.0,
-            ));
-        }
-        if !has_high {
-            settings_objects.push(create_radio_object(
-                "radio_settings_reasoning_high",
-                "high",
-                ui_tool::REASONING_HIGH,
-                "reasoning_effort",
-                false,
-                110,
-                482.0,
-                18.0,
-                66.0,
-                28.0,
-            ));
-        }
-        if !has_xhigh {
-            settings_objects.push(create_radio_object(
-                "radio_settings_reasoning_xhigh",
-                "xhigh",
-                ui_tool::REASONING_XHIGH,
-                "reasoning_effort",
-                false,
-                110,
-                556.0,
-                18.0,
-                72.0,
-                28.0,
-            ));
-        }
+        settings_objects.push(create_label_object(
+            "lbl_settings_model",
+            "モデル",
+            100,
+            320.0,
+            18.0,
+            72.0,
+            28.0,
+            "left",
+        ));
+        settings_objects.push(create_combo_object(
+            "cmb_settings_model",
+            "モデルを選択",
+            ui_tool::CONFIG_MODEL,
+            110,
+            396.0,
+            18.0,
+            184.0,
+            28.0,
+        ));
+        settings_objects.push(create_label_object(
+            "lbl_settings_reasoning_effort",
+            "思考深度",
+            100,
+            596.0,
+            18.0,
+            96.0,
+            28.0,
+            "left",
+        ));
+        settings_objects.push(create_combo_object(
+            "cmb_settings_reasoning_effort",
+            "思考深度を選択",
+            ui_tool::CONFIG_MODEL_REASONING_EFFORT,
+            110,
+            692.0,
+            18.0,
+            104.0,
+            28.0,
+        ));
     }
 
     fn ensure_auto_start_controls_in_settings(&mut self) {
@@ -719,12 +704,10 @@ fn create_checkbox_object(
     }
 }
 
-fn create_radio_object(
+fn create_combo_object(
     id: &str,
     text: &str,
     command: &str,
-    group: &str,
-    checked: bool,
     z_index: i32,
     x: f32,
     y: f32,
@@ -733,16 +716,16 @@ fn create_radio_object(
 ) -> UiObject {
     UiObject {
         id: id.to_string(),
-        object_type: "radio".to_string(),
+        object_type: "combo_box".to_string(),
         z_index,
-        checked,
+        checked: false,
         position: UiPosition { x, y },
         size: UiSize { w, h },
         visible: true,
         enabled: true,
         bind: UiBind {
             command: command.to_string(),
-            group: group.to_string(),
+            group: String::new(),
         },
         visual: UiVisual {
             text: UiText {
@@ -944,6 +927,7 @@ struct CodexShellApp {
     ui_selected_screen_id: String,
     ui_selected_object_id: String,
     ui_selected_object_ids: Vec<String>,
+    selected_model: String,
     selected_reasoning_effort: String,
     input_command: String,
     status_message: String,
@@ -1001,6 +985,7 @@ impl CodexShellApp {
         } else {
             vec![ui_selected_object_id.clone()]
         };
+        let selected_model = load_model();
         let selected_reasoning_effort = load_reasoning_effort();
 
         let mut app = Self {
@@ -1016,6 +1001,7 @@ impl CodexShellApp {
             ui_selected_screen_id: UI_MAIN_SCREEN_ID.to_string(),
             ui_selected_object_id,
             ui_selected_object_ids,
+            selected_model,
             selected_reasoning_effort,
             input_command: String::new(),
             status_message: "待機中".to_string(),
@@ -1667,9 +1653,10 @@ impl CodexShellApp {
     fn runtime_checked_for_command(&self, command: &str) -> Option<bool> {
         match command.trim() {
             ui_tool::UI_EDIT_TOGGLE => Some(self.ui_edit_mode),
+            ui_tool::REASONING_LOW => Some(self.selected_reasoning_effort == "low"),
             ui_tool::REASONING_MEDIUM => Some(self.selected_reasoning_effort == "medium"),
             ui_tool::REASONING_HIGH => Some(self.selected_reasoning_effort == "high"),
-            ui_tool::REASONING_XHIGH => Some(self.selected_reasoning_effort == "xhigh"),
+            ui_tool::REASONING_XHIGH => Some(self.selected_reasoning_effort == "high"),
             _ => None,
         }
     }
@@ -1687,9 +1674,10 @@ impl CodexShellApp {
         for object in objects {
             let desired = match object.bind.command.trim() {
                 ui_tool::UI_EDIT_TOGGLE => Some(ui_edit_mode),
+                ui_tool::REASONING_LOW => Some(selected_reasoning_effort == "low"),
                 ui_tool::REASONING_MEDIUM => Some(selected_reasoning_effort == "medium"),
                 ui_tool::REASONING_HIGH => Some(selected_reasoning_effort == "high"),
-                ui_tool::REASONING_XHIGH => Some(selected_reasoning_effort == "xhigh"),
+                ui_tool::REASONING_XHIGH => Some(selected_reasoning_effort == "high"),
                 _ => None,
             };
             if let Some(desired_checked) = desired && object.checked != desired_checked {
@@ -1790,6 +1778,23 @@ impl CodexShellApp {
         self.save_config();
     }
 
+    fn handle_model(&mut self, model: &str) {
+        if self.selected_model == model {
+            return;
+        }
+        match update_model(model) {
+            Ok(()) => {
+                self.selected_model = model.to_string();
+                self.update_status(format!("モデルを {model} に設定しました"));
+                self.push_history(format!("config.toml を更新しました: model = \"{model}\""));
+            }
+            Err(err) => {
+                self.update_status(format!("config.toml 更新失敗: {err}"));
+                self.push_history(format!("config.toml 更新失敗: {err}"));
+            }
+        }
+    }
+
     fn handle_reasoning_effort(&mut self, effort: &str) {
         if self.selected_reasoning_effort == effort {
             return;
@@ -1875,9 +1880,10 @@ impl CodexShellApp {
             ui_tool::CONFIG_AUTO_START_EXE_2_BROWSE => self.handle_auto_start_exe_browse(1),
             ui_tool::CONFIG_AUTO_START_EXE_3_BROWSE => self.handle_auto_start_exe_browse(2),
             ui_tool::CONFIG_AUTO_START_EXE_4_BROWSE => self.handle_auto_start_exe_browse(3),
+            REASONING_LOW => self.handle_reasoning_effort("low"),
             REASONING_MEDIUM => self.handle_reasoning_effort("medium"),
             REASONING_HIGH => self.handle_reasoning_effort("high"),
-            REASONING_XHIGH => self.handle_reasoning_effort("xhigh"),
+            REASONING_XHIGH => self.handle_reasoning_effort("high"),
             UI_EDIT_TOGGLE => self.handle_ui_edit_toggle(),
             other => self.handle_unknown_ui_command(other),
         }
@@ -2167,6 +2173,109 @@ impl CodexShellApp {
         }
     }
 
+    fn render_obj_codex_config_combo_box(&mut self, ctx: &mut RenderObjCtx<'_>) {
+        let enabled = ctx.controls_enabled
+            && ctx.object.enabled
+            && self.is_bind_command_enabled(ctx.object_command);
+        let fixed_width = ctx.object_size.x.max(12.0);
+        let placeholder_text = ctx.object.visual.text.value.trim();
+        let id_salt = ("codex_config_combo_box", ctx.object_id);
+
+        match ctx.object_command {
+            ui_tool::CONFIG_MODEL => {
+                let mut selected_model = self.selected_model.clone();
+                let selected_text = if selected_model.is_empty() {
+                    if placeholder_text.is_empty() {
+                        MODEL_CANDIDATES[0].to_string()
+                    } else {
+                        placeholder_text.to_string()
+                    }
+                } else {
+                    selected_model.clone()
+                };
+                ctx.ui.add_enabled_ui(enabled, |ui| {
+                    ui.allocate_ui_with_layout(
+                        ctx.object_size,
+                        egui::Layout::left_to_right(egui::Align::Center),
+                        |ui| {
+                            ui.style_mut()
+                                .text_styles
+                                .insert(egui::TextStyle::Button, ctx.text_font.clone());
+                            ui.style_mut()
+                                .text_styles
+                                .insert(egui::TextStyle::Body, ctx.text_font.clone());
+                            ui.spacing_mut().combo_width = fixed_width;
+                            ui.spacing_mut().interact_size.y = ctx.object_size.y.max(18.0);
+                            ui.set_min_width(fixed_width);
+                            ui.set_max_width(fixed_width);
+                            egui::ComboBox::from_id_salt(id_salt)
+                                .width(fixed_width)
+                                .selected_text(selected_text)
+                                .show_ui(ui, |ui| {
+                                    for model in MODEL_CANDIDATES {
+                                        ui.selectable_value(
+                                            &mut selected_model,
+                                            model.to_string(),
+                                            model,
+                                        );
+                                    }
+                                });
+                        },
+                    );
+                });
+                if selected_model != self.selected_model {
+                    self.handle_model(&selected_model);
+                }
+            }
+            ui_tool::CONFIG_MODEL_REASONING_EFFORT => {
+                let mut selected_effort = self.selected_reasoning_effort.clone();
+                let selected_text = if selected_effort.is_empty() {
+                    if placeholder_text.is_empty() {
+                        REASONING_EFFORT_CANDIDATES[1].to_string()
+                    } else {
+                        placeholder_text.to_string()
+                    }
+                } else {
+                    selected_effort.clone()
+                };
+                ctx.ui.add_enabled_ui(enabled, |ui| {
+                    ui.allocate_ui_with_layout(
+                        ctx.object_size,
+                        egui::Layout::left_to_right(egui::Align::Center),
+                        |ui| {
+                            ui.style_mut()
+                                .text_styles
+                                .insert(egui::TextStyle::Button, ctx.text_font.clone());
+                            ui.style_mut()
+                                .text_styles
+                                .insert(egui::TextStyle::Body, ctx.text_font.clone());
+                            ui.spacing_mut().combo_width = fixed_width;
+                            ui.spacing_mut().interact_size.y = ctx.object_size.y.max(18.0);
+                            ui.set_min_width(fixed_width);
+                            ui.set_max_width(fixed_width);
+                            egui::ComboBox::from_id_salt(id_salt)
+                                .width(fixed_width)
+                                .selected_text(selected_text)
+                                .show_ui(ui, |ui| {
+                                    for effort in REASONING_EFFORT_CANDIDATES {
+                                        ui.selectable_value(
+                                            &mut selected_effort,
+                                            effort.to_string(),
+                                            effort,
+                                        );
+                                    }
+                                });
+                        },
+                    );
+                });
+                if selected_effort != self.selected_reasoning_effort {
+                    self.handle_reasoning_effort(&selected_effort);
+                }
+            }
+            _ => self.render_obj_project_combo_box(ctx),
+        }
+    }
+
     fn render_obj_checkbox(&self, ctx: &mut RenderObjCtx<'_>) -> Option<bool> {
         let text = self.resolve_object_text(ctx.object);
         let enabled = ctx.controls_enabled
@@ -2259,7 +2368,7 @@ impl CodexShellApp {
             "input" => self.render_obj_input(ctx, state_changed),
             "image" => self.render_obj_image(ctx),
             "combo_box" | "combobox" | "project_dropdown" | "dropdown" => {
-                self.render_obj_project_combo_box(ctx)
+                self.render_obj_codex_config_combo_box(ctx)
             }
             "checkbox" => {
                 *checkbox_changed = self.render_obj_checkbox(ctx);
@@ -3165,29 +3274,56 @@ fn apply_visual_fix(ctx: &egui::Context) {
     });
 }
 
-fn load_reasoning_effort() -> String {
-    let config_path = Path::new(CODEX_CONFIG_PATH);
-    let Ok(current) = fs::read_to_string(config_path) else {
-        return "medium".to_string();
-    };
-    let Ok(verify_pattern) = Regex::new(r#"model_reasoning_effort\s*=\s*"(.*?)""#) else {
-        return "medium".to_string();
-    };
-    for captures in verify_pattern.captures_iter(&current) {
-        if let Some(value) = captures.get(1).map(|m| m.as_str())
-            && matches!(value, "medium" | "high" | "xhigh")
-        {
-            return value.to_string();
-        }
-    }
-    "medium".to_string()
+fn is_valid_model(model: &str) -> bool {
+    MODEL_CANDIDATES.contains(&model)
 }
 
-fn update_reasoning_effort(selected: &str) -> Result<(), String> {
-    if !matches!(selected, "medium" | "high" | "xhigh") {
-        return Err(format!("不正な思考深度です: {selected}"));
-    }
+fn is_valid_reasoning_effort(effort: &str) -> bool {
+    REASONING_EFFORT_CANDIDATES.contains(&effort)
+}
 
+fn load_codex_config_value(key: &str) -> Option<String> {
+    let config_path = Path::new(CODEX_CONFIG_PATH);
+    let current = fs::read_to_string(config_path).ok()?;
+    let pattern = Regex::new(
+        format!(
+            r#"(?m)^\s*{}\s*=\s*"(.*?)"\s*$"#,
+            regex::escape(key)
+        )
+        .as_str(),
+    )
+    .ok()?;
+    pattern
+        .captures_iter(&current)
+        .filter_map(|captures| captures.get(1).map(|m| m.as_str().to_string()))
+        .next()
+}
+
+fn load_model() -> String {
+    let Some(model) = load_codex_config_value("model") else {
+        return MODEL_CANDIDATES[0].to_string();
+    };
+    if is_valid_model(&model) {
+        model
+    } else {
+        MODEL_CANDIDATES[0].to_string()
+    }
+}
+
+fn load_reasoning_effort() -> String {
+    let Some(effort) = load_codex_config_value("model_reasoning_effort") else {
+        return "medium".to_string();
+    };
+    if is_valid_reasoning_effort(&effort) {
+        effort
+    } else if effort == "xhigh" {
+        "high".to_string()
+    } else {
+        "medium".to_string()
+    }
+}
+
+fn update_codex_config_key(key: &str, value: &str) -> Result<(), String> {
     let config_path = Path::new(CODEX_CONFIG_PATH);
     let backup_path = Path::new(CODEX_CONFIG_BACKUP_PATH);
 
@@ -3224,9 +3360,11 @@ fn update_reasoning_effort(selected: &str) -> Result<(), String> {
         )
     })?;
 
-    let key_pattern = Regex::new(r#"model_reasoning_effort\s*=\s*".*?""#)
-        .map_err(|err| format!("正規表現の構築に失敗しました: {err}"))?;
-    let replacement = format!(r#"model_reasoning_effort = "{selected}""#);
+    let key_pattern = Regex::new(
+        format!(r#"(?m)^\s*{}\s*=\s*".*?"\s*$"#, regex::escape(key)).as_str(),
+    )
+    .map_err(|err| format!("正規表現の構築に失敗しました: {err}"))?;
+    let replacement = format!(r#"{key} = "{value}""#);
 
     let updated = if key_pattern.is_match(&current) {
         key_pattern
@@ -3255,19 +3393,39 @@ fn update_reasoning_effort(selected: &str) -> Result<(), String> {
             config_path.display()
         )
     })?;
-    let verify_pattern = Regex::new(r#"model_reasoning_effort\s*=\s*"(.*?)""#)
-        .map_err(|err| format!("確認用正規表現の構築に失敗しました: {err}"))?;
+    let verify_pattern = Regex::new(
+        format!(
+            r#"(?m)^\s*{}\s*=\s*"(.*?)"\s*$"#,
+            regex::escape(key)
+        )
+        .as_str(),
+    )
+    .map_err(|err| format!("確認用正規表現の構築に失敗しました: {err}"))?;
     let reflected = verify_pattern
         .captures_iter(&verified)
         .filter_map(|caps| caps.get(1).map(|m| m.as_str()))
-        .any(|value| value == selected);
+        .any(|v| v == value);
     if !reflected {
         return Err(format!(
-            "更新後確認に失敗しました: model_reasoning_effort が {selected} ではありません"
+            "更新後確認に失敗しました: {key} が {value} ではありません"
         ));
     }
 
     Ok(())
+}
+
+fn update_model(selected: &str) -> Result<(), String> {
+    if !is_valid_model(selected) {
+        return Err(format!("不正なモデルです: {selected}"));
+    }
+    update_codex_config_key("model", selected)
+}
+
+fn update_reasoning_effort(selected: &str) -> Result<(), String> {
+    if !is_valid_reasoning_effort(selected) {
+        return Err(format!("不正な思考深度です: {selected}"));
+    }
+    update_codex_config_key("model_reasoning_effort", selected)
 }
 
 pub(crate) fn run() -> Result<()> {

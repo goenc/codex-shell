@@ -7,9 +7,12 @@ pub const INPUT_VOICE_TOGGLE: &str = "input.voice_toggle";
 pub const UI_SETTINGS: &str = "ui.settings";
 pub const NAV_BACK_MAIN: &str = "nav.back_main";
 pub const UI_EDIT_TOGGLE: &str = "ui.edit.toggle";
+pub const REASONING_LOW: &str = "reasoning.low";
 pub const REASONING_MEDIUM: &str = "reasoning.medium";
 pub const REASONING_HIGH: &str = "reasoning.high";
 pub const REASONING_XHIGH: &str = "reasoning.xhigh";
+pub const CONFIG_MODEL: &str = "config.model";
+pub const CONFIG_MODEL_REASONING_EFFORT: &str = "config.model_reasoning_effort";
 pub const CONFIG_WORKING_DIR: &str = "config.working_dir";
 pub const CONFIG_AUTO_START_EXE_1: &str = "config.auto_start_exe.1";
 pub const CONFIG_AUTO_START_EXE_2: &str = "config.auto_start_exe.2";
@@ -31,9 +34,12 @@ pub const ALL_UI_COMMANDS: &[&str] = &[
     UI_SETTINGS,
     NAV_BACK_MAIN,
     UI_EDIT_TOGGLE,
+    REASONING_LOW,
     REASONING_MEDIUM,
     REASONING_HIGH,
     REASONING_XHIGH,
+    CONFIG_MODEL,
+    CONFIG_MODEL_REASONING_EFFORT,
     CONFIG_WORKING_DIR,
     CONFIG_AUTO_START_EXE_1,
     CONFIG_AUTO_START_EXE_2,
