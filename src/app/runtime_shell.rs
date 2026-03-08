@@ -73,7 +73,7 @@ const AUTO_START_SLOT_COUNT: usize = 4;
 const MODEL_CANDIDATES: [&str; 3] = ["gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.4"];
 const REASONING_EFFORT_CANDIDATES: [&str; 4] = ["low", "medium", "high", "xhigh"];
 #[cfg(windows)]
-const CREATE_NEW_CONSOLE_FLAG: u32 = 0x0000_0010;
+const CREATE_NO_WINDOW_FLAG: u32 = 0x0800_0000;
 
 #[cfg(windows)]
 #[derive(Default)]
@@ -730,7 +730,7 @@ impl CodexShellApp {
             .stderr(Stdio::piped());
         #[cfg(windows)]
         {
-            command.creation_flags(CREATE_NEW_CONSOLE_FLAG);
+            command.creation_flags(CREATE_NO_WINDOW_FLAG);
         }
 
         match command.spawn() {
@@ -757,7 +757,9 @@ impl CodexShellApp {
                 spawn_powershell_stream_reader(stdout, false, tx.clone());
                 spawn_powershell_stream_reader(stderr, true, tx);
                 #[cfg(windows)]
-                if let Err(err) = disable_window_close_button_for_pid(child.id()) {
+                if find_visible_window_by_pid(child.id()).is_some()
+                    && let Err(err) = disable_window_close_button_for_pid(child.id())
+                {
                     self.push_history(format!("PowerShell閉じるボタン無効化失敗: {err}"));
                 }
                 self.powershell_session = Some(PowerShellSession {
@@ -1758,6 +1760,8 @@ impl CodexShellApp {
             + 1;
         let editor_height = (output_line_count.max(CODEX_OUTPUT_LINE_COUNT) as f32 * row_height)
             + FIXED_INPUT_HEIGHT_PADDING;
+        let mut codex_output_display_text =
+            decorate_codex_output_display_lines(&self.codex_output_text);
 
         egui::Frame::default()
             .fill(Color32::from_gray(242))
@@ -1775,7 +1779,7 @@ impl CodexShellApp {
                                 (ctx.object_size.x - 8.0).max(1.0),
                                 editor_height.max(visible_height),
                             ],
-                            TextEdit::multiline(&mut self.codex_output_text)
+                            TextEdit::multiline(&mut codex_output_display_text)
                                 .id_source(CODEX_OUTPUT_TEXT_EDIT_ID_SALT)
                                 .font(output_font_id)
                                 .interactive(false)
@@ -2610,6 +2614,16 @@ fn is_codex_output_noise_line(line: &str) -> bool {
         || lowered.contains("elapsed")
         || lowered.starts_with("stdout")
         || lowered.starts_with("stderr")
+}
+
+fn decorate_codex_output_display_lines(text: &str) -> String {
+    if text.is_empty() {
+        return String::new();
+    }
+    text.lines()
+        .map(|line| format!("- {}", line))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn unix_timestamp() -> String {
