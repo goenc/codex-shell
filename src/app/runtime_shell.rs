@@ -66,6 +66,7 @@ const CODEX_OUTPUT_RUNTIME_LOG_DIR_RELATIVE_PATH: &str = "runtime/codex_output_l
 const CODEX_OUTPUT_RELOAD_CHECK_INTERVAL_MS: u64 = 250;
 const CODEX_STREAM_BEGIN_MARKER: &str = "__CODEX_STREAM_BEGIN__";
 const CODEX_STREAM_END_MARKER: &str = "__CODEX_STREAM_END__";
+const CODEX_TURN_SEPARATOR: &str = "--------------------------------------------------------------------------------------------------------------------------------------------------------";
 const VOICE_INPUT_HOTKEY_LABEL: &str = "Ctrl+Alt+Right";
 const POWERSHELL_EXECUTABLE: &str = "pwsh.exe";
 const AUTO_START_SLOT_COUNT: usize = 4;
@@ -841,9 +842,16 @@ impl CodexShellApp {
                 self.codex_output_streaming_active = true;
                 self.codex_output_text.clear();
                 self.start_codex_output_runtime_log();
+                self.codex_output_text.push_str(CODEX_TURN_SEPARATOR);
+                self.append_codex_output_runtime_log_line(CODEX_TURN_SEPARATOR);
                 continue;
             }
             if trimmed == CODEX_STREAM_END_MARKER {
+                if !self.codex_output_text.is_empty() {
+                    self.codex_output_text.push('\n');
+                }
+                self.codex_output_text.push_str(CODEX_TURN_SEPARATOR);
+                self.append_codex_output_runtime_log_line(CODEX_TURN_SEPARATOR);
                 self.codex_output_streaming_active = false;
                 self.codex_output_runtime_log_path = None;
                 continue;
