@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, anyhow};
+use rfd::FileDialog;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
 use windows::Win32::Foundation::{CloseHandle, GetLastError, HANDLE};
@@ -152,77 +152,13 @@ pub(crate) fn terminate_running_executable(path: &str) -> Result<usize> {
 }
 
 pub(crate) fn select_executable_file_path() -> Result<Option<String>> {
-    let script = r#"
-Add-Type -AssemblyName System.Windows.Forms
-$dialog = New-Object System.Windows.Forms.OpenFileDialog
-$dialog.Filter = "Executable Files (*.exe)|*.exe"
-$dialog.CheckFileExists = $true
-$dialog.Multiselect = $false
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-  [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-  Write-Output $dialog.FileName
-}
-"#;
-    let output = Command::new("powershell.exe")
-        .arg("-NoProfile")
-        .arg("-Command")
-        .arg(script)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .context("実行ファイル参照ダイアログ起動に失敗")?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        if stderr.is_empty() {
-            return Err(anyhow!(
-                "実行ファイル参照ダイアログが失敗しました: {}",
-                output.status
-            ));
-        }
-        return Err(anyhow!(
-            "実行ファイル参照ダイアログが失敗しました: {stderr}"
-        ));
-    }
-    let selected = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if selected.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(selected))
-    }
+    let selected = FileDialog::new()
+        .add_filter("Executable Files (*.exe)", &["exe"])
+        .pick_file();
+    Ok(selected.map(|path| path.to_string_lossy().into_owned()))
 }
 
 pub(crate) fn select_directory_path() -> Result<Option<String>> {
-    let script = r#"
-Add-Type -AssemblyName System.Windows.Forms
-$dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-$dialog.ShowNewFolderButton = $true
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-  [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-  Write-Output $dialog.SelectedPath
-}
-"#;
-    let output = Command::new("powershell.exe")
-        .arg("-NoProfile")
-        .arg("-Command")
-        .arg(script)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .context("フォルダ参照ダイアログ起動に失敗")?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        if stderr.is_empty() {
-            return Err(anyhow!(
-                "フォルダ参照ダイアログが失敗しました: {}",
-                output.status
-            ));
-        }
-        return Err(anyhow!("フォルダ参照ダイアログが失敗しました: {stderr}"));
-    }
-    let selected = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if selected.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(selected))
-    }
+    let selected = FileDialog::new().pick_folder();
+    Ok(selected.map(|path| path.to_string_lossy().into_owned()))
 }
