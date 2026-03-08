@@ -1169,6 +1169,7 @@ impl CodexShellApp {
         let command = format!("cd \"{escaped}\"");
         if self.send_text_to_powershell(&command) {
             self.moved_project_highlight_key = self.selected_project_highlight_key();
+            self.sync_selected_project_path_bridge_file();
             self.update_status(format!(
                 "PowerShell作業フォルダを移動しました: {target_dir_text}"
             ));
@@ -1920,7 +1921,6 @@ impl CodexShellApp {
         if selected_index != self.project_selected_index {
             self.project_selected_index = selected_index;
             self.sync_selected_project_target_dir();
-            self.sync_selected_project_path_bridge_file();
         }
     }
 
