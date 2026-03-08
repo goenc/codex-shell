@@ -93,15 +93,6 @@ fn process_image_path(pid: u32) -> Option<PathBuf> {
     )))
 }
 
-fn process_entry_executable_name(entry: &PROCESSENTRY32W) -> String {
-    let len = entry
-        .szExeFile
-        .iter()
-        .position(|value| *value == 0)
-        .unwrap_or(entry.szExeFile.len());
-    String::from_utf16_lossy(&entry.szExeFile[..len])
-}
-
 fn find_process_ids_by_executable(path: &Path) -> Result<Vec<u32>> {
     let target = normalize_path_for_dedup(path);
     let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) }
@@ -122,38 +113,6 @@ fn find_process_ids_by_executable(path: &Path) -> Result<Vec<u32>> {
         has_entry = unsafe { Process32NextW(snapshot, &mut entry).is_ok() };
     }
     close_handle(snapshot);
-    Ok(process_ids)
-}
-
-pub(crate) fn find_child_process_ids_by_executable_name(
-    parent_pid: u32,
-    executable_name: &str,
-) -> Result<Vec<u32>> {
-    let normalized_target = executable_name.trim().to_ascii_lowercase();
-    if normalized_target.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) }
-        .context("プロセススナップショット取得に失敗")?;
-    let mut process_ids = Vec::new();
-    let mut entry = PROCESSENTRY32W {
-        dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
-        ..Default::default()
-    };
-
-    let mut has_entry = unsafe { Process32FirstW(snapshot, &mut entry).is_ok() };
-    while has_entry {
-        if entry.th32ParentProcessID == parent_pid {
-            let process_name = process_entry_executable_name(&entry).to_ascii_lowercase();
-            if process_name == normalized_target {
-                process_ids.push(entry.th32ProcessID);
-            }
-        }
-        has_entry = unsafe { Process32NextW(snapshot, &mut entry).is_ok() };
-    }
-    close_handle(snapshot);
-
     Ok(process_ids)
 }
 

@@ -66,8 +66,6 @@ const CODEX_OUTPUT_RUNTIME_LOG_DIR_RELATIVE_PATH: &str = "runtime/codex_output_l
 const CODEX_OUTPUT_RELOAD_CHECK_INTERVAL_MS: u64 = 250;
 const CODEX_STREAM_BEGIN_MARKER: &str = "__CODEX_STREAM_BEGIN__";
 const CODEX_STREAM_END_MARKER: &str = "__CODEX_STREAM_END__";
-const CODEX_EXECUTABLE_NAME: &str = "codex.exe";
-const CODEX_CHILD_DETECT_GRACE_MS: u64 = 2000;
 const CODEX_TURN_SEPARATOR: &str = "--------------------------------------------------------------------------------------------------------------------------------------------------------";
 const VOICE_INPUT_HOTKEY_LABEL: &str = "Ctrl+Alt+Right";
 const POWERSHELL_EXECUTABLE: &str = "pwsh.exe";
@@ -519,8 +517,6 @@ struct CodexShellApp {
     codex_output_last_reload_check: Instant,
     codex_output_waiting_stderr_body: bool,
     is_codex_running: bool,
-    codex_running_started_at: Option<Instant>,
-    codex_child_observed: bool,
 }
 
 struct RenderObjCtx<'a> {
@@ -631,8 +627,6 @@ impl CodexShellApp {
             codex_output_last_reload_check: Instant::now(),
             codex_output_waiting_stderr_body: false,
             is_codex_running: false,
-            codex_running_started_at: None,
-            codex_child_observed: false,
         };
 
         app.push_history(format!(
@@ -814,48 +808,11 @@ impl CodexShellApp {
     }
 
     fn set_codex_running_state(&mut self, running: bool) {
-        if running {
-            self.is_codex_running = true;
-            self.codex_running_started_at = Some(Instant::now());
-            self.codex_child_observed = false;
-        } else {
-            self.clear_codex_running_state();
-        }
+        self.is_codex_running = running;
     }
 
     fn clear_codex_running_state(&mut self) {
         self.is_codex_running = false;
-        self.codex_running_started_at = None;
-        self.codex_child_observed = false;
-    }
-
-    fn refresh_codex_running_state(&mut self) {
-        if !self.is_codex_running {
-            return;
-        }
-        let Some(session) = self.powershell_session.as_ref() else {
-            self.clear_codex_running_state();
-            return;
-        };
-        let child_pids = process_runtime::find_child_process_ids_by_executable_name(
-            session.process.id(),
-            CODEX_EXECUTABLE_NAME,
-        )
-        .unwrap_or_default();
-        if !child_pids.is_empty() {
-            self.codex_child_observed = true;
-            return;
-        }
-        if !self.codex_child_observed
-            && self
-                .codex_running_started_at
-                .is_some_and(|started| {
-                    started.elapsed() < Duration::from_millis(CODEX_CHILD_DETECT_GRACE_MS)
-                })
-        {
-            return;
-        }
-        self.clear_codex_running_state();
     }
 
     fn start_codex_output_runtime_log(&mut self) {
@@ -916,6 +873,7 @@ impl CodexShellApp {
                 self.append_codex_output_runtime_log_line(CODEX_TURN_SEPARATOR);
                 self.codex_output_streaming_active = false;
                 self.codex_output_runtime_log_path = None;
+                self.clear_codex_running_state();
                 continue;
             }
             if !self.codex_output_streaming_active {
@@ -2170,6 +2128,21 @@ impl CodexShellApp {
             rich = rich.color(Color32::from_gray(140));
         }
         let response = ctx.ui.scope(|ui| {
+            if ctx.object_command == ui_tool::INPUT_SEND && self.is_codex_running {
+                let orange = Color32::from_rgb(245, 173, 89);
+                let orange_active = Color32::from_rgb(232, 154, 64);
+                let visuals = &mut ui.style_mut().visuals;
+                visuals.widgets.noninteractive.weak_bg_fill = orange;
+                visuals.widgets.noninteractive.bg_fill = orange;
+                visuals.widgets.inactive.weak_bg_fill = orange;
+                visuals.widgets.inactive.bg_fill = orange;
+                visuals.widgets.hovered.weak_bg_fill = orange;
+                visuals.widgets.hovered.bg_fill = orange;
+                visuals.widgets.active.weak_bg_fill = orange_active;
+                visuals.widgets.active.bg_fill = orange_active;
+                visuals.widgets.open.weak_bg_fill = orange_active;
+                visuals.widgets.open.bg_fill = orange_active;
+            }
             ui.add_enabled_ui(enabled, |ui| {
                 ui.add_sized(
                     [ctx.object_size.x, ctx.object_size.y],
@@ -2649,7 +2622,6 @@ impl eframe::App for CodexShellApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.apply_window_resize_policy(ctx);
         self.refresh_powershell_session();
-        self.refresh_codex_running_state();
         self.drain_powershell_output();
         self.reload_codex_output_from_event_end_file(false);
         let next_window_size = ctx.content_rect().size();
