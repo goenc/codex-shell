@@ -13,22 +13,22 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 #[cfg(windows)]
-use windows::core::BOOL;
-#[cfg(windows)]
 use windows::Win32::Foundation::{HWND, LPARAM};
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{
-    DeleteMenu, DrawMenuBar, EnumWindows, GetSystemMenu, GetWindowThreadProcessId,
-    IsWindowVisible, MENU_ITEM_FLAGS, MF_BYCOMMAND, SC_CLOSE,
+    DeleteMenu, DrawMenuBar, EnumWindows, GetSystemMenu, GetWindowThreadProcessId, IsWindowVisible,
+    MENU_ITEM_FLAGS, MF_BYCOMMAND, SC_CLOSE,
 };
+#[cfg(windows)]
+use windows::core::BOOL;
 
-use crate::tools::ui_edit::api as ui_tool;
 use super::process_runtime;
+use crate::tools::ui_edit::api as ui_tool;
 
 use ui_tool::{
-    CONFIG_SAVE, INPUT_SEND, INPUT_VOICE_TOGGLE, MODE_PROJECT_DEBUG_RUN,
-    MODE_PROJECT_TARGET_MOVE, NAV_BACK_MAIN, REASONING_HIGH, REASONING_LOW,
-    REASONING_MEDIUM, REASONING_XHIGH, UI_EDIT_TOGGLE, UI_SETTINGS, is_known_ui_command,
+    CONFIG_SAVE, INPUT_SEND, INPUT_VOICE_TOGGLE, MODE_PROJECT_DEBUG_RUN, MODE_PROJECT_TARGET_MOVE,
+    NAV_BACK_MAIN, REASONING_HIGH, REASONING_LOW, REASONING_MEDIUM, REASONING_XHIGH,
+    UI_EDIT_TOGGLE, UI_SETTINGS, is_known_ui_command,
 };
 
 const MAX_HISTORY: usize = 200;
@@ -37,8 +37,8 @@ const FONT_OFL_RELATIVE_PATH: &str = "assets/fonts/OFL.txt";
 const FONT_SOURCE_RELATIVE_PATH: &str = "assets/fonts/FONT_SOURCE.txt";
 const CODEX_CONFIG_PATH: &str = r"C:\Users\gonec\.codex\config.toml";
 const CODEX_CONFIG_BACKUP_PATH: &str = r"C:\Users\gonec\.codex\config.toml.bak";
+const UI_RUNTIME_RELATIVE_PATH: &str = "runtime/ui/ui.json";
 const UI_INIT_RELATIVE_PATH: &str = "runtime/ui/init/ui.json";
-const UI_LIVE_RELATIVE_PATH: &str = "runtime/ui/live/ui.json";
 pub(crate) const UI_RELOAD_CHECK_INTERVAL_MS: u64 = 250;
 pub(crate) const UI_MAIN_SCREEN_ID: &str = "main";
 const UI_SETTINGS_SCREEN_ID: &str = "settings";
@@ -132,8 +132,6 @@ fn disable_window_close_button_for_pid(pid: u32) -> Result<()> {
     }
     Ok(())
 }
-
-
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
@@ -247,270 +245,14 @@ impl UiDefinition {
                 objects: Vec::new(),
             });
         }
-        if self.screen(UI_SETTINGS_SCREEN_ID).is_none() {
-            self.screens.push(default_settings_screen());
-        }
-        self.ensure_input_send_button();
-        self.ensure_codex_exec_controls_in_main();
-        self.ensure_codex_output_view_in_main();
-        self.ensure_auto_start_controls_in_settings();
-        ensure_project_target_move_button(self);
         self.objects.clear();
     }
 
-    fn ensure_input_send_button(&mut self) {
-        let Some(main_objects) = self.screen_objects_mut(UI_MAIN_SCREEN_ID) else {
-            return;
-        };
-        if let Some(button) = main_objects.iter_mut().find(|object| object.id == "btn_input_send") {
-            if button.bind.command.trim().is_empty() {
-                button.bind.command = ui_tool::INPUT_SEND.to_string();
-            }
-            return;
-        }
-        if main_objects
-            .iter()
-            .any(|object| object.bind.command.trim() == ui_tool::INPUT_SEND)
-        {
-            return;
-        }
-        let input_rect = main_objects
-            .iter()
-            .find(|object| object.id == "input_command")
-            .map(|object| (object.position.x, object.position.y, object.size.w, object.size.h));
-        let (input_x, input_y, input_w, input_h) = input_rect.unwrap_or((37.0, 103.0, 763.0, 220.0));
-        main_objects.push(create_button_object(
-            "btn_input_send",
-            "送信",
-            ui_tool::INPUT_SEND,
-            70,
-            input_x + input_w + 8.0,
-            input_y,
-            96.0,
-            input_h.min(50.0).max(40.0),
-        ));
-    }
-
-    fn ensure_codex_exec_controls_in_main(&mut self) {
-        let reasoning_commands = [
-            ui_tool::REASONING_LOW,
-            ui_tool::REASONING_MEDIUM,
-            ui_tool::REASONING_HIGH,
-            ui_tool::REASONING_XHIGH,
-        ];
-        let legacy_remove_ids = [
-            "lbl_settings_model",
-            "cmb_settings_model",
-            "lbl_reasoning_effort",
-            "lbl_settings_reasoning_effort",
-            "cmb_settings_reasoning_effort",
-            "radio_reasoning_medium",
-            "radio_reasoning_high",
-            "radio_reasoning_xhigh",
-            "radio_reasoning_low",
-            "radio_settings_reasoning_medium",
-            "radio_settings_reasoning_high",
-            "radio_settings_reasoning_xhigh",
-            "radio_settings_reasoning_low",
-        ];
-        if let Some(main_objects) = self.screen_objects_mut(UI_MAIN_SCREEN_ID) {
-            main_objects.retain(|object| {
-                !legacy_remove_ids.contains(&object.id.as_str())
-                    && !reasoning_commands.contains(&object.bind.command.trim())
-            });
-            if !main_objects.iter().any(|object| object.id == "lbl_main_model") {
-                main_objects.push(create_label_object(
-                    "lbl_main_model",
-                    "モデル",
-                    100,
-                    24.0,
-                    18.0,
-                    72.0,
-                    28.0,
-                    "left",
-                ));
-            }
-            if !main_objects.iter().any(|object| object.id == "cmb_main_model") {
-                main_objects.push(create_combo_object(
-                    "cmb_main_model",
-                    "モデルを選択",
-                    ui_tool::CONFIG_MODEL,
-                    110,
-                    100.0,
-                    18.0,
-                    184.0,
-                    28.0,
-                ));
-            }
-            if !main_objects
-                .iter()
-                .any(|object| object.id == "lbl_main_reasoning_effort")
-            {
-                main_objects.push(create_label_object(
-                    "lbl_main_reasoning_effort",
-                    "思考深度",
-                    100,
-                    300.0,
-                    18.0,
-                    96.0,
-                    28.0,
-                    "left",
-                ));
-            }
-            if !main_objects
-                .iter()
-                .any(|object| object.id == "cmb_main_reasoning_effort")
-            {
-                main_objects.push(create_combo_object(
-                    "cmb_main_reasoning_effort",
-                    "思考深度を選択",
-                    ui_tool::CONFIG_MODEL_REASONING_EFFORT,
-                    110,
-                    396.0,
-                    18.0,
-                    104.0,
-                    28.0,
-                ));
-            }
-        }
-
-        let Some(settings_objects) = self.screen_objects_mut(UI_SETTINGS_SCREEN_ID) else {
-            return;
-        };
-        settings_objects.retain(|object| {
-            !legacy_remove_ids.contains(&object.id.as_str())
-                && !reasoning_commands.contains(&object.bind.command.trim())
-        });
-    }
-
-    fn ensure_codex_output_view_in_main(&mut self) {
-        let Some(main_objects) = self.screen_objects_mut(UI_MAIN_SCREEN_ID) else {
-            return;
-        };
-
-        let input_rect = main_objects
-            .iter()
-            .find(|object| object.id == "input_command")
-            .map(|object| (object.position.x, object.position.y, object.size.w, object.size.h))
-            .unwrap_or((37.0, 149.0, 763.0, 220.0));
-        let (input_x, input_y, input_w, input_h) = input_rect;
-        let input_bottom = input_y + input_h;
-        let output_label_y = input_bottom + UI_BASE_COMPONENT_GAP;
-        let output_y = output_label_y + 28.0;
-        let output_h = 104.0;
-        let model_y = output_y + output_h + UI_BASE_COMPONENT_GAP;
-
-        if let Some(label) = main_objects.iter_mut().find(|object| object.id == "lbl_codex_output") {
-            label.position.x = input_x;
-            label.position.y = output_label_y;
-            label.size.w = input_w;
-            label.size.h = 24.0;
-            label.z_index = 100;
-        } else {
-            main_objects.push(create_label_object(
-                "lbl_codex_output",
-                "Codex出力",
-                100,
-                input_x,
-                output_label_y,
-                input_w,
-                24.0,
-                "left",
-            ));
-        }
-
-        if let Some(output) = main_objects
-            .iter_mut()
-            .find(|object| object.id == "input_codex_output")
-        {
-            output.position.x = input_x;
-            output.position.y = output_y;
-            output.size.w = input_w;
-            output.size.h = output_h;
-            output.z_index = 105;
-            output.bind.command.clear();
-        } else {
-            main_objects.push(create_input_object(
-                "input_codex_output",
-                "",
-                105,
-                input_x,
-                output_y,
-                input_w,
-                output_h,
-            ));
-        }
-
-        if let Some(label) = main_objects.iter_mut().find(|object| object.id == "lbl_main_model") {
-            label.position.y = model_y;
-        }
-        if let Some(combo) = main_objects.iter_mut().find(|object| object.id == "cmb_main_model") {
-            combo.position.y = model_y;
-        }
-        if let Some(label) = main_objects
-            .iter_mut()
-            .find(|object| object.id == "lbl_main_reasoning_effort")
-        {
-            label.position.y = model_y;
-        }
-        if let Some(combo) = main_objects
-            .iter_mut()
-            .find(|object| object.id == "cmb_main_reasoning_effort")
-        {
-            combo.position.y = model_y;
-        }
-    }
-
-    fn ensure_auto_start_controls_in_settings(&mut self) {
-        let Some(settings_objects) = self.screen_objects_mut(UI_SETTINGS_SCREEN_ID) else {
-            return;
-        };
-        for (slot, y) in auto_start_slot_layouts() {
-            let label_id = format!("lbl_settings_auto_start_exe_{}", slot + 1);
-            let input_id = format!("input_settings_auto_start_exe_{}", slot + 1);
-            let button_id = format!("btn_settings_auto_start_exe_{}_browse", slot + 1);
-            let command = auto_start_input_command(slot);
-            let browse_command = auto_start_browse_command(slot);
-            if !settings_objects.iter().any(|object| object.id == label_id) {
-                settings_objects.push(create_label_object(
-                    label_id.as_str(),
-                    auto_start_label_text(slot),
-                    100,
-                    24.0,
-                    y,
-                    120.0,
-                    24.0,
-                    "left",
-                ));
-            }
-            if !settings_objects.iter().any(|object| object.id == input_id) {
-                settings_objects.push(create_input_object(
-                    input_id.as_str(),
-                    command,
-                    110,
-                    156.0,
-                    y,
-                    544.0,
-                    24.0,
-                ));
-            }
-            if !settings_objects.iter().any(|object| object.id == button_id) {
-                settings_objects.push(create_button_object(
-                    button_id.as_str(),
-                    "参照",
-                    browse_command,
-                    120,
-                    708.0,
-                    y,
-                    88.0,
-                    24.0,
-                ));
-            }
-        }
-    }
-
     pub(crate) fn screen_ids(&self) -> Vec<String> {
-        self.screens.iter().map(|screen| screen.id.clone()).collect()
+        self.screens
+            .iter()
+            .map(|screen| screen.id.clone())
+            .collect()
     }
 
     pub(crate) fn screen(&self, screen_id: &str) -> Option<&UiScreen> {
@@ -518,7 +260,9 @@ impl UiDefinition {
     }
 
     fn screen_index(&self, screen_id: &str) -> Option<usize> {
-        self.screens.iter().position(|screen| screen.id == screen_id)
+        self.screens
+            .iter()
+            .position(|screen| screen.id == screen_id)
     }
 
     fn screen_mut(&mut self, screen_id: &str) -> Option<&mut UiScreen> {
@@ -556,363 +300,6 @@ impl Default for UiScreen {
             id: String::new(),
             objects: Vec::new(),
         }
-    }
-}
-
-fn ensure_project_target_move_button(definition: &mut UiDefinition) {
-    let Some(objects) = definition.screen_objects_mut(UI_MAIN_SCREEN_ID) else {
-        return;
-    };
-    let combo_rect = objects.iter_mut().find(|object| object.id == "cmb_project_selector");
-    if let Some(combo) = combo_rect
-        && combo.bind.command.trim().is_empty()
-    {
-        combo.bind.command = ui_tool::MODE_PROJECT_TARGET_MOVE.to_string();
-    }
-    let combo_rect = objects
-        .iter()
-        .find(|object| object.id == "cmb_project_selector")
-        .map(|object| (object.position.x, object.position.y, object.size.w, object.size.h));
-    let Some((combo_x, combo_y, combo_w, combo_h)) = combo_rect else {
-        return;
-    };
-
-    if let Some(button) = objects
-        .iter_mut()
-        .find(|object| object.id == "btn_project_target_move")
-    {
-        if button.bind.command.trim().is_empty() {
-            button.bind.command = ui_tool::MODE_PROJECT_TARGET_MOVE.to_string();
-        }
-        return;
-    }
-
-    let button_w = 96.0;
-    let mut button = create_button_object(
-        "btn_project_target_move",
-        "このフォルダへ移動",
-        ui_tool::MODE_PROJECT_TARGET_MOVE,
-        93,
-        combo_x + combo_w + 8.0,
-        combo_y,
-        button_w,
-        combo_h.max(24.0),
-    );
-    button.visual.text.font_size = 14.0;
-    objects.push(button);
-}
-
-fn default_settings_screen() -> UiScreen {
-    let mut objects = vec![
-        create_label_object("lbl_settings_title", "設定", 100, 24.0, 18.0, 240.0, 28.0, "left"),
-        create_label_object(
-            "lbl_settings_working_dir",
-            "起動フォルダ",
-            100,
-            24.0,
-            64.0,
-            120.0,
-            24.0,
-            "left",
-        ),
-        create_input_object(
-            "input_settings_working_dir",
-            ui_tool::CONFIG_WORKING_DIR,
-            110,
-            156.0,
-            64.0,
-            640.0,
-            24.0,
-        ),
-        create_label_object(
-            "lbl_settings_auto_start_exe",
-            "自動起動ソフト",
-            100,
-            24.0,
-            100.0,
-            120.0,
-            24.0,
-            "left",
-        ),
-        create_button_object(
-            "btn_settings_save",
-            "設定保存",
-            ui_tool::CONFIG_SAVE,
-            120,
-            24.0,
-            224.0,
-            120.0,
-            28.0,
-        ),
-        create_button_object(
-            "btn_settings_back",
-            "閉じる",
-            ui_tool::NAV_BACK_MAIN,
-            120,
-            256.0,
-            224.0,
-            120.0,
-            28.0,
-        ),
-        create_checkbox_object(
-            "chk_settings_ui_edit",
-            "UI編集",
-            ui_tool::UI_EDIT_TOGGLE,
-            130,
-            280.0,
-            96.0,
-            120.0,
-            28.0,
-        ),
-    ];
-    for object in &mut objects {
-        if object.id == "chk_settings_ui_edit" {
-            object.checked = false;
-        }
-    }
-    for (slot, y) in auto_start_slot_layouts() {
-        let label_id = format!("lbl_settings_auto_start_exe_{}", slot + 1);
-        let input_id = format!("input_settings_auto_start_exe_{}", slot + 1);
-        let button_id = format!("btn_settings_auto_start_exe_{}_browse", slot + 1);
-        objects.push(create_label_object(
-            label_id.as_str(),
-            auto_start_label_text(slot),
-            100,
-            24.0,
-            y,
-            120.0,
-            24.0,
-            "left",
-        ));
-        objects.push(create_input_object(
-            input_id.as_str(),
-            auto_start_input_command(slot),
-            110,
-            156.0,
-            y,
-            544.0,
-            24.0,
-        ));
-        objects.push(create_button_object(
-            button_id.as_str(),
-            "参照",
-            auto_start_browse_command(slot),
-            120,
-            708.0,
-            y,
-            88.0,
-            24.0,
-        ));
-    }
-    UiScreen {
-        id: UI_SETTINGS_SCREEN_ID.to_string(),
-        objects,
-    }
-}
-
-fn auto_start_slot_layouts() -> [(usize, f32); AUTO_START_SLOT_COUNT] {
-    [(0, 100.0), (1, 132.0), (2, 164.0), (3, 196.0)]
-}
-
-fn auto_start_input_command(slot: usize) -> &'static str {
-    match slot {
-        0 => ui_tool::CONFIG_AUTO_START_EXE_1,
-        1 => ui_tool::CONFIG_AUTO_START_EXE_2,
-        2 => ui_tool::CONFIG_AUTO_START_EXE_3,
-        3 => ui_tool::CONFIG_AUTO_START_EXE_4,
-        _ => "",
-    }
-}
-
-fn auto_start_browse_command(slot: usize) -> &'static str {
-    match slot {
-        0 => ui_tool::CONFIG_AUTO_START_EXE_1_BROWSE,
-        1 => ui_tool::CONFIG_AUTO_START_EXE_2_BROWSE,
-        2 => ui_tool::CONFIG_AUTO_START_EXE_3_BROWSE,
-        3 => ui_tool::CONFIG_AUTO_START_EXE_4_BROWSE,
-        _ => "",
-    }
-}
-
-fn auto_start_label_text(slot: usize) -> &'static str {
-    match slot {
-        0 => "起動A",
-        1 => "起動B",
-        2 => "起動C",
-        3 => "起動D",
-        _ => "",
-    }
-}
-
-
-fn create_label_object(
-    id: &str,
-    text: &str,
-    z_index: i32,
-    x: f32,
-    y: f32,
-    w: f32,
-    h: f32,
-    align: &str,
-) -> UiObject {
-    UiObject {
-        id: id.to_string(),
-        object_type: "label".to_string(),
-        z_index,
-        checked: false,
-        position: UiPosition { x, y },
-        size: UiSize { w, h },
-        visible: true,
-        enabled: true,
-        bind: UiBind::default(),
-        visual: UiVisual {
-            text: UiText {
-                value: text.to_string(),
-                align: align.to_string(),
-                font_size: 16.0,
-                font_family: "noto_sans_jp".to_string(),
-                bold: false,
-                italic: false,
-            },
-            ..UiVisual::default()
-        },
-    }
-}
-
-fn create_input_object(
-    id: &str,
-    command: &str,
-    z_index: i32,
-    x: f32,
-    y: f32,
-    w: f32,
-    h: f32,
-) -> UiObject {
-    UiObject {
-        id: id.to_string(),
-        object_type: "input".to_string(),
-        z_index,
-        checked: false,
-        position: UiPosition { x, y },
-        size: UiSize { w, h },
-        visible: true,
-        enabled: true,
-        bind: UiBind {
-            command: command.to_string(),
-            group: String::new(),
-        },
-        visual: UiVisual::default(),
-    }
-}
-
-fn create_button_object(
-    id: &str,
-    text: &str,
-    command: &str,
-    z_index: i32,
-    x: f32,
-    y: f32,
-    w: f32,
-    h: f32,
-) -> UiObject {
-    UiObject {
-        id: id.to_string(),
-        object_type: "button".to_string(),
-        z_index,
-        checked: false,
-        position: UiPosition { x, y },
-        size: UiSize { w, h },
-        visible: true,
-        enabled: true,
-        bind: UiBind {
-            command: command.to_string(),
-            group: String::new(),
-        },
-        visual: UiVisual {
-            text: UiText {
-                value: text.to_string(),
-                align: "center".to_string(),
-                font_size: 16.0,
-                font_family: "noto_sans_jp".to_string(),
-                bold: false,
-                italic: false,
-            },
-            ..UiVisual::default()
-        },
-    }
-}
-
-fn create_checkbox_object(
-    id: &str,
-    text: &str,
-    command: &str,
-    z_index: i32,
-    x: f32,
-    y: f32,
-    w: f32,
-    h: f32,
-) -> UiObject {
-    UiObject {
-        id: id.to_string(),
-        object_type: "checkbox".to_string(),
-        z_index,
-        checked: false,
-        position: UiPosition { x, y },
-        size: UiSize { w, h },
-        visible: true,
-        enabled: true,
-        bind: UiBind {
-            command: command.to_string(),
-            group: String::new(),
-        },
-        visual: UiVisual {
-            text: UiText {
-                value: text.to_string(),
-                align: "left".to_string(),
-                font_size: 16.0,
-                font_family: "noto_sans_jp".to_string(),
-                bold: false,
-                italic: false,
-            },
-            ..UiVisual::default()
-        },
-    }
-}
-
-fn create_combo_object(
-    id: &str,
-    text: &str,
-    command: &str,
-    z_index: i32,
-    x: f32,
-    y: f32,
-    w: f32,
-    h: f32,
-) -> UiObject {
-    UiObject {
-        id: id.to_string(),
-        object_type: "combo_box".to_string(),
-        z_index,
-        checked: false,
-        position: UiPosition { x, y },
-        size: UiSize { w, h },
-        visible: true,
-        enabled: true,
-        bind: UiBind {
-            command: command.to_string(),
-            group: String::new(),
-        },
-        visual: UiVisual {
-            text: UiText {
-                value: text.to_string(),
-                align: "center".to_string(),
-                font_size: 16.0,
-                font_family: "noto_sans_jp".to_string(),
-                bold: false,
-                italic: false,
-            },
-            ..UiVisual::default()
-        },
     }
 }
 
@@ -1092,9 +479,7 @@ struct ProjectDeclarationEntry {
 struct CodexShellApp {
     config: AppConfig,
     ui_definition: UiDefinition,
-    ui_live_path: PathBuf,
-    ui_last_modified: Option<SystemTime>,
-    ui_last_reload_check: Instant,
+    ui_definition_path: PathBuf,
     ui_edit_mode: bool,
     ui_edit_grid_visible: bool,
     ui_has_unsaved_changes: bool,
@@ -1140,7 +525,6 @@ struct PowerShellSession {
     stdin: ChildStdin,
 }
 
-
 impl CodexShellApp {
     fn try_new(cc: &eframe::CreationContext<'_>) -> Result<Self> {
         let (loaded_font, ui_font_names) = apply_required_font(&cc.egui_ctx)
@@ -1148,11 +532,8 @@ impl CodexShellApp {
         apply_visual_fix(&cc.egui_ctx);
 
         let config = load_config().unwrap_or_default();
-        let ui_live_path = ensure_live_ui_file()?;
-        let mut ui_definition = load_ui_definition(&ui_live_path)?;
-        ui_definition.normalize_screens();
-        ensure_project_target_move_button(&mut ui_definition);
-        let ui_last_modified = ui_file_modified_time(&ui_live_path).ok();
+        let ui_definition_path = ensure_runtime_ui_file()?;
+        let ui_definition = load_ui_definition(&ui_definition_path)?;
         let ui_selected_object_id = ui_definition
             .screen_objects(UI_MAIN_SCREEN_ID)
             .and_then(|objects| objects.first())
@@ -1169,9 +550,7 @@ impl CodexShellApp {
         let mut app = Self {
             config,
             ui_definition,
-            ui_live_path,
-            ui_last_modified,
-            ui_last_reload_check: Instant::now(),
+            ui_definition_path,
             ui_edit_mode: false,
             ui_edit_grid_visible: true,
             ui_has_unsaved_changes: false,
@@ -1205,7 +584,10 @@ impl CodexShellApp {
             "同梱フォントを読み込みました: {}",
             loaded_font.display()
         ));
-        app.push_history(format!("UI定義を読み込みました: {}", app.ui_live_path.display()));
+        app.push_history(format!(
+            "UI定義を読み込みました: {}",
+            app.ui_definition_path.display()
+        ));
         app.launch_configured_auto_start_executables();
         app.refresh_project_declarations();
         app.start_powershell_session();
@@ -1233,7 +615,9 @@ impl CodexShellApp {
 
         if allow_resize {
             ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(egui::vec2(10.0, 10.0)));
-            ctx.send_viewport_cmd(egui::ViewportCommand::MaxInnerSize(egui::vec2(8192.0, 8192.0)));
+            ctx.send_viewport_cmd(egui::ViewportCommand::MaxInnerSize(egui::vec2(
+                8192.0, 8192.0,
+            )));
             ctx.send_viewport_cmd(egui::ViewportCommand::Resizable(true));
         } else {
             let lock_size = egui::vec2(
@@ -1359,7 +743,8 @@ impl CodexShellApp {
             match session.process.try_wait() {
                 Ok(Some(status)) => {
                     clear_session = true;
-                    status_message = Some(format!("PowerShell終了済みのため送信しません: {status}"));
+                    status_message =
+                        Some(format!("PowerShell終了済みのため送信しません: {status}"));
                     Err(())
                 }
                 Ok(None) => {
@@ -1397,7 +782,6 @@ impl CodexShellApp {
         send_result.is_ok()
     }
 }
-
 
 impl CodexShellApp {
     fn project_entry_highlight_key(entry: &ProjectDeclarationEntry) -> String {
@@ -1512,11 +896,7 @@ impl CodexShellApp {
                 path: Some(path),
             });
         }
-        entries.sort_by(|left, right| {
-            left.name
-                .cmp(&right.name)
-                .then(left.path.cmp(&right.path))
-        });
+        entries.sort_by(|left, right| left.name.cmp(&right.name).then(left.path.cmp(&right.path)));
         self.project_declarations = entries;
         self.project_selected_index = match selected_path {
             Some(path) => self
@@ -1531,7 +911,9 @@ impl CodexShellApp {
 
     fn launch_active_project_debug_executable(&mut self) {
         if !self.is_project_launch_ready() {
-            self.update_status("緑ハイライトのプロジェクトが未選択のためデバッグEXEを起動できません");
+            self.update_status(
+                "緑ハイライトのプロジェクトが未選択のためデバッグEXEを起動できません",
+            );
             self.push_history("デバッグEXE起動を中止しました: 緑ハイライト未選択");
             return;
         }
@@ -1573,7 +955,12 @@ impl CodexShellApp {
         let project_dir = declaration_path
             .parent()
             .map(Path::to_path_buf)
-            .unwrap_or_else(|| exe_path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf());
+            .unwrap_or_else(|| {
+                exe_path
+                    .parent()
+                    .unwrap_or_else(|| Path::new("."))
+                    .to_path_buf()
+            });
         let launch_target = resolve_project_debug_launch_target(&exe_path);
         match launch_target_with_shell(&launch_target, &project_dir) {
             Ok(()) => {
@@ -1615,7 +1002,9 @@ impl CodexShellApp {
         let command = format!("cd \"{escaped}\"");
         if self.send_text_to_powershell(&command) {
             self.moved_project_highlight_key = self.selected_project_highlight_key();
-            self.update_status(format!("PowerShell作業フォルダを移動しました: {target_dir_text}"));
+            self.update_status(format!(
+                "PowerShell作業フォルダを移動しました: {target_dir_text}"
+            ));
             self.push_history(format!(
                 "PowerShell作業フォルダ移動コマンド送信: {target_dir_text}"
             ));
@@ -1658,7 +1047,10 @@ impl CodexShellApp {
                 }
             }
             Ok(None) => {
-                self.update_status(format!("自動起動設定{}の選択をキャンセルしました", slot + 1));
+                self.update_status(format!(
+                    "自動起動設定{}の選択をキャンセルしました",
+                    slot + 1
+                ));
                 self.push_history(format!("自動起動設定{}の参照選択をキャンセル", slot + 1));
             }
             Err(err) => {
@@ -1710,16 +1102,12 @@ impl CodexShellApp {
             }
         }
     }
-
 }
 
-
 impl CodexShellApp {
-
-    fn save_live_ui_definition(&mut self, summary: &str) {
-        match save_ui_definition(&self.ui_live_path, &self.ui_definition) {
+    fn save_ui_definition_cache(&mut self, summary: &str) {
+        match save_ui_definition(&self.ui_definition_path, &self.ui_definition) {
             Ok(()) => {
-                self.ui_last_modified = ui_file_modified_time(&self.ui_live_path).ok();
                 self.ui_has_unsaved_changes = false;
                 self.push_history(summary);
             }
@@ -1734,89 +1122,8 @@ impl CodexShellApp {
         self.ui_has_unsaved_changes = true;
     }
 
-    fn reload_ui_definition_if_changed(&mut self, ctx: &egui::Context) {
-        if self.ui_last_reload_check.elapsed() < Duration::from_millis(UI_RELOAD_CHECK_INTERVAL_MS) {
-            return;
-        }
-        self.ui_last_reload_check = Instant::now();
-
-        if !self.ui_live_path.exists() {
-            match ensure_live_ui_file() {
-                Ok(path) => {
-                    self.ui_live_path = path;
-                }
-                Err(err) => {
-                    self.update_status(format!("UI定義復元失敗: {err}"));
-                    return;
-                }
-            }
-        }
-
-        let modified = match ui_file_modified_time(&self.ui_live_path) {
-            Ok(modified) => modified,
-            Err(err) => {
-                self.update_status(format!("UI定義時刻取得失敗: {err}"));
-                return;
-            }
-        };
-
-        if self.ui_last_modified == Some(modified) {
-            return;
-        }
-
-        match load_ui_definition(&self.ui_live_path) {
-            Ok(mut definition) => {
-                definition.normalize_screens();
-                ensure_project_target_move_button(&mut definition);
-                self.ui_definition = definition;
-                self.ui_last_modified = Some(modified);
-                self.ui_has_unsaved_changes = false;
-                if self
-                    .ui_definition
-                    .screen(self.ui_current_screen_id.as_str())
-                    .is_none()
-                {
-                    self.ui_current_screen_id = UI_MAIN_SCREEN_ID.to_string();
-                }
-                if self
-                    .ui_definition
-                    .screen(self.ui_selected_screen_id.as_str())
-                    .is_none()
-                {
-                    self.ui_selected_screen_id = self.ui_current_screen_id.clone();
-                }
-                if self.ui_selected_object_id.is_empty()
-                    || self
-                        .ui_definition
-                        .object_index_in_screen(
-                            self.ui_selected_screen_id.as_str(),
-                            &self.ui_selected_object_id,
-                        )
-                        .is_none()
-                {
-                    self.ui_selected_object_id = self
-                        .ui_definition
-                        .screen_objects(self.ui_selected_screen_id.as_str())
-                        .and_then(|objects| objects.first())
-                        .map(|object| object.id.clone())
-                        .unwrap_or_default();
-                }
-                let selected_screen_id = self.ui_selected_screen_id.clone();
-                self.ensure_selected_objects_valid(selected_screen_id.as_str());
-                self.push_history("UI定義を再読み込みしました");
-                ctx.request_repaint();
-            }
-            Err(err) => {
-                self.update_status(format!("UI定義再読み込み失敗: {err}"));
-            }
-        }
-    }
-
     fn is_project_launch_command(command: &str) -> bool {
-        matches!(
-            command.trim(),
-            ui_tool::MODE_PROJECT_DEBUG_RUN
-        )
+        matches!(command.trim(), ui_tool::MODE_PROJECT_DEBUG_RUN)
     }
 
     fn is_bind_command_enabled(&self, command: &str) -> bool {
@@ -1866,7 +1173,9 @@ impl CodexShellApp {
                 ui_tool::REASONING_XHIGH => Some(selected_reasoning_effort == "xhigh"),
                 _ => None,
             };
-            if let Some(desired_checked) = desired && object.checked != desired_checked {
+            if let Some(desired_checked) = desired
+                && object.checked != desired_checked
+            {
                 object.checked = desired_checked;
                 changed = true;
             }
@@ -2074,12 +1383,9 @@ impl CodexShellApp {
             other => self.handle_unknown_ui_command(other),
         }
     }
-
 }
 
-
 impl CodexShellApp {
-
     fn set_primary_selected_object(&mut self, object_id: String) {
         self.ui_selected_object_id = object_id.clone();
         self.ui_selected_object_ids.clear();
@@ -2168,7 +1474,11 @@ impl CodexShellApp {
             ctx.object_size,
             egui::Layout::left_to_right(egui::Align::Center).with_main_align(main_align),
             |ui| {
-                ui.add(egui::Label::new(rich).selectable(false).sense(egui::Sense::hover()));
+                ui.add(
+                    egui::Label::new(rich)
+                        .selectable(false)
+                        .sense(egui::Sense::hover()),
+                );
             },
         );
     }
@@ -2226,10 +1536,9 @@ impl CodexShellApp {
                     .desired_rows(desired_rows);
                 if ctx.object_id == "input_command" {
                     let ime_commit_this_frame = ui.input(|input| {
-                        input
-                            .events
-                            .iter()
-                            .any(|event| matches!(event, egui::Event::Ime(egui::ImeEvent::Commit(_))))
+                        input.events.iter().any(|event| {
+                            matches!(event, egui::Event::Ime(egui::ImeEvent::Commit(_)))
+                        })
                     });
                     let input_return_key = if ime_commit_this_frame {
                         None
@@ -2249,7 +1558,10 @@ impl CodexShellApp {
                         .auto_shrink([false, false])
                         .max_height(visible_height)
                         .show(ui, |ui| {
-                            ui.add_sized([(ctx.object_size.x - 8.0).max(1.0), editor_height], editor)
+                            ui.add_sized(
+                                [(ctx.object_size.x - 8.0).max(1.0), editor_height],
+                                editor,
+                            )
                         })
                         .inner;
                 }
@@ -2273,7 +1585,12 @@ impl CodexShellApp {
         let row_height = ctx.ui.fonts_mut(|fonts| fonts.row_height(&output_font_id));
         let visible_height =
             row_height * CODEX_OUTPUT_LINE_COUNT as f32 + FIXED_INPUT_HEIGHT_PADDING;
-        let output_line_count = self.codex_output_text.chars().filter(|ch| *ch == '\n').count() + 1;
+        let output_line_count = self
+            .codex_output_text
+            .chars()
+            .filter(|ch| *ch == '\n')
+            .count()
+            + 1;
         let editor_height = (output_line_count.max(CODEX_OUTPUT_LINE_COUNT) as f32 * row_height)
             + FIXED_INPUT_HEIGHT_PADDING;
 
@@ -2288,7 +1605,10 @@ impl CodexShellApp {
                     .max_height(visible_height)
                     .show(ui, |ui| {
                         ui.add_sized(
-                            [(ctx.object_size.x - 8.0).max(1.0), editor_height.max(visible_height)],
+                            [
+                                (ctx.object_size.x - 8.0).max(1.0),
+                                editor_height.max(visible_height),
+                            ],
                             TextEdit::multiline(&mut self.codex_output_text)
                                 .id_source(CODEX_OUTPUT_TEXT_EDIT_ID_SALT)
                                 .font(output_font_id)
@@ -2409,7 +1729,8 @@ impl CodexShellApp {
                                 if self.project_declarations.is_empty() {
                                     ui.label("プロジェクト宣言_*.md が見つかりません");
                                 } else {
-                                    for (index, entry) in self.project_declarations.iter().enumerate()
+                                    for (index, entry) in
+                                        self.project_declarations.iter().enumerate()
                                     {
                                         ui.selectable_value(
                                             &mut selected_index,
@@ -2587,8 +1908,8 @@ impl CodexShellApp {
 
     fn render_obj_button(&self, ctx: &mut RenderObjCtx<'_>) -> bool {
         let text = self.resolve_object_text(ctx.object);
-        let disabled_for_selected_project = ctx.object_id == "btn_project_target_move"
-            && self.is_selected_project_highlighted();
+        let disabled_for_selected_project =
+            ctx.object_id == "btn_project_target_move" && self.is_selected_project_highlighted();
         let enabled = ctx.controls_enabled
             && ctx.object.enabled
             && self.is_bind_command_enabled(ctx.object_command)
@@ -2605,7 +1926,10 @@ impl CodexShellApp {
         }
         let response = ctx.ui.scope(|ui| {
             ui.add_enabled_ui(enabled, |ui| {
-                ui.add_sized([ctx.object_size.x, ctx.object_size.y], egui::Button::new(rich))
+                ui.add_sized(
+                    [ctx.object_size.x, ctx.object_size.y],
+                    egui::Button::new(rich),
+                )
             })
         });
         response.inner.inner.clicked()
@@ -2638,12 +1962,9 @@ impl CodexShellApp {
             }
         }
     }
-
 }
 
-
 impl CodexShellApp {
-
     fn render_runtime_ui_objects(&mut self, ctx: &egui::Context) {
         let mut clicked_commands = Vec::new();
         let mut position_changed = false;
@@ -2685,7 +2006,10 @@ impl CodexShellApp {
             let text_size = object.visual.text.font_size.max(1.0);
             let requested_family = object.visual.text.font_family.trim();
             let text_font = if !requested_family.is_empty()
-                && self.ui_font_names.iter().any(|name| name == requested_family)
+                && self
+                    .ui_font_names
+                    .iter()
+                    .any(|name| name == requested_family)
             {
                 egui::FontId::new(
                     text_size,
@@ -2770,7 +2094,8 @@ impl CodexShellApp {
                     input.modifiers.ctrl || input.modifiers.command || input.modifiers.shift
                 });
                 if additive_select {
-                    if self.ui_selected_object_ids.is_empty() && !self.ui_selected_object_id.is_empty()
+                    if self.ui_selected_object_ids.is_empty()
+                        && !self.ui_selected_object_id.is_empty()
                     {
                         self.ui_selected_object_ids
                             .push(self.ui_selected_object_id.clone());
@@ -2964,7 +2289,7 @@ impl CodexShellApp {
                 self.save_config();
                 self.ui_resize_locked_by_save = true;
             }
-            self.save_live_ui_definition("UI編集内容を保存しました");
+            self.save_ui_definition_cache("UI編集内容を保存しました");
             self.update_status("UI編集内容を保存しました");
         }
         if events.closed {
@@ -2991,8 +2316,14 @@ impl CodexShellApp {
         while x <= max_x {
             let is_major = x % major_step_px == 0;
             painter.line_segment(
-                [egui::pos2(x as f32, 0.0), egui::pos2(x as f32, max_y as f32)],
-                egui::Stroke::new(if is_major { 1.6 } else { 1.0 }, if is_major { major_color } else { minor_color }),
+                [
+                    egui::pos2(x as f32, 0.0),
+                    egui::pos2(x as f32, max_y as f32),
+                ],
+                egui::Stroke::new(
+                    if is_major { 1.6 } else { 1.0 },
+                    if is_major { major_color } else { minor_color },
+                ),
             );
             x += grid_step_px;
         }
@@ -3001,8 +2332,14 @@ impl CodexShellApp {
         while y <= max_y {
             let is_major = y % major_step_px == 0;
             painter.line_segment(
-                [egui::pos2(0.0, y as f32), egui::pos2(max_x as f32, y as f32)],
-                egui::Stroke::new(if is_major { 1.6 } else { 1.0 }, if is_major { major_color } else { minor_color }),
+                [
+                    egui::pos2(0.0, y as f32),
+                    egui::pos2(max_x as f32, y as f32),
+                ],
+                egui::Stroke::new(
+                    if is_major { 1.6 } else { 1.0 },
+                    if is_major { major_color } else { minor_color },
+                ),
             );
             y += grid_step_px;
         }
@@ -3048,7 +2385,6 @@ impl CodexShellApp {
             || normalized.ends_with("_win");
         looks_like_window_screen && !normalized.contains("modal")
     }
-
 }
 
 impl eframe::App for CodexShellApp {
@@ -3069,12 +2405,14 @@ impl eframe::App for CodexShellApp {
         self.apply_window_resize_policy(ctx);
         self.refresh_powershell_session();
         self.reload_codex_output_from_event_end_file(false);
-        self.reload_ui_definition_if_changed(ctx);
         let next_window_size = ctx.content_rect().size();
         if self.ui_edit_mode {
             let width_changed = (next_window_size.x - self.window_size.x).abs() >= 1.0;
             let height_changed = (next_window_size.y - self.window_size.y).abs() >= 1.0;
-            if self.window_size.x > 1.0 && self.window_size.y > 1.0 && (width_changed || height_changed) {
+            if self.window_size.x > 1.0
+                && self.window_size.y > 1.0
+                && (width_changed || height_changed)
+            {
                 self.mark_ui_definition_dirty();
             }
         }
@@ -3087,9 +2425,8 @@ impl eframe::App for CodexShellApp {
         self.render_runtime_ui_objects(ctx);
 
         self.render_ui_editor(ctx);
-        ctx.request_repaint_after(Duration::from_millis(UI_RELOAD_CHECK_INTERVAL_MS));
+        ctx.request_repaint_after(Duration::from_millis(CODEX_OUTPUT_RELOAD_CHECK_INTERVAL_MS));
     }
-
 }
 
 fn is_codex_output_noise_line(line: &str) -> bool {
@@ -3104,7 +2441,6 @@ fn is_codex_output_noise_line(line: &str) -> bool {
         || lowered.starts_with("stdout")
         || lowered.starts_with("stderr")
 }
-
 
 fn unix_timestamp() -> String {
     match SystemTime::now().duration_since(UNIX_EPOCH) {
@@ -3167,11 +2503,12 @@ fn read_project_name_from_declaration(path: &Path) -> Option<String> {
 fn resolve_project_debug_executable_path(declaration_path: &Path) -> Result<PathBuf> {
     let body = fs::read_to_string(declaration_path)
         .with_context(|| format!("宣言ファイル読み込みに失敗: {}", declaration_path.display()))?;
-    let line_4 = body
-        .lines()
-        .nth(3)
-        .map(str::trim)
-        .ok_or_else(|| anyhow!("宣言ファイルの4行目が見つかりません: {}", declaration_path.display()))?;
+    let line_4 = body.lines().nth(3).map(str::trim).ok_or_else(|| {
+        anyhow!(
+            "宣言ファイルの4行目が見つかりません: {}",
+            declaration_path.display()
+        )
+    })?;
     if line_4.is_empty() {
         return Err(anyhow!(
             "宣言ファイルの4行目にEXEパスがありません: {}",
@@ -3277,9 +2614,12 @@ fn selected_repo_bridge_file_path(auto_start_exe_path: &str) -> Result<PathBuf> 
         return Err(anyhow!("自動起動設定1が未設定です"));
     }
     let exe_path = Path::new(trimmed);
-    let exe_dir = exe_path
-        .parent()
-        .ok_or_else(|| anyhow!("自動起動設定1の親ディレクトリを解決できません: {}", exe_path.display()))?;
+    let exe_dir = exe_path.parent().ok_or_else(|| {
+        anyhow!(
+            "自動起動設定1の親ディレクトリを解決できません: {}",
+            exe_path.display()
+        )
+    })?;
     Ok(exe_dir.join("runtime").join("selected_repo_path.txt"))
 }
 
@@ -3346,7 +2686,7 @@ fn asset_base_candidates() -> Vec<PathBuf> {
 
 fn ui_runtime_base_dir() -> PathBuf {
     for candidate in asset_base_candidates() {
-        if candidate.join(UI_LIVE_RELATIVE_PATH).is_file() {
+        if candidate.join(UI_RUNTIME_RELATIVE_PATH).is_file() {
             return candidate;
         }
     }
@@ -3356,26 +2696,31 @@ fn ui_runtime_base_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
-fn ui_live_file_path() -> PathBuf {
-    ui_runtime_base_dir().join(UI_LIVE_RELATIVE_PATH)
+fn ui_definition_file_path() -> PathBuf {
+    ui_runtime_base_dir().join(UI_RUNTIME_RELATIVE_PATH)
 }
 
-fn ensure_live_ui_file() -> Result<PathBuf> {
-    let live_path = ui_live_file_path();
-    if live_path.is_file() {
-        return Ok(live_path);
+fn ensure_runtime_ui_file() -> Result<PathBuf> {
+    let ui_path = ui_definition_file_path();
+    if ui_path.is_file() {
+        return Ok(ui_path);
     }
-    let init_path = ui_runtime_base_dir().join(UI_INIT_RELATIVE_PATH);
-    let body = fs::read_to_string(&init_path)
-        .with_context(|| format!("init UI定義読み込みに失敗: {}", init_path.display()))?;
-    if let Some(parent) = live_path.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("live UIディレクトリ作成に失敗: {}", parent.display()))?;
-    }
-    fs::write(&live_path, body)
-        .with_context(|| format!("live UI定義生成に失敗: {}", live_path.display()))?;
 
-    Ok(live_path)
+    let runtime_base = ui_runtime_base_dir();
+    let source_path = runtime_base.join(UI_INIT_RELATIVE_PATH);
+    if !source_path.is_file() {
+        return Err(anyhow!("UI定義が見つかりません: {}", ui_path.display()));
+    }
+    let body = fs::read_to_string(&source_path)
+        .with_context(|| format!("UI定義移行元の読み込みに失敗: {}", source_path.display()))?;
+    if let Some(parent) = ui_path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("UI定義ディレクトリ作成に失敗: {}", parent.display()))?;
+    }
+    fs::write(&ui_path, body)
+        .with_context(|| format!("UI定義移行に失敗: {}", ui_path.display()))?;
+
+    Ok(ui_path)
 }
 
 fn load_ui_definition(path: &Path) -> Result<UiDefinition> {
@@ -3396,12 +2741,6 @@ fn save_ui_definition(path: &Path, definition: &UiDefinition) -> Result<()> {
     fs::write(path, format!("{body}\n"))
         .with_context(|| format!("UI定義保存に失敗: {}", path.display()))?;
     Ok(())
-}
-
-fn ui_file_modified_time(path: &Path) -> Result<SystemTime> {
-    fs::metadata(path)
-        .and_then(|metadata| metadata.modified())
-        .with_context(|| format!("UI定義更新時刻取得に失敗: {}", path.display()))
 }
 
 fn required_asset_path(relative_path: &str) -> Result<PathBuf> {
@@ -3556,14 +2895,8 @@ fn is_valid_reasoning_effort(effort: &str) -> bool {
 fn load_codex_config_value(key: &str) -> Option<String> {
     let config_path = Path::new(CODEX_CONFIG_PATH);
     let current = fs::read_to_string(config_path).ok()?;
-    let pattern = Regex::new(
-        format!(
-            r#"(?m)^\s*{}\s*=\s*"(.*?)"\s*$"#,
-            regex::escape(key)
-        )
-        .as_str(),
-    )
-    .ok()?;
+    let pattern =
+        Regex::new(format!(r#"(?m)^\s*{}\s*=\s*"(.*?)"\s*$"#, regex::escape(key)).as_str()).ok()?;
     pattern
         .captures_iter(&current)
         .filter_map(|captures| captures.get(1).map(|m| m.as_str().to_string()))
@@ -3629,10 +2962,9 @@ fn update_codex_config_key(key: &str, value: &str) -> Result<(), String> {
         )
     })?;
 
-    let key_pattern = Regex::new(
-        format!(r#"(?m)^\s*{}\s*=\s*".*?"\s*$"#, regex::escape(key)).as_str(),
-    )
-    .map_err(|err| format!("正規表現の構築に失敗しました: {err}"))?;
+    let key_pattern =
+        Regex::new(format!(r#"(?m)^\s*{}\s*=\s*".*?"\s*$"#, regex::escape(key)).as_str())
+            .map_err(|err| format!("正規表現の構築に失敗しました: {err}"))?;
     let replacement = format!(r#"{key} = "{value}""#);
 
     let updated = if key_pattern.is_match(&current) {
@@ -3662,14 +2994,9 @@ fn update_codex_config_key(key: &str, value: &str) -> Result<(), String> {
             config_path.display()
         )
     })?;
-    let verify_pattern = Regex::new(
-        format!(
-            r#"(?m)^\s*{}\s*=\s*"(.*?)"\s*$"#,
-            regex::escape(key)
-        )
-        .as_str(),
-    )
-    .map_err(|err| format!("確認用正規表現の構築に失敗しました: {err}"))?;
+    let verify_pattern =
+        Regex::new(format!(r#"(?m)^\s*{}\s*=\s*"(.*?)"\s*$"#, regex::escape(key)).as_str())
+            .map_err(|err| format!("確認用正規表現の構築に失敗しました: {err}"))?;
     let reflected = verify_pattern
         .captures_iter(&verified)
         .filter_map(|caps| caps.get(1).map(|m| m.as_str()))
