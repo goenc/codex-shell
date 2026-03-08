@@ -1901,6 +1901,9 @@ impl CodexShellApp {
                 |ui| {
                     ui.scope(|ui| {
                         let fixed_width = ctx.object_size.x.max(12.0);
+                        if !enabled {
+                            ui.visuals_mut().override_text_color = Some(Color32::from_gray(140));
+                        }
                         if highlight_green {
                             let green = Color32::from_rgb(188, 233, 188);
                             let open_green = Color32::from_rgb(172, 224, 172);
@@ -1979,6 +1982,11 @@ impl CodexShellApp {
                         ctx.object_size,
                         egui::Layout::left_to_right(egui::Align::Center),
                         |ui| {
+                            let previous_override = ui.style().visuals.override_text_color;
+                            if !enabled {
+                                ui.visuals_mut().override_text_color =
+                                    Some(Color32::from_gray(140));
+                            }
                             ui.style_mut()
                                 .text_styles
                                 .insert(egui::TextStyle::Button, ctx.text_font.clone());
@@ -2001,6 +2009,7 @@ impl CodexShellApp {
                                         );
                                     }
                                 });
+                            ui.visuals_mut().override_text_color = previous_override;
                         },
                     );
                 });
@@ -2024,6 +2033,11 @@ impl CodexShellApp {
                         ctx.object_size,
                         egui::Layout::left_to_right(egui::Align::Center),
                         |ui| {
+                            let previous_override = ui.style().visuals.override_text_color;
+                            if !enabled {
+                                ui.visuals_mut().override_text_color =
+                                    Some(Color32::from_gray(140));
+                            }
                             ui.style_mut()
                                 .text_styles
                                 .insert(egui::TextStyle::Button, ctx.text_font.clone());
@@ -2046,6 +2060,7 @@ impl CodexShellApp {
                                         );
                                     }
                                 });
+                            ui.visuals_mut().override_text_color = previous_override;
                         },
                     );
                 });
