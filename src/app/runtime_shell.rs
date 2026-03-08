@@ -515,6 +515,7 @@ struct CodexShellApp {
     moved_project_highlight_key: Option<String>,
     codex_output_event_last_modified: Option<SystemTime>,
     codex_output_last_reload_check: Instant,
+    codex_output_waiting_stderr_body: bool,
 }
 
 struct RenderObjCtx<'a> {
@@ -623,6 +624,7 @@ impl CodexShellApp {
             moved_project_highlight_key: None,
             codex_output_event_last_modified: None,
             codex_output_last_reload_check: Instant::now(),
+            codex_output_waiting_stderr_body: false,
         };
 
         app.push_history(format!(
@@ -840,6 +842,7 @@ impl CodexShellApp {
             let trimmed = line.text.trim();
             if trimmed == CODEX_STREAM_BEGIN_MARKER {
                 self.codex_output_streaming_active = true;
+                self.codex_output_waiting_stderr_body = false;
                 self.codex_output_text.clear();
                 self.start_codex_output_runtime_log();
                 self.codex_output_text.push_str(CODEX_TURN_SEPARATOR);
@@ -847,6 +850,7 @@ impl CodexShellApp {
                 continue;
             }
             if trimmed == CODEX_STREAM_END_MARKER {
+                self.codex_output_waiting_stderr_body = false;
                 if !self.codex_output_text.is_empty() {
                     self.codex_output_text.push('\n');
                 }
@@ -863,7 +867,18 @@ impl CodexShellApp {
                 continue;
             }
             let output_line = if line.is_stderr {
-                format!("stderr: {trimmed}")
+                let marker = trimmed.strip_prefix("stderr:").unwrap_or(trimmed).trim();
+                let lowered_marker = marker.to_ascii_lowercase();
+                if lowered_marker == "user" || lowered_marker == "codex" {
+                    self.codex_output_waiting_stderr_body = true;
+                    continue;
+                }
+                if self.codex_output_waiting_stderr_body {
+                    self.codex_output_waiting_stderr_body = false;
+                    marker.to_string()
+                } else {
+                    continue;
+                }
             } else {
                 trimmed.to_string()
             };
