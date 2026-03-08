@@ -62,6 +62,7 @@ const INPUT_COMMAND_ID_SALT: &str = "input_command_text_edit";
 const CODEX_OUTPUT_TEXT_EDIT_ID_SALT: &str = "codex_output_text_edit";
 const CODEX_OUTPUT_LINE_COUNT: usize = 5;
 const CODEX_OUTPUT_EVENT_END_PATH: &str = r"C:\Users\gonec\.codex\runtime\agent_event_end.md";
+const CODEX_OUTPUT_RUNTIME_LOG_DIR_RELATIVE_PATH: &str = "runtime/codex_output_logs";
 const CODEX_OUTPUT_RELOAD_CHECK_INTERVAL_MS: u64 = 250;
 const CODEX_STREAM_BEGIN_MARKER: &str = "__CODEX_STREAM_BEGIN__";
 const CODEX_STREAM_END_MARKER: &str = "__CODEX_STREAM_END__";
@@ -505,6 +506,7 @@ struct CodexShellApp {
     powershell_session: Option<PowerShellSession>,
     powershell_output_rx: Option<Receiver<PowerShellOutputLine>>,
     codex_output_streaming_active: bool,
+    codex_output_runtime_log_path: Option<PathBuf>,
     ui_resize_locked_by_save: bool,
     target_project_dir_path: Option<PathBuf>,
     project_declarations: Vec<ProjectDeclarationEntry>,
@@ -612,6 +614,7 @@ impl CodexShellApp {
             powershell_session: None,
             powershell_output_rx: None,
             codex_output_streaming_active: false,
+            codex_output_runtime_log_path: None,
             ui_resize_locked_by_save: false,
             target_project_dir_path: None,
             project_declarations: Vec::new(),
@@ -760,6 +763,7 @@ impl CodexShellApp {
                 });
                 self.powershell_output_rx = Some(rx);
                 self.codex_output_streaming_active = false;
+                self.codex_output_runtime_log_path = None;
                 self.update_status("PowerShellを起動しました");
                 self.push_history("PowerShellを起動しました");
             }
@@ -787,8 +791,39 @@ impl CodexShellApp {
             self.powershell_session = None;
             self.powershell_output_rx = None;
             self.codex_output_streaming_active = false;
+            self.codex_output_runtime_log_path = None;
             self.update_status(message.clone());
             self.push_history(message);
+        }
+    }
+
+    fn start_codex_output_runtime_log(&mut self) {
+        match create_codex_output_runtime_log_path() {
+            Ok(path) => {
+                self.codex_output_runtime_log_path = Some(path);
+            }
+            Err(err) => {
+                self.codex_output_runtime_log_path = None;
+                self.push_history(format!("Codex出力ログ初期化失敗: {err}"));
+            }
+        }
+    }
+
+    fn append_codex_output_runtime_log_line(&mut self, line: &str) {
+        let Some(path) = self.codex_output_runtime_log_path.as_ref() else {
+            return;
+        };
+        let mut file = match fs::OpenOptions::new().create(true).append(true).open(path) {
+            Ok(file) => file,
+            Err(err) => {
+                self.codex_output_runtime_log_path = None;
+                self.push_history(format!("Codex出力ログ追記失敗: {err}"));
+                return;
+            }
+        };
+        if let Err(err) = writeln!(file, "{line}") {
+            self.codex_output_runtime_log_path = None;
+            self.push_history(format!("Codex出力ログ書き込み失敗: {err}"));
         }
     }
 
@@ -805,10 +840,12 @@ impl CodexShellApp {
             if trimmed == CODEX_STREAM_BEGIN_MARKER {
                 self.codex_output_streaming_active = true;
                 self.codex_output_text.clear();
+                self.start_codex_output_runtime_log();
                 continue;
             }
             if trimmed == CODEX_STREAM_END_MARKER {
                 self.codex_output_streaming_active = false;
+                self.codex_output_runtime_log_path = None;
                 continue;
             }
             if !self.codex_output_streaming_active {
@@ -817,13 +854,16 @@ impl CodexShellApp {
             if trimmed.is_empty() || is_codex_output_noise_line(trimmed) {
                 continue;
             }
+            let output_line = if line.is_stderr {
+                format!("stderr: {trimmed}")
+            } else {
+                trimmed.to_string()
+            };
             if !self.codex_output_text.is_empty() {
                 self.codex_output_text.push('\n');
             }
-            if line.is_stderr {
-                self.codex_output_text.push_str("stderr: ");
-            }
-            self.codex_output_text.push_str(trimmed);
+            self.codex_output_text.push_str(&output_line);
+            self.append_codex_output_runtime_log_line(&output_line);
         }
     }
 
@@ -2552,6 +2592,13 @@ fn unix_timestamp() -> String {
     }
 }
 
+fn unix_timestamp_millis() -> String {
+    match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(duration) => duration.as_millis().to_string(),
+        Err(_) => "0".to_string(),
+    }
+}
+
 fn send_voice_input_hotkey() -> Result<()> {
     process_runtime::send_voice_input_hotkey()
 }
@@ -2797,6 +2844,18 @@ fn ui_runtime_base_dir() -> PathBuf {
         return current_dir;
     }
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+}
+
+fn create_codex_output_runtime_log_path() -> Result<PathBuf> {
+    let runtime_base = ui_runtime_base_dir();
+    let log_dir = runtime_base.join(CODEX_OUTPUT_RUNTIME_LOG_DIR_RELATIVE_PATH);
+    fs::create_dir_all(&log_dir)
+        .with_context(|| format!("Codex出力ログディレクトリ作成に失敗: {}", log_dir.display()))?;
+    let file_name = format!("codex_output_{}.log", unix_timestamp_millis());
+    let log_path = log_dir.join(file_name);
+    fs::write(&log_path, "")
+        .with_context(|| format!("Codex出力ログ作成に失敗: {}", log_path.display()))?;
+    Ok(log_path)
 }
 
 fn ui_definition_file_path() -> PathBuf {
