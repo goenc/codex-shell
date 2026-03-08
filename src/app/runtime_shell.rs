@@ -1767,6 +1767,7 @@ impl CodexShellApp {
                 egui::ScrollArea::vertical()
                     .id_salt("codex_output_vertical_scroll")
                     .auto_shrink([false, false])
+                    .stick_to_bottom(true)
                     .max_height(visible_height)
                     .show(ui, |ui| {
                         ui.add_sized(
