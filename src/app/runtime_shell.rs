@@ -66,6 +66,8 @@ const CODEX_OUTPUT_RUNTIME_LOG_DIR_RELATIVE_PATH: &str = "runtime/codex_output_l
 const CODEX_OUTPUT_RELOAD_CHECK_INTERVAL_MS: u64 = 250;
 const CODEX_STREAM_BEGIN_MARKER: &str = "__CODEX_STREAM_BEGIN__";
 const CODEX_STREAM_END_MARKER: &str = "__CODEX_STREAM_END__";
+const CODEX_EXECUTABLE_NAME: &str = "codex.exe";
+const CODEX_CHILD_DETECT_GRACE_MS: u64 = 2000;
 const CODEX_TURN_SEPARATOR: &str = "--------------------------------------------------------------------------------------------------------------------------------------------------------";
 const VOICE_INPUT_HOTKEY_LABEL: &str = "Ctrl+Alt+Right";
 const POWERSHELL_EXECUTABLE: &str = "pwsh.exe";
@@ -516,6 +518,9 @@ struct CodexShellApp {
     codex_output_event_last_modified: Option<SystemTime>,
     codex_output_last_reload_check: Instant,
     codex_output_waiting_stderr_body: bool,
+    is_codex_running: bool,
+    codex_running_started_at: Option<Instant>,
+    codex_child_observed: bool,
 }
 
 struct RenderObjCtx<'a> {
@@ -625,6 +630,9 @@ impl CodexShellApp {
             codex_output_event_last_modified: None,
             codex_output_last_reload_check: Instant::now(),
             codex_output_waiting_stderr_body: false,
+            is_codex_running: false,
+            codex_running_started_at: None,
+            codex_child_observed: false,
         };
 
         app.push_history(format!(
@@ -705,15 +713,17 @@ impl CodexShellApp {
         });
     }
 
-    fn send_input_command_by_button(&mut self) {
+    fn send_input_command_by_button(&mut self) -> bool {
         let input = self.input_command.clone();
         let command = format!(
             "$prompt = @\"\n{input}\n\"@\nWrite-Output \"{CODEX_STREAM_BEGIN_MARKER}\"\ncodex exec $prompt\nWrite-Output \"{CODEX_STREAM_END_MARKER}\"\n"
         );
-        if self.send_text_to_powershell(&command) {
+        let sent = self.send_text_to_powershell(&command);
+        if sent {
             self.input_command.clear();
         }
         self.pending_input_focus = true;
+        sent
     }
 
     fn start_powershell_session(&mut self) {
@@ -797,9 +807,55 @@ impl CodexShellApp {
             self.powershell_output_rx = None;
             self.codex_output_streaming_active = false;
             self.codex_output_runtime_log_path = None;
+            self.clear_codex_running_state();
             self.update_status(message.clone());
             self.push_history(message);
         }
+    }
+
+    fn set_codex_running_state(&mut self, running: bool) {
+        if running {
+            self.is_codex_running = true;
+            self.codex_running_started_at = Some(Instant::now());
+            self.codex_child_observed = false;
+        } else {
+            self.clear_codex_running_state();
+        }
+    }
+
+    fn clear_codex_running_state(&mut self) {
+        self.is_codex_running = false;
+        self.codex_running_started_at = None;
+        self.codex_child_observed = false;
+    }
+
+    fn refresh_codex_running_state(&mut self) {
+        if !self.is_codex_running {
+            return;
+        }
+        let Some(session) = self.powershell_session.as_ref() else {
+            self.clear_codex_running_state();
+            return;
+        };
+        let child_pids = process_runtime::find_child_process_ids_by_executable_name(
+            session.process.id(),
+            CODEX_EXECUTABLE_NAME,
+        )
+        .unwrap_or_default();
+        if !child_pids.is_empty() {
+            self.codex_child_observed = true;
+            return;
+        }
+        if !self.codex_child_observed
+            && self
+                .codex_running_started_at
+                .is_some_and(|started| {
+                    started.elapsed() < Duration::from_millis(CODEX_CHILD_DETECT_GRACE_MS)
+                })
+        {
+            return;
+        }
+        self.clear_codex_running_state();
     }
 
     fn start_codex_output_runtime_log(&mut self) {
@@ -941,6 +997,7 @@ impl CodexShellApp {
 
         if clear_session {
             self.powershell_session = None;
+            self.clear_codex_running_state();
         }
         if let Some(message) = status_message {
             self.update_status(message.clone());
@@ -1296,11 +1353,23 @@ impl CodexShellApp {
 
     fn is_bind_command_enabled(&self, command: &str) -> bool {
         let command = command.trim();
+        if self.is_codex_running
+            && matches!(
+                command,
+                ui_tool::INPUT_SEND
+                    | ui_tool::MODE_PROJECT_DEBUG_RUN
+                    | ui_tool::MODE_PROJECT_TARGET_MOVE
+                    | ui_tool::CONFIG_MODEL
+                    | ui_tool::CONFIG_MODEL_REASONING_EFFORT
+            )
+        {
+            return false;
+        }
         if Self::is_project_launch_command(command) && !self.is_project_launch_ready() {
             return false;
         }
         match command {
-            ui_tool::INPUT_SEND => true,
+            ui_tool::INPUT_SEND => self.is_selected_project_highlighted() && !self.is_codex_running,
             ui_tool::MODE_PROJECT_DEBUG_RUN => self
                 .selected_project_declaration_path()
                 .is_some_and(|declaration_path| {
@@ -1415,7 +1484,10 @@ impl CodexShellApp {
     }
 
     fn handle_input_send(&mut self) {
-        self.send_input_command_by_button();
+        self.set_codex_running_state(true);
+        if !self.send_input_command_by_button() {
+            self.clear_codex_running_state();
+        }
     }
 
     fn handle_input_voice_toggle(&mut self) {
@@ -2577,6 +2649,7 @@ impl eframe::App for CodexShellApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.apply_window_resize_policy(ctx);
         self.refresh_powershell_session();
+        self.refresh_codex_running_state();
         self.drain_powershell_output();
         self.reload_codex_output_from_event_end_file(false);
         let next_window_size = ctx.content_rect().size();
