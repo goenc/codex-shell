@@ -142,6 +142,7 @@ fn disable_window_close_button_for_pid(pid: u32) -> Result<()> {
 #[serde(default)]
 pub(crate) struct AppConfig {
     pub(crate) working_dir: String,
+    pub(crate) log_dir: String,
     pub(crate) auto_start_exe_1: String,
     pub(crate) auto_start_exe_2: String,
     pub(crate) auto_start_exe_3: String,
@@ -156,6 +157,7 @@ impl Default for AppConfig {
             working_dir: std::env::current_dir()
                 .map(|path| path.to_string_lossy().into_owned())
                 .unwrap_or_else(|_| ".".to_string()),
+            log_dir: String::new(),
             auto_start_exe_1: String::new(),
             auto_start_exe_2: String::new(),
             auto_start_exe_3: String::new(),
@@ -170,6 +172,7 @@ impl AppConfig {
     fn bound_input_mut(&mut self, command: &str) -> Option<&mut String> {
         match command.trim() {
             ui_tool::CONFIG_WORKING_DIR => Some(&mut self.working_dir),
+            ui_tool::CONFIG_LOG_DIR => Some(&mut self.log_dir),
             ui_tool::CONFIG_AUTO_START_EXE_1 => Some(&mut self.auto_start_exe_1),
             ui_tool::CONFIG_AUTO_START_EXE_2 => Some(&mut self.auto_start_exe_2),
             ui_tool::CONFIG_AUTO_START_EXE_3 => Some(&mut self.auto_start_exe_3),
@@ -1466,8 +1469,26 @@ impl CodexShellApp {
         }
     }
 
+    fn handle_log_dir_browse(&mut self) {
+        match process_runtime::select_directory_path() {
+            Ok(Some(path)) => {
+                self.config.log_dir = path.clone();
+                self.update_status("ログパスを更新しました");
+                self.push_history(format!("ログパスを更新: {path}"));
+            }
+            Ok(None) => {
+                self.update_status("ログパスの参照選択をキャンセルしました");
+                self.push_history("ログパスの参照選択をキャンセル");
+            }
+            Err(err) => {
+                self.update_status(format!("ログパスの参照に失敗: {err}"));
+                self.push_history(format!("ログパスの参照失敗: {err}"));
+            }
+        }
+    }
+
     fn handle_open_codex_output_log_dir(&mut self) {
-        let trimmed = self.config.working_dir.trim();
+        let trimmed = self.config.log_dir.trim();
         if trimmed.is_empty() {
             self.update_status("ログフォルダパスが未設定です");
             self.push_history("ログフォルダを開けませんでした: パス未設定");
@@ -1630,6 +1651,7 @@ impl CodexShellApp {
             NAV_BACK_MAIN => self.handle_nav_back_main(),
             CONFIG_SAVE => self.handle_config_save(),
             ui_tool::CONFIG_WORKING_DIR_BROWSE => self.handle_working_dir_browse(),
+            ui_tool::CONFIG_LOG_DIR_BROWSE => self.handle_log_dir_browse(),
             ui_tool::CONFIG_AUTO_START_EXE_1_BROWSE => self.handle_auto_start_exe_browse(0),
             ui_tool::CONFIG_AUTO_START_EXE_2_BROWSE => self.handle_auto_start_exe_browse(1),
             ui_tool::CONFIG_AUTO_START_EXE_3_BROWSE => self.handle_auto_start_exe_browse(2),

@@ -1340,6 +1340,204 @@
           }
         },
         {
+          "id": "lbl_settings_log_dir",
+          "type": "label",
+          "z_index": 100,
+          "checked": false,
+          "position": {
+            "x": 39.0,
+            "y": 228.0
+          },
+          "size": {
+            "w": 120.0,
+            "h": 24.0
+          },
+          "visible": true,
+          "enabled": true,
+          "bind": {
+            "command": "",
+            "group": ""
+          },
+          "visual": {
+            "background": {
+              "image": "",
+              "fit": ""
+            },
+            "icon": {
+              "image": "",
+              "anchor": "center",
+              "offset": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "size": {
+                "w": 120.0,
+                "h": 32.0
+              }
+            },
+            "text": {
+              "value": "ログパス",
+              "align": "left",
+              "font_size": 16.0,
+              "font_family": "noto_sans_jp",
+              "bold": false,
+              "italic": false
+            },
+            "states": {
+              "hover": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "pressed": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "disabled": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "input_settings_log_dir",
+          "type": "input",
+          "z_index": 110,
+          "checked": false,
+          "position": {
+            "x": 171.0,
+            "y": 228.0
+          },
+          "size": {
+            "w": 544.0,
+            "h": 24.0
+          },
+          "visible": true,
+          "enabled": true,
+          "bind": {
+            "command": "config.log_dir",
+            "group": ""
+          },
+          "visual": {
+            "background": {
+              "image": "",
+              "fit": ""
+            },
+            "icon": {
+              "image": "",
+              "anchor": "center",
+              "offset": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "size": {
+                "w": 120.0,
+                "h": 32.0
+              }
+            },
+            "text": {
+              "value": "",
+              "align": "center",
+              "font_size": 16.0,
+              "font_family": "noto_sans_jp",
+              "bold": false,
+              "italic": false
+            },
+            "states": {
+              "hover": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "pressed": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "disabled": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "btn_settings_log_dir_browse",
+          "type": "button",
+          "z_index": 120,
+          "checked": false,
+          "position": {
+            "x": 737.0,
+            "y": 228.0
+          },
+          "size": {
+            "w": 88.0,
+            "h": 24.0
+          },
+          "visible": true,
+          "enabled": true,
+          "bind": {
+            "command": "config.log_dir.browse",
+            "group": ""
+          },
+          "visual": {
+            "background": {
+              "image": "",
+              "fit": ""
+            },
+            "icon": {
+              "image": "",
+              "anchor": "center",
+              "offset": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "size": {
+                "w": 120.0,
+                "h": 32.0
+              }
+            },
+            "text": {
+              "value": "参照",
+              "align": "center",
+              "font_size": 16.0,
+              "font_family": "noto_sans_jp",
+              "bold": false,
+              "italic": false
+            },
+            "states": {
+              "hover": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "pressed": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "disabled": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              }
+            }
+          }
+        },
+        {
           "id": "btn_settings_save",
           "type": "button",
           "z_index": 120,
