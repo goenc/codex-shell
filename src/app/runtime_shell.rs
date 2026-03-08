@@ -1448,6 +1448,52 @@ impl CodexShellApp {
         }
     }
 
+    fn handle_working_dir_browse(&mut self) {
+        match process_runtime::select_directory_path() {
+            Ok(Some(path)) => {
+                self.config.working_dir = path.clone();
+                self.update_status("ルートフォルダを更新しました");
+                self.push_history(format!("ルートフォルダを更新: {path}"));
+            }
+            Ok(None) => {
+                self.update_status("ルートフォルダの参照選択をキャンセルしました");
+                self.push_history("ルートフォルダの参照選択をキャンセル");
+            }
+            Err(err) => {
+                self.update_status(format!("ルートフォルダの参照に失敗: {err}"));
+                self.push_history(format!("ルートフォルダの参照失敗: {err}"));
+            }
+        }
+    }
+
+    fn handle_open_codex_output_log_dir(&mut self) {
+        let log_dir = codex_output_runtime_log_dir_path();
+        if let Err(err) = fs::create_dir_all(&log_dir) {
+            self.update_status(format!("ログフォルダ作成失敗: {err}"));
+            self.push_history(format!(
+                "Codex出力ログフォルダ作成に失敗: {} ({err})",
+                log_dir.display()
+            ));
+            return;
+        }
+        match Command::new("explorer").arg(&log_dir).spawn() {
+            Ok(_) => {
+                self.update_status("ログフォルダを開きました");
+                self.push_history(format!(
+                    "Codex出力ログフォルダを開きました: {}",
+                    log_dir.display()
+                ));
+            }
+            Err(err) => {
+                self.update_status(format!("ログフォルダを開けません: {err}"));
+                self.push_history(format!(
+                    "Codex出力ログフォルダを開けませんでした: {} ({err})",
+                    log_dir.display()
+                ));
+            }
+        }
+    }
+
     fn handle_input_voice_toggle(&mut self) {
         self.toggle_voice_input();
     }
@@ -1569,10 +1615,12 @@ impl CodexShellApp {
             UI_SETTINGS => self.handle_ui_settings(),
             NAV_BACK_MAIN => self.handle_nav_back_main(),
             CONFIG_SAVE => self.handle_config_save(),
+            ui_tool::CONFIG_WORKING_DIR_BROWSE => self.handle_working_dir_browse(),
             ui_tool::CONFIG_AUTO_START_EXE_1_BROWSE => self.handle_auto_start_exe_browse(0),
             ui_tool::CONFIG_AUTO_START_EXE_2_BROWSE => self.handle_auto_start_exe_browse(1),
             ui_tool::CONFIG_AUTO_START_EXE_3_BROWSE => self.handle_auto_start_exe_browse(2),
             ui_tool::CONFIG_AUTO_START_EXE_4_BROWSE => self.handle_auto_start_exe_browse(3),
+            ui_tool::CONFIG_CODEX_OUTPUT_LOG_DIR_OPEN => self.handle_open_codex_output_log_dir(),
             REASONING_LOW => self.handle_reasoning_effort("low"),
             REASONING_MEDIUM => self.handle_reasoning_effort("medium"),
             REASONING_HIGH => self.handle_reasoning_effort("high"),
@@ -2948,8 +2996,7 @@ fn ui_runtime_base_dir() -> PathBuf {
 }
 
 fn create_codex_output_runtime_log_path() -> Result<PathBuf> {
-    let runtime_base = ui_runtime_base_dir();
-    let log_dir = runtime_base.join(CODEX_OUTPUT_RUNTIME_LOG_DIR_RELATIVE_PATH);
+    let log_dir = codex_output_runtime_log_dir_path();
     fs::create_dir_all(&log_dir)
         .with_context(|| format!("Codex出力ログディレクトリ作成に失敗: {}", log_dir.display()))?;
     let file_name = format!("codex_output_{}.log", unix_timestamp_millis());
@@ -2957,6 +3004,10 @@ fn create_codex_output_runtime_log_path() -> Result<PathBuf> {
     fs::write(&log_path, "")
         .with_context(|| format!("Codex出力ログ作成に失敗: {}", log_path.display()))?;
     Ok(log_path)
+}
+
+fn codex_output_runtime_log_dir_path() -> PathBuf {
+    ui_runtime_base_dir().join(CODEX_OUTPUT_RUNTIME_LOG_DIR_RELATIVE_PATH)
 }
 
 fn ui_definition_file_path() -> PathBuf {

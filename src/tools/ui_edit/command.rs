@@ -14,6 +14,7 @@ pub const REASONING_XHIGH: &str = "reasoning.xhigh";
 pub const CONFIG_MODEL: &str = "config.model";
 pub const CONFIG_MODEL_REASONING_EFFORT: &str = "config.model_reasoning_effort";
 pub const CONFIG_WORKING_DIR: &str = "config.working_dir";
+pub const CONFIG_WORKING_DIR_BROWSE: &str = "config.working_dir.browse";
 pub const CONFIG_AUTO_START_EXE_1: &str = "config.auto_start_exe.1";
 pub const CONFIG_AUTO_START_EXE_2: &str = "config.auto_start_exe.2";
 pub const CONFIG_AUTO_START_EXE_3: &str = "config.auto_start_exe.3";
@@ -22,6 +23,7 @@ pub const CONFIG_AUTO_START_EXE_1_BROWSE: &str = "config.auto_start_exe.1.browse
 pub const CONFIG_AUTO_START_EXE_2_BROWSE: &str = "config.auto_start_exe.2.browse";
 pub const CONFIG_AUTO_START_EXE_3_BROWSE: &str = "config.auto_start_exe.3.browse";
 pub const CONFIG_AUTO_START_EXE_4_BROWSE: &str = "config.auto_start_exe.4.browse";
+pub const CONFIG_CODEX_OUTPUT_LOG_DIR_OPEN: &str = "config.codex_output_log_dir.open";
 pub const CONFIG_SAVE: &str = "config.save";
 
 pub const ALL_UI_COMMANDS: &[&str] = &[
@@ -41,6 +43,7 @@ pub const ALL_UI_COMMANDS: &[&str] = &[
     CONFIG_MODEL,
     CONFIG_MODEL_REASONING_EFFORT,
     CONFIG_WORKING_DIR,
+    CONFIG_WORKING_DIR_BROWSE,
     CONFIG_AUTO_START_EXE_1,
     CONFIG_AUTO_START_EXE_2,
     CONFIG_AUTO_START_EXE_3,
@@ -49,6 +52,7 @@ pub const ALL_UI_COMMANDS: &[&str] = &[
     CONFIG_AUTO_START_EXE_2_BROWSE,
     CONFIG_AUTO_START_EXE_3_BROWSE,
     CONFIG_AUTO_START_EXE_4_BROWSE,
+    CONFIG_CODEX_OUTPUT_LOG_DIR_OPEN,
     CONFIG_SAVE,
 ];
 
