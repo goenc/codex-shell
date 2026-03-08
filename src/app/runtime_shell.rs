@@ -1816,7 +1816,10 @@ impl CodexShellApp {
             .collect::<Vec<_>>()
             .join("\n");
         if !filtered.is_empty() {
-            self.codex_output_text = filtered;
+            if !self.codex_output_text.is_empty() {
+                self.codex_output_text.push('\n');
+            }
+            self.codex_output_text.push_str(&filtered);
         }
     }
 
