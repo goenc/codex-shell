@@ -3,11 +3,11 @@
   "assets": {
     "base_dir": "assets/ui",
     "images": {
-      "btn_hover": "buttons/hover.png",
-      "btn_primary": "buttons/primary.png",
-      "icon_build": "icons/build.png",
       "icon_voice": "icons/voice.png",
-      "btn_pressed": "buttons/pressed.png"
+      "btn_pressed": "buttons/pressed.png",
+      "icon_build": "icons/build.png",
+      "btn_hover": "buttons/hover.png",
+      "btn_primary": "buttons/primary.png"
     }
   },
   "screens": [
@@ -20,8 +20,8 @@
           "z_index": 30,
           "checked": false,
           "position": {
-            "x": 814.0,
-            "y": 497.0
+            "x": 819.0,
+            "y": 384.0
           },
           "size": {
             "w": 96.0,
@@ -86,8 +86,8 @@
           "z_index": 40,
           "checked": false,
           "position": {
-            "x": 38.0,
-            "y": 576.0
+            "x": 43.0,
+            "y": 561.0
           },
           "size": {
             "w": 780.0,
@@ -152,8 +152,8 @@
           "z_index": 60,
           "checked": false,
           "position": {
-            "x": 35.0,
-            "y": 614.0
+            "x": 34.0,
+            "y": 521.0
           },
           "size": {
             "w": 767.0,
@@ -218,8 +218,8 @@
           "z_index": 81,
           "checked": false,
           "position": {
-            "x": 814.0,
-            "y": 370.0
+            "x": 815.0,
+            "y": 224.0
           },
           "size": {
             "w": 96.0,
@@ -284,8 +284,8 @@
           "z_index": 90,
           "checked": true,
           "position": {
-            "x": 674.0,
-            "y": 589.0
+            "x": 825.0,
+            "y": 438.0
           },
           "size": {
             "w": 88.0,
@@ -350,8 +350,8 @@
           "z_index": 95,
           "checked": false,
           "position": {
-            "x": 316.0,
-            "y": 274.0
+            "x": 269.0,
+            "y": 240.0
           },
           "size": {
             "w": 236.0,
@@ -416,8 +416,8 @@
           "z_index": 50,
           "checked": false,
           "position": {
-            "x": 43.0,
-            "y": 297.0
+            "x": 28.0,
+            "y": 141.0
           },
           "size": {
             "w": 763.0,
@@ -614,8 +614,8 @@
           "z_index": 70,
           "checked": false,
           "position": {
-            "x": 814.0,
-            "y": 301.0
+            "x": 813.0,
+            "y": 146.0
           },
           "size": {
             "w": 96.0,
@@ -680,8 +680,8 @@
           "z_index": 100,
           "checked": false,
           "position": {
-            "x": 39.0,
-            "y": 665.0
+            "x": 32.0,
+            "y": 97.0
           },
           "size": {
             "w": 72.0,
@@ -746,8 +746,8 @@
           "z_index": 110,
           "checked": false,
           "position": {
-            "x": 115.0,
-            "y": 665.0
+            "x": 108.0,
+            "y": 97.0
           },
           "size": {
             "w": 184.0,
@@ -812,8 +812,8 @@
           "z_index": 100,
           "checked": false,
           "position": {
-            "x": 315.0,
-            "y": 665.0
+            "x": 308.0,
+            "y": 97.0
           },
           "size": {
             "w": 96.0,
@@ -878,8 +878,8 @@
           "z_index": 110,
           "checked": false,
           "position": {
-            "x": 411.0,
-            "y": 665.0
+            "x": 404.0,
+            "y": 97.0
           },
           "size": {
             "w": 104.0,
@@ -939,79 +939,13 @@
           }
         },
         {
-          "id": "lbl_codex_output",
-          "type": "label",
-          "z_index": 100,
-          "checked": false,
-          "position": {
-            "x": 43.0,
-            "y": 525.0
-          },
-          "size": {
-            "w": 763.0,
-            "h": 24.0
-          },
-          "visible": true,
-          "enabled": true,
-          "bind": {
-            "command": "",
-            "group": ""
-          },
-          "visual": {
-            "background": {
-              "image": "",
-              "fit": ""
-            },
-            "icon": {
-              "image": "",
-              "anchor": "center",
-              "offset": {
-                "x": 0.0,
-                "y": 0.0
-              },
-              "size": {
-                "w": 120.0,
-                "h": 32.0
-              }
-            },
-            "text": {
-              "value": "Codex出力",
-              "align": "left",
-              "font_size": 16.0,
-              "font_family": "noto_sans_jp",
-              "bold": false,
-              "italic": false
-            },
-            "states": {
-              "hover": {
-                "background": {
-                  "image": "",
-                  "fit": ""
-                }
-              },
-              "pressed": {
-                "background": {
-                  "image": "",
-                  "fit": ""
-                }
-              },
-              "disabled": {
-                "background": {
-                  "image": "",
-                  "fit": ""
-                }
-              }
-            }
-          }
-        },
-        {
           "id": "input_codex_output",
           "type": "input",
           "z_index": 105,
           "checked": false,
           "position": {
-            "x": 68.0,
-            "y": 106.0
+            "x": 31.0,
+            "y": 379.0
           },
           "size": {
             "w": 763.0,

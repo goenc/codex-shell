@@ -23,7 +23,7 @@ pub const CONFIG_AUTO_START_EXE_2_BROWSE: &str = "config.auto_start_exe.2.browse
 pub const CONFIG_AUTO_START_EXE_3_BROWSE: &str = "config.auto_start_exe.3.browse";
 pub const CONFIG_AUTO_START_EXE_4_BROWSE: &str = "config.auto_start_exe.4.browse";
 pub const CONFIG_SAVE: &str = "config.save";
- 
+
 pub const ALL_UI_COMMANDS: &[&str] = &[
     STATUS_MESSAGE,
     UI_EDIT_LOCKED_HINT,

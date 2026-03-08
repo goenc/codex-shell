@@ -5,12 +5,13 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::Write;
+use std::io::{BufRead, BufReader, Write};
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::Arc;
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 #[cfg(windows)]
 use windows::Win32::Foundation::{HWND, LPARAM};
@@ -62,6 +63,8 @@ const CODEX_OUTPUT_TEXT_EDIT_ID_SALT: &str = "codex_output_text_edit";
 const CODEX_OUTPUT_LINE_COUNT: usize = 5;
 const CODEX_OUTPUT_EVENT_END_PATH: &str = r"C:\Users\gonec\.codex\runtime\agent_event_end.md";
 const CODEX_OUTPUT_RELOAD_CHECK_INTERVAL_MS: u64 = 250;
+const CODEX_STREAM_BEGIN_MARKER: &str = "__CODEX_STREAM_BEGIN__";
+const CODEX_STREAM_END_MARKER: &str = "__CODEX_STREAM_END__";
 const VOICE_INPUT_HOTKEY_LABEL: &str = "Ctrl+Alt+Right";
 const POWERSHELL_EXECUTABLE: &str = "pwsh.exe";
 const AUTO_START_SLOT_COUNT: usize = 4;
@@ -500,6 +503,8 @@ struct CodexShellApp {
     voice_input_active: bool,
     pending_input_focus: bool,
     powershell_session: Option<PowerShellSession>,
+    powershell_output_rx: Option<Receiver<PowerShellOutputLine>>,
+    codex_output_streaming_active: bool,
     ui_resize_locked_by_save: bool,
     target_project_dir_path: Option<PathBuf>,
     project_declarations: Vec<ProjectDeclarationEntry>,
@@ -523,6 +528,40 @@ struct RenderObjCtx<'a> {
 struct PowerShellSession {
     process: Child,
     stdin: ChildStdin,
+}
+
+struct PowerShellOutputLine {
+    text: String,
+    is_stderr: bool,
+}
+
+fn spawn_powershell_stream_reader<R>(reader: R, is_stderr: bool, sender: Sender<PowerShellOutputLine>)
+where
+    R: std::io::Read + Send + 'static,
+{
+    std::thread::spawn(move || {
+        let mut reader = BufReader::new(reader);
+        let mut line = String::new();
+        loop {
+            line.clear();
+            match reader.read_line(&mut line) {
+                Ok(0) => break,
+                Ok(_) => {
+                    let text = line.trim_end_matches(['\r', '\n']).to_string();
+                    if sender.send(PowerShellOutputLine { text, is_stderr }).is_err() {
+                        break;
+                    }
+                }
+                Err(err) => {
+                    let _ = sender.send(PowerShellOutputLine {
+                        text: format!("PowerShell出力読み取り失敗: {err}"),
+                        is_stderr: true,
+                    });
+                    break;
+                }
+            }
+        }
+    });
 }
 
 impl CodexShellApp {
@@ -571,6 +610,8 @@ impl CodexShellApp {
             voice_input_active: false,
             pending_input_focus: false,
             powershell_session: None,
+            powershell_output_rx: None,
+            codex_output_streaming_active: false,
             ui_resize_locked_by_save: false,
             target_project_dir_path: None,
             project_declarations: Vec::new(),
@@ -660,7 +701,9 @@ impl CodexShellApp {
 
     fn send_input_command_by_button(&mut self) {
         let input = self.input_command.clone();
-        let command = format!("$prompt = @\"\n{input}\n\"@\ncodex exec $prompt\n");
+        let command = format!(
+            "$prompt = @\"\n{input}\n\"@\nWrite-Output \"{CODEX_STREAM_BEGIN_MARKER}\"\ncodex exec $prompt\nWrite-Output \"{CODEX_STREAM_END_MARKER}\"\n"
+        );
         if self.send_text_to_powershell(&command) {
             self.input_command.clear();
         }
@@ -673,7 +716,12 @@ impl CodexShellApp {
         }
 
         let mut command = Command::new(POWERSHELL_EXECUTABLE);
-        command.arg("-NoLogo").arg("-NoExit").stdin(Stdio::piped());
+        command
+            .arg("-NoLogo")
+            .arg("-NoExit")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
         #[cfg(windows)]
         {
             command.creation_flags(CREATE_NEW_CONSOLE_FLAG);
@@ -687,6 +735,21 @@ impl CodexShellApp {
                     self.push_history("PowerShell起動失敗: stdin取得不可");
                     return;
                 };
+                let Some(stdout) = child.stdout.take() else {
+                    let _ = child.kill();
+                    self.update_status("PowerShell起動失敗: stdout取得不可");
+                    self.push_history("PowerShell起動失敗: stdout取得不可");
+                    return;
+                };
+                let Some(stderr) = child.stderr.take() else {
+                    let _ = child.kill();
+                    self.update_status("PowerShell起動失敗: stderr取得不可");
+                    self.push_history("PowerShell起動失敗: stderr取得不可");
+                    return;
+                };
+                let (tx, rx) = mpsc::channel();
+                spawn_powershell_stream_reader(stdout, false, tx.clone());
+                spawn_powershell_stream_reader(stderr, true, tx);
                 #[cfg(windows)]
                 if let Err(err) = disable_window_close_button_for_pid(child.id()) {
                     self.push_history(format!("PowerShell閉じるボタン無効化失敗: {err}"));
@@ -695,6 +758,8 @@ impl CodexShellApp {
                     process: child,
                     stdin,
                 });
+                self.powershell_output_rx = Some(rx);
+                self.codex_output_streaming_active = false;
                 self.update_status("PowerShellを起動しました");
                 self.push_history("PowerShellを起動しました");
             }
@@ -720,8 +785,45 @@ impl CodexShellApp {
         }
         if let Some(message) = exited_message {
             self.powershell_session = None;
+            self.powershell_output_rx = None;
+            self.codex_output_streaming_active = false;
             self.update_status(message.clone());
             self.push_history(message);
+        }
+    }
+
+    fn drain_powershell_output(&mut self) {
+        let mut lines = Vec::new();
+        if let Some(rx) = self.powershell_output_rx.as_ref() {
+            while let Ok(line) = rx.try_recv() {
+                lines.push(line);
+            }
+        }
+
+        for line in lines {
+            let trimmed = line.text.trim();
+            if trimmed == CODEX_STREAM_BEGIN_MARKER {
+                self.codex_output_streaming_active = true;
+                self.codex_output_text.clear();
+                continue;
+            }
+            if trimmed == CODEX_STREAM_END_MARKER {
+                self.codex_output_streaming_active = false;
+                continue;
+            }
+            if !self.codex_output_streaming_active {
+                continue;
+            }
+            if trimmed.is_empty() || is_codex_output_noise_line(trimmed) {
+                continue;
+            }
+            if !self.codex_output_text.is_empty() {
+                self.codex_output_text.push('\n');
+            }
+            if line.is_stderr {
+                self.codex_output_text.push_str("stderr: ");
+            }
+            self.codex_output_text.push_str(trimmed);
         }
     }
 
@@ -2404,6 +2506,7 @@ impl eframe::App for CodexShellApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.apply_window_resize_policy(ctx);
         self.refresh_powershell_session();
+        self.drain_powershell_output();
         self.reload_codex_output_from_event_end_file(false);
         let next_window_size = ctx.content_rect().size();
         if self.ui_edit_mode {

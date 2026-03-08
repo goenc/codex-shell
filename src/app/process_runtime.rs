@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
-use windows::core::PWSTR;
 use windows::Win32::Foundation::{CloseHandle, GetLastError, HANDLE};
 use windows::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW, TH32CS_SNAPPROCESS,
@@ -14,9 +13,10 @@ use windows::Win32::System::Threading::{
     QueryFullProcessImageNameW, TerminateProcess,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, SendInput,
+    INPUT, INPUT_0, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS, KEYBDINPUT, KEYEVENTF_KEYUP, SendInput,
     VIRTUAL_KEY, VK_CONTROL, VK_MENU, VK_RIGHT,
 };
+use windows::core::PWSTR;
 
 fn keyboard_input(vk: VIRTUAL_KEY, flags: KEYBD_EVENT_FLAGS) -> INPUT {
     INPUT {
@@ -179,7 +179,9 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
                 output.status
             ));
         }
-        return Err(anyhow!("実行ファイル参照ダイアログが失敗しました: {stderr}"));
+        return Err(anyhow!(
+            "実行ファイル参照ダイアログが失敗しました: {stderr}"
+        ));
     }
     let selected = String::from_utf8_lossy(&output.stdout).trim().to_string();
     if selected.is_empty() {
