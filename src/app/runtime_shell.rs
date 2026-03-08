@@ -1467,11 +1467,25 @@ impl CodexShellApp {
     }
 
     fn handle_open_codex_output_log_dir(&mut self) {
-        let log_dir = codex_output_runtime_log_dir_path();
-        if let Err(err) = fs::create_dir_all(&log_dir) {
-            self.update_status(format!("ログフォルダ作成失敗: {err}"));
+        let trimmed = self.config.working_dir.trim();
+        if trimmed.is_empty() {
+            self.update_status("ログフォルダパスが未設定です");
+            self.push_history("ログフォルダを開けませんでした: パス未設定");
+            return;
+        }
+        let log_dir = PathBuf::from(trimmed);
+        if !log_dir.exists() {
+            self.update_status("ログフォルダが存在しません");
             self.push_history(format!(
-                "Codex出力ログフォルダ作成に失敗: {} ({err})",
+                "ログフォルダを開けませんでした: 存在しません ({})",
+                log_dir.display()
+            ));
+            return;
+        }
+        if !log_dir.is_dir() {
+            self.update_status("ログフォルダの指定が不正です");
+            self.push_history(format!(
+                "ログフォルダを開けませんでした: フォルダではありません ({})",
                 log_dir.display()
             ));
             return;
@@ -1480,14 +1494,14 @@ impl CodexShellApp {
             Ok(_) => {
                 self.update_status("ログフォルダを開きました");
                 self.push_history(format!(
-                    "Codex出力ログフォルダを開きました: {}",
+                    "ログフォルダを開きました: {}",
                     log_dir.display()
                 ));
             }
             Err(err) => {
                 self.update_status(format!("ログフォルダを開けません: {err}"));
                 self.push_history(format!(
-                    "Codex出力ログフォルダを開けませんでした: {} ({err})",
+                    "ログフォルダを開けませんでした: {} ({err})",
                     log_dir.display()
                 ));
             }

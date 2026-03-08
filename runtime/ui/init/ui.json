@@ -81,6 +81,72 @@
           }
         },
         {
+          "id": "btn_main_open_log_dir",
+          "type": "button",
+          "z_index": 30,
+          "checked": false,
+          "position": {
+            "x": 712.0,
+            "y": 497.0
+          },
+          "size": {
+            "w": 96.0,
+            "h": 28.0
+          },
+          "visible": true,
+          "enabled": true,
+          "bind": {
+            "command": "config.codex_output_log_dir.open",
+            "group": ""
+          },
+          "visual": {
+            "background": {
+              "image": "btn_primary",
+              "fit": "stretch"
+            },
+            "icon": {
+              "image": "",
+              "anchor": "center",
+              "offset": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "size": {
+                "w": 0.0,
+                "h": 0.0
+              }
+            },
+            "text": {
+              "value": "ログフォルダ",
+              "align": "center",
+              "font_size": 16.0,
+              "font_family": "noto_sans_jp",
+              "bold": false,
+              "italic": false
+            },
+            "states": {
+              "hover": {
+                "background": {
+                  "image": "btn_hover",
+                  "fit": "stretch"
+                }
+              },
+              "pressed": {
+                "background": {
+                  "image": "btn_pressed",
+                  "fit": "stretch"
+                }
+              },
+              "disabled": {
+                "background": {
+                  "image": "btn_primary",
+                  "fit": "stretch"
+                }
+              }
+            }
+          }
+        },
+        {
           "id": "lbl_status",
           "type": "label",
           "z_index": 40,
@@ -1311,72 +1377,6 @@
             },
             "text": {
               "value": "設定保存",
-              "align": "center",
-              "font_size": 16.0,
-              "font_family": "noto_sans_jp",
-              "bold": false,
-              "italic": false
-            },
-            "states": {
-              "hover": {
-                "background": {
-                  "image": "",
-                  "fit": ""
-                }
-              },
-              "pressed": {
-                "background": {
-                  "image": "",
-                  "fit": ""
-                }
-              },
-              "disabled": {
-                "background": {
-                  "image": "",
-                  "fit": ""
-                }
-              }
-            }
-          }
-        },
-        {
-          "id": "btn_settings_open_log_dir",
-          "type": "button",
-          "z_index": 120,
-          "checked": false,
-          "position": {
-            "x": 248.0,
-            "y": 413.0
-          },
-          "size": {
-            "w": 180.0,
-            "h": 28.0
-          },
-          "visible": true,
-          "enabled": true,
-          "bind": {
-            "command": "config.codex_output_log_dir.open",
-            "group": ""
-          },
-          "visual": {
-            "background": {
-              "image": "",
-              "fit": ""
-            },
-            "icon": {
-              "image": "",
-              "anchor": "center",
-              "offset": {
-                "x": 0.0,
-                "y": 0.0
-              },
-              "size": {
-                "w": 120.0,
-                "h": 32.0
-              }
-            },
-            "text": {
-              "value": "ログフォルダを開く",
               "align": "center",
               "font_size": 16.0,
               "font_family": "noto_sans_jp",

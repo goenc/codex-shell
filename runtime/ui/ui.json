@@ -3,11 +3,11 @@
   "assets": {
     "base_dir": "assets/ui",
     "images": {
-      "icon_voice": "icons/voice.png",
       "btn_pressed": "buttons/pressed.png",
-      "icon_build": "icons/build.png",
+      "icon_voice": "icons/voice.png",
       "btn_hover": "buttons/hover.png",
-      "btn_primary": "buttons/primary.png"
+      "btn_primary": "buttons/primary.png",
+      "icon_build": "icons/build.png"
     }
   },
   "screens": [
@@ -52,6 +52,72 @@
             },
             "text": {
               "value": "設定",
+              "align": "center",
+              "font_size": 16.0,
+              "font_family": "noto_sans_jp",
+              "bold": false,
+              "italic": false
+            },
+            "states": {
+              "hover": {
+                "background": {
+                  "image": "btn_hover",
+                  "fit": "stretch"
+                }
+              },
+              "pressed": {
+                "background": {
+                  "image": "btn_pressed",
+                  "fit": "stretch"
+                }
+              },
+              "disabled": {
+                "background": {
+                  "image": "btn_primary",
+                  "fit": "stretch"
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "btn_main_open_log_dir",
+          "type": "button",
+          "z_index": 30,
+          "checked": false,
+          "position": {
+            "x": 713.0,
+            "y": 384.0
+          },
+          "size": {
+            "w": 96.0,
+            "h": 28.0
+          },
+          "visible": true,
+          "enabled": true,
+          "bind": {
+            "command": "config.codex_output_log_dir.open",
+            "group": ""
+          },
+          "visual": {
+            "background": {
+              "image": "btn_primary",
+              "fit": "stretch"
+            },
+            "icon": {
+              "image": "",
+              "anchor": "center",
+              "offset": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "size": {
+                "w": 0.0,
+                "h": 0.0
+              }
+            },
+            "text": {
+              "value": "ログフォルダ",
               "align": "center",
               "font_size": 16.0,
               "font_family": "noto_sans_jp",
@@ -282,7 +348,7 @@
           "id": "chk_ui_edit",
           "type": "checkbox",
           "z_index": 90,
-          "checked": true,
+          "checked": false,
           "position": {
             "x": 825.0,
             "y": 438.0
@@ -1279,8 +1345,8 @@
           "z_index": 120,
           "checked": false,
           "position": {
-            "x": 50.0,
-            "y": 413.0
+            "x": 53.0,
+            "y": 288.0
           },
           "size": {
             "w": 120.0,
@@ -1311,72 +1377,6 @@
             },
             "text": {
               "value": "設定保存",
-              "align": "center",
-              "font_size": 16.0,
-              "font_family": "noto_sans_jp",
-              "bold": false,
-              "italic": false
-            },
-            "states": {
-              "hover": {
-                "background": {
-                  "image": "",
-                  "fit": ""
-                }
-              },
-              "pressed": {
-                "background": {
-                  "image": "",
-                  "fit": ""
-                }
-              },
-              "disabled": {
-                "background": {
-                  "image": "",
-                  "fit": ""
-                }
-              }
-            }
-          }
-        },
-        {
-          "id": "btn_settings_open_log_dir",
-          "type": "button",
-          "z_index": 120,
-          "checked": false,
-          "position": {
-            "x": 248.0,
-            "y": 413.0
-          },
-          "size": {
-            "w": 180.0,
-            "h": 28.0
-          },
-          "visible": true,
-          "enabled": true,
-          "bind": {
-            "command": "config.codex_output_log_dir.open",
-            "group": ""
-          },
-          "visual": {
-            "background": {
-              "image": "",
-              "fit": ""
-            },
-            "icon": {
-              "image": "",
-              "anchor": "center",
-              "offset": {
-                "x": 0.0,
-                "y": 0.0
-              },
-              "size": {
-                "w": 120.0,
-                "h": 32.0
-              }
-            },
-            "text": {
-              "value": "ログフォルダを開く",
               "align": "center",
               "font_size": 16.0,
               "font_family": "noto_sans_jp",
