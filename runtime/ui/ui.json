@@ -3,11 +3,11 @@
   "assets": {
     "base_dir": "assets/ui",
     "images": {
-      "icon_build": "icons/build.png",
+      "icon_voice": "icons/voice.png",
       "btn_primary": "buttons/primary.png",
       "btn_hover": "buttons/hover.png",
-      "btn_pressed": "buttons/pressed.png",
-      "icon_voice": "icons/voice.png"
+      "icon_build": "icons/build.png",
+      "btn_pressed": "buttons/pressed.png"
     }
   },
   "screens": [
@@ -152,8 +152,8 @@
           "z_index": 40,
           "checked": false,
           "position": {
-            "x": 43.0,
-            "y": 561.0
+            "x": 35.0,
+            "y": 573.0
           },
           "size": {
             "w": 780.0,
@@ -218,8 +218,8 @@
           "z_index": 60,
           "checked": false,
           "position": {
-            "x": 34.0,
-            "y": 521.0
+            "x": 30.0,
+            "y": 533.0
           },
           "size": {
             "w": 767.0,
@@ -350,8 +350,8 @@
           "z_index": 90,
           "checked": true,
           "position": {
-            "x": 827.0,
-            "y": 552.0
+            "x": 818.0,
+            "y": 540.0
           },
           "size": {
             "w": 88.0,
@@ -1005,13 +1005,79 @@
           }
         },
         {
+          "id": "lbl_codex_indicator",
+          "type": "label",
+          "z_index": 104,
+          "checked": false,
+          "position": {
+            "x": 30.0,
+            "y": 347.0
+          },
+          "size": {
+            "w": 120.0,
+            "h": 20.0
+          },
+          "visible": true,
+          "enabled": true,
+          "bind": {
+            "command": "",
+            "group": ""
+          },
+          "visual": {
+            "background": {
+              "image": "",
+              "fit": ""
+            },
+            "icon": {
+              "image": "",
+              "anchor": "center",
+              "offset": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "size": {
+                "w": 120.0,
+                "h": 32.0
+              }
+            },
+            "text": {
+              "value": "Codex",
+              "align": "left",
+              "font_size": 13.0,
+              "font_family": "noto_sans_jp",
+              "bold": false,
+              "italic": false
+            },
+            "states": {
+              "hover": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "pressed": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "disabled": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              }
+            }
+          }
+        },
+        {
           "id": "input_codex_output",
           "type": "input",
           "z_index": 105,
           "checked": false,
           "position": {
-            "x": 31.0,
-            "y": 379.0
+            "x": 30.0,
+            "y": 369.0
           },
           "size": {
             "w": 763.0,
@@ -1673,7 +1739,7 @@
           "id": "chk_settings_ui_edit",
           "type": "checkbox",
           "z_index": 130,
-          "checked": true,
+          "checked": false,
           "position": {
             "x": 494.0,
             "y": 413.0

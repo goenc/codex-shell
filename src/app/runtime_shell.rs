@@ -65,6 +65,7 @@ const CODEX_OUTPUT_EVENT_END_PATH: &str = r"C:\Users\gonec\.codex\runtime\agent_
 const CODEX_OUTPUT_RUNTIME_LOG_DIR_RELATIVE_PATH: &str = "runtime/codex_output_logs";
 const CODEX_OUTPUT_RELOAD_CHECK_INTERVAL_MS: u64 = 250;
 const CODEX_OUTPUT_FLASH_DURATION_MS: u64 = 700;
+const CODEX_INDICATOR_LABEL_ID: &str = "lbl_codex_indicator";
 const CODEX_STREAM_BEGIN_MARKER: &str = "__CODEX_STREAM_BEGIN__";
 const CODEX_STREAM_END_MARKER: &str = "__CODEX_STREAM_END__";
 const CODEX_TURN_SEPARATOR: &str = "--------------------------------------------------------------------------------------------------------------------------------------------------------";
@@ -1829,6 +1830,10 @@ impl CodexShellApp {
     }
 
     fn render_obj_label(&self, ctx: &mut RenderObjCtx<'_>) {
+        if ctx.object_id == CODEX_INDICATOR_LABEL_ID {
+            self.render_codex_indicator_label(ctx);
+            return;
+        }
         let text = self.resolve_object_text(ctx.object);
         let main_align = match ctx.object.visual.text.align.trim() {
             "left" => egui::Align::Min,
@@ -1838,6 +1843,49 @@ impl CodexShellApp {
         let mut rich = RichText::new(text)
             .font(ctx.text_font.clone())
             .color(self.resolve_label_color(ctx.object));
+        if ctx.object.visual.text.bold {
+            rich = rich.strong();
+        }
+        if ctx.object.visual.text.italic {
+            rich = rich.italics();
+        }
+        ctx.ui.allocate_ui_with_layout(
+            ctx.object_size,
+            egui::Layout::left_to_right(egui::Align::Center).with_main_align(main_align),
+            |ui| {
+                ui.add(
+                    egui::Label::new(rich)
+                        .selectable(false)
+                        .sense(egui::Sense::hover()),
+                );
+            },
+        );
+    }
+
+    fn render_codex_indicator_label(&self, ctx: &mut RenderObjCtx<'_>) {
+        let base_label = self.resolve_object_text(ctx.object);
+        let indicator_base = if base_label.trim().is_empty() {
+            "Codex"
+        } else {
+            base_label.trim()
+        };
+        let flash_active = self.is_codex_output_flash_active();
+        let text = if flash_active {
+            format!("● {indicator_base}")
+        } else {
+            format!("○ {indicator_base}")
+        };
+        let text_color = if flash_active {
+            Color32::from_rgb(36, 120, 36)
+        } else {
+            Color32::from_rgb(88, 88, 88)
+        };
+        let main_align = match ctx.object.visual.text.align.trim() {
+            "left" => egui::Align::Min,
+            "right" => egui::Align::Max,
+            _ => egui::Align::Center,
+        };
+        let mut rich = RichText::new(text).font(ctx.text_font.clone()).color(text_color);
         if ctx.object.visual.text.bold {
             rich = rich.strong();
         }
@@ -1969,26 +2017,6 @@ impl CodexShellApp {
             + FIXED_INPUT_HEIGHT_PADDING;
         let mut codex_output_display_text =
             decorate_codex_output_display_lines(&self.codex_output_text);
-        let flash_active = self.is_codex_output_flash_active();
-        let flash_text_color = if flash_active {
-            Color32::from_rgb(36, 120, 36)
-        } else {
-            Color32::from_rgb(88, 88, 88)
-        };
-        let flash_label = if flash_active {
-            "● Codex"
-        } else {
-            "○ Codex"
-        };
-
-        ctx.ui.horizontal(|ui| {
-            ui.label(
-                RichText::new(flash_label)
-                    .color(flash_text_color)
-                    .font(egui::FontId::proportional(13.0)),
-            );
-        });
-        ctx.ui.add_space(4.0);
 
         egui::Frame::default()
             .fill(Color32::from_gray(242))

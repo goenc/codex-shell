@@ -1005,6 +1005,72 @@
           }
         },
         {
+          "id": "lbl_codex_indicator",
+          "type": "label",
+          "z_index": 104,
+          "checked": false,
+          "position": {
+            "x": 68.0,
+            "y": 84.0
+          },
+          "size": {
+            "w": 120.0,
+            "h": 20.0
+          },
+          "visible": true,
+          "enabled": true,
+          "bind": {
+            "command": "",
+            "group": ""
+          },
+          "visual": {
+            "background": {
+              "image": "",
+              "fit": ""
+            },
+            "icon": {
+              "image": "",
+              "anchor": "center",
+              "offset": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "size": {
+                "w": 120.0,
+                "h": 32.0
+              }
+            },
+            "text": {
+              "value": "Codex",
+              "align": "left",
+              "font_size": 13.0,
+              "font_family": "noto_sans_jp",
+              "bold": false,
+              "italic": false
+            },
+            "states": {
+              "hover": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "pressed": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "disabled": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              }
+            }
+          }
+        },
+        {
           "id": "input_codex_output",
           "type": "input",
           "z_index": 105,
