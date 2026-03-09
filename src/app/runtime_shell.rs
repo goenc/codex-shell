@@ -520,6 +520,8 @@ struct CodexShellApp {
     codex_output_last_reload_check: Instant,
     codex_output_waiting_stderr_body: bool,
     is_codex_running: bool,
+    codex_response_choices: Vec<CodexResponseChoice>,
+    codex_response_prompt: String,
 }
 
 struct RenderObjCtx<'a> {
@@ -541,6 +543,12 @@ struct PowerShellSession {
 struct PowerShellOutputLine {
     text: String,
     is_stderr: bool,
+}
+
+#[derive(Clone, Debug)]
+struct CodexResponseChoice {
+    label: String,
+    value: String,
 }
 
 fn spawn_powershell_stream_reader<R>(reader: R, is_stderr: bool, sender: Sender<PowerShellOutputLine>)
@@ -630,6 +638,8 @@ impl CodexShellApp {
             codex_output_last_reload_check: Instant::now(),
             codex_output_waiting_stderr_body: false,
             is_codex_running: false,
+            codex_response_choices: Vec::new(),
+            codex_response_prompt: String::new(),
         };
 
         app.push_history(format!(
@@ -712,6 +722,7 @@ impl CodexShellApp {
 
     fn send_input_command_by_button(&mut self) -> bool {
         let input = self.input_command.clone();
+        self.clear_codex_response_state();
         let command = format!(
             "$prompt = @\"\n{input}\n\"@\nWrite-Output \"{CODEX_STREAM_BEGIN_MARKER}\"\ncodex exec $prompt\nWrite-Output \"{CODEX_STREAM_END_MARKER}\"\n"
         );
@@ -816,6 +827,12 @@ impl CodexShellApp {
 
     fn clear_codex_running_state(&mut self) {
         self.is_codex_running = false;
+        self.clear_codex_response_state();
+    }
+
+    fn clear_codex_response_state(&mut self) {
+        self.codex_response_choices.clear();
+        self.codex_response_prompt.clear();
     }
 
     fn start_codex_output_runtime_log(&mut self) {
@@ -862,6 +879,7 @@ impl CodexShellApp {
                 self.codex_output_streaming_active = true;
                 self.codex_output_waiting_stderr_body = false;
                 self.codex_output_text.clear();
+                self.clear_codex_response_state();
                 self.start_codex_output_runtime_log();
                 self.codex_output_text.push_str(CODEX_TURN_SEPARATOR);
                 self.append_codex_output_runtime_log_line(CODEX_TURN_SEPARATOR);
@@ -906,7 +924,66 @@ impl CodexShellApp {
             }
             self.codex_output_text.push_str(&output_line);
             self.append_codex_output_runtime_log_line(&output_line);
+            self.detect_codex_response_choices(&output_line);
         }
+    }
+
+    fn detect_codex_response_choices(&mut self, line: &str) {
+        if !self.is_codex_running {
+            return;
+        }
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+
+        if let Some(choices) = yes_no_choices_from_line(trimmed) {
+            self.codex_response_prompt = trimmed.to_string();
+            self.codex_response_choices = choices;
+            return;
+        }
+
+        if let Some((label, value)) = parse_numbered_choice_line(trimmed) {
+            let numbered_active = choices_are_numbered(&self.codex_response_choices);
+            if !numbered_active || value == "1" {
+                self.codex_response_choices.clear();
+                self.codex_response_prompt.clear();
+            }
+            if !self
+                .codex_response_choices
+                .iter()
+                .any(|choice| choice.value == value)
+            {
+                self.codex_response_choices
+                    .push(CodexResponseChoice { label, value });
+            }
+            return;
+        }
+
+        if choices_are_numbered(&self.codex_response_choices) {
+            let lowered = trimmed.to_ascii_lowercase();
+            if lowered.contains("select")
+                || lowered.contains("choose")
+                || lowered.contains("choice")
+                || lowered.contains("番号")
+            {
+                self.codex_response_prompt = trimmed.to_string();
+            }
+        }
+    }
+
+    fn send_codex_response_choice(&mut self, answer: &str) -> bool {
+        if !self.is_codex_running {
+            self.update_status("Codex実行中ではないため回答を送信しません");
+            return false;
+        }
+        let sent = self.send_text_to_powershell(answer);
+        if sent {
+            self.update_status(format!("Codex回答を送信しました: {answer}"));
+            self.push_history(format!("Codex回答を送信しました: {answer}"));
+            self.clear_codex_response_state();
+        }
+        sent
     }
 
     fn send_text_to_powershell(&mut self, text: &str) -> bool {
@@ -1904,6 +1981,26 @@ impl CodexShellApp {
                         )
                     });
             });
+
+        if !self.ui_edit_mode && self.is_codex_running && !self.codex_response_choices.is_empty() {
+            let choices = self.codex_response_choices.clone();
+            let prompt = self.codex_response_prompt.clone();
+            ctx.ui.add_space(UI_BASE_COMPONENT_GAP);
+            if !prompt.is_empty() {
+                ctx.ui.label(RichText::new(prompt));
+            }
+            let mut selected_answer = None;
+            ctx.ui.horizontal_wrapped(|ui| {
+                for choice in &choices {
+                    if ui.button(choice.label.as_str()).clicked() {
+                        selected_answer = Some(choice.value.clone());
+                    }
+                }
+            });
+            if let Some(answer) = selected_answer {
+                self.send_codex_response_choice(&answer);
+            }
+        }
     }
 
     fn reload_codex_output_from_event_end_file(&mut self, force: bool) {
@@ -2758,6 +2855,67 @@ fn is_codex_output_noise_line(line: &str) -> bool {
         || lowered.contains("elapsed")
         || lowered.starts_with("stdout")
         || lowered.starts_with("stderr")
+}
+
+fn choices_are_numbered(choices: &[CodexResponseChoice]) -> bool {
+    !choices.is_empty()
+        && choices
+            .iter()
+            .all(|choice| choice.value.chars().all(|ch| ch.is_ascii_digit()))
+}
+
+fn parse_numbered_choice_line(line: &str) -> Option<(String, String)> {
+    let trimmed = line.trim_start();
+    let mut number_end = 0usize;
+    for (idx, ch) in trimmed.char_indices() {
+        if ch.is_ascii_digit() {
+            number_end = idx + ch.len_utf8();
+        } else {
+            break;
+        }
+    }
+    if number_end == 0 {
+        return None;
+    }
+    let number = trimmed[..number_end].to_string();
+    let rest = trimmed[number_end..].trim_start();
+    let body = rest
+        .strip_prefix('.')
+        .or_else(|| rest.strip_prefix(')'))
+        .map(str::trim)?;
+    if body.is_empty() {
+        return None;
+    }
+    Some((format!("{number}. {body}"), number))
+}
+
+fn yes_no_choices_from_line(line: &str) -> Option<Vec<CodexResponseChoice>> {
+    let lowered = line.trim().to_ascii_lowercase();
+    if lowered.contains("yes / no") {
+        return Some(vec![
+            CodexResponseChoice {
+                label: "yes".to_string(),
+                value: "yes".to_string(),
+            },
+            CodexResponseChoice {
+                label: "no".to_string(),
+                value: "no".to_string(),
+            },
+        ]);
+    }
+    if lowered.contains("y / n") || lowered.contains("[y/n]") || lowered.contains("y/n") {
+        return Some(vec![
+            CodexResponseChoice {
+                label: "y".to_string(),
+                value: "y".to_string(),
+            },
+            CodexResponseChoice {
+                label: "n".to_string(),
+                value: "n".to_string(),
+            },
+        ]);
+    }
+    None
 }
 
 fn decorate_codex_output_display_lines(text: &str) -> String {
