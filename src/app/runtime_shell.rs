@@ -64,6 +64,7 @@ const CODEX_OUTPUT_LINE_COUNT: usize = 5;
 const CODEX_OUTPUT_EVENT_END_PATH: &str = r"C:\Users\gonec\.codex\runtime\agent_event_end.md";
 const CODEX_OUTPUT_RUNTIME_LOG_DIR_RELATIVE_PATH: &str = "runtime/codex_output_logs";
 const CODEX_OUTPUT_RELOAD_CHECK_INTERVAL_MS: u64 = 250;
+const CODEX_OUTPUT_FLASH_DURATION_MS: u64 = 700;
 const CODEX_STREAM_BEGIN_MARKER: &str = "__CODEX_STREAM_BEGIN__";
 const CODEX_STREAM_END_MARKER: &str = "__CODEX_STREAM_END__";
 const CODEX_TURN_SEPARATOR: &str = "--------------------------------------------------------------------------------------------------------------------------------------------------------";
@@ -519,6 +520,7 @@ struct CodexShellApp {
     codex_output_event_last_modified: Option<SystemTime>,
     codex_output_last_reload_check: Instant,
     codex_output_waiting_stderr_body: bool,
+    codex_flash_until: Option<Instant>,
     is_codex_running: bool,
     codex_response_choices: Vec<CodexResponseChoice>,
     codex_response_prompt: String,
@@ -637,6 +639,7 @@ impl CodexShellApp {
             codex_output_event_last_modified: None,
             codex_output_last_reload_check: Instant::now(),
             codex_output_waiting_stderr_body: false,
+            codex_flash_until: None,
             is_codex_running: false,
             codex_response_choices: Vec::new(),
             codex_response_prompt: String::new(),
@@ -827,6 +830,7 @@ impl CodexShellApp {
 
     fn clear_codex_running_state(&mut self) {
         self.is_codex_running = false;
+        self.codex_flash_until = None;
         self.clear_codex_response_state();
     }
 
@@ -900,6 +904,7 @@ impl CodexShellApp {
             if !self.codex_output_streaming_active {
                 continue;
             }
+            self.trigger_codex_output_flash();
             if trimmed.is_empty() || is_codex_output_noise_line(trimmed) {
                 continue;
             }
@@ -926,6 +931,16 @@ impl CodexShellApp {
             self.append_codex_output_runtime_log_line(&output_line);
             self.detect_codex_response_choices(&output_line);
         }
+    }
+
+    fn trigger_codex_output_flash(&mut self) {
+        self.codex_flash_until =
+            Some(Instant::now() + Duration::from_millis(CODEX_OUTPUT_FLASH_DURATION_MS));
+    }
+
+    fn is_codex_output_flash_active(&self) -> bool {
+        self.codex_flash_until
+            .is_some_and(|until| Instant::now() <= until)
     }
 
     fn detect_codex_response_choices(&mut self, line: &str) {
@@ -1954,6 +1969,26 @@ impl CodexShellApp {
             + FIXED_INPUT_HEIGHT_PADDING;
         let mut codex_output_display_text =
             decorate_codex_output_display_lines(&self.codex_output_text);
+        let flash_active = self.is_codex_output_flash_active();
+        let flash_text_color = if flash_active {
+            Color32::from_rgb(36, 120, 36)
+        } else {
+            Color32::from_rgb(88, 88, 88)
+        };
+        let flash_label = if flash_active {
+            "● Codex"
+        } else {
+            "○ Codex"
+        };
+
+        ctx.ui.horizontal(|ui| {
+            ui.label(
+                RichText::new(flash_label)
+                    .color(flash_text_color)
+                    .font(egui::FontId::proportional(13.0)),
+            );
+        });
+        ctx.ui.add_space(4.0);
 
         egui::Frame::default()
             .fill(Color32::from_gray(242))
