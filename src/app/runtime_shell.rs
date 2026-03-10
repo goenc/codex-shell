@@ -62,7 +62,6 @@ const INPUT_COMMAND_ID_SALT: &str = "input_command_text_edit";
 const CODEX_OUTPUT_TEXT_EDIT_ID_SALT: &str = "codex_output_text_edit";
 const CODEX_OUTPUT_LINE_COUNT: usize = 5;
 const CODEX_OUTPUT_EVENT_END_PATH: &str = r"C:\Users\gonec\.codex\runtime\agent_event_end.md";
-const CODEX_OUTPUT_RUNTIME_LOG_DIR_RELATIVE_PATH: &str = "runtime/codex_output_logs";
 const CODEX_RAW_RUNTIME_LOG_DIR_RELATIVE_PATH: &str = "runtime/codex_raw_logs";
 const CODEX_OUTPUT_RELOAD_CHECK_INTERVAL_MS: u64 = 250;
 const CODEX_OUTPUT_FLASH_DURATION_MS: u64 = 700;
@@ -865,33 +864,10 @@ impl CodexShellApp {
     }
 
     fn start_codex_output_runtime_log(&mut self) {
-        match create_codex_output_runtime_log_path() {
-            Ok(path) => {
-                self.codex_output_runtime_log_path = Some(path);
-            }
-            Err(err) => {
-                self.codex_output_runtime_log_path = None;
-                self.push_history(format!("Codex出力ログ初期化失敗: {err}"));
-            }
-        }
+        self.codex_output_runtime_log_path = None;
     }
 
-    fn append_codex_output_runtime_log_line(&mut self, line: &str) {
-        let Some(path) = self.codex_output_runtime_log_path.as_ref() else {
-            return;
-        };
-        let mut file = match fs::OpenOptions::new().create(true).append(true).open(path) {
-            Ok(file) => file,
-            Err(err) => {
-                self.codex_output_runtime_log_path = None;
-                self.push_history(format!("Codex出力ログ追記失敗: {err}"));
-                return;
-            }
-        };
-        if let Err(err) = writeln!(file, "{line}") {
-            self.codex_output_runtime_log_path = None;
-            self.push_history(format!("Codex出力ログ書き込み失敗: {err}"));
-        }
+    fn append_codex_output_runtime_log_line(&mut self, _line: &str) {
     }
 
     fn drain_powershell_output(&mut self) {
@@ -3277,21 +3253,6 @@ fn ui_runtime_base_dir() -> PathBuf {
         return current_dir;
     }
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-}
-
-fn create_codex_output_runtime_log_path() -> Result<PathBuf> {
-    let log_dir = codex_output_runtime_log_dir_path();
-    fs::create_dir_all(&log_dir)
-        .with_context(|| format!("Codex出力ログディレクトリ作成に失敗: {}", log_dir.display()))?;
-    let file_name = format!("codex_output_{}.log", unix_timestamp_millis());
-    let log_path = log_dir.join(file_name);
-    fs::write(&log_path, "")
-        .with_context(|| format!("Codex出力ログ作成に失敗: {}", log_path.display()))?;
-    Ok(log_path)
-}
-
-fn codex_output_runtime_log_dir_path() -> PathBuf {
-    ui_runtime_base_dir().join(CODEX_OUTPUT_RUNTIME_LOG_DIR_RELATIVE_PATH)
 }
 
 fn append_codex_raw_runtime_log_line(

@@ -1,0 +1,55 @@
+[stdout] __CODEX_STREAM_BEGIN__
+[stderr] OpenAI Codex v0.112.0 (research preview)
+[stderr] --------
+[stderr] workdir: C:\Users\gonec\RustProjects\bevy_game1
+[stderr] model: gpt-5.3-codex
+[stderr] provider: openai
+[stderr] approval: never
+[stderr] sandbox: danger-full-access
+[stderr] reasoning effort: medium
+[stderr] reasoning summaries: none
+[stderr] session id: 019cd6a6-fb9e-7273-8151-383b32dc43b7
+[stderr] --------
+[stderr] user
+[stderr] Codexの週あたりの使用制限を確認して
+[stderr] mcp startup: no servers
+[stderr] 🌐 Searching the web...
+[stderr] 🌐 Searched: OpenAI Codex weekly usage limit
+[stderr] 🌐 Searching the web...
+[stderr] 🌐 Searched: https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan
+[stderr] 🌐 Searching the web...
+[stderr] 🌐 Searched: https://developers.openai.com/codex/pricing
+[stderr] 🌐 Searching the web...
+[stderr] 🌐 Searched: 'week' in https://developers.openai.com/codex/pricing
+[stderr] codex
+[stderr] 2026年3月10日時点の公式情報では、Codexの「週あたり制限」は以下です（プラン・モデルで変動）。
+[stderr] 
+[stderr] - `GPT-5.3-Codex` の `Code Review / week`
+[stderr]   - Plus: `10–25件/週`
+[stderr]   - Pro: `100–250件/週`
+[stderr]   - Business: `10–25件/週`
+[stderr]   - Enterprise/Edu: `固定上限なし（クレジット連動）`
+[stderr] - `ローカルメッセージ/クラウドタスク` は主に「5時間ウィンドウ」で管理され、`追加の週次制限が適用される場合あり`（固定の週次数値は公開上は一律で明記されていません）。
+[stderr] 
+[stderr] 自分の正確な現在上限は `Codex usage dashboard` で確認するのが確実です。
+[stderr] 
+[stderr] 参照:
+[stderr] - https://developers.openai.com/codex/pricing
+[stderr] - https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan
+[stderr] tokens used
+[stdout] 2026年3月10日時点の公式情報では、Codexの「週あたり制限」は以下です（プラン・モデルで変動）。
+[stderr] 18,236
+[stdout] 
+[stdout] - `GPT-5.3-Codex` の `Code Review / week`
+[stdout]   - Plus: `10–25件/週`
+[stdout]   - Pro: `100–250件/週`
+[stdout]   - Business: `10–25件/週`
+[stdout]   - Enterprise/Edu: `固定上限なし（クレジット連動）`
+[stdout] - `ローカルメッセージ/クラウドタスク` は主に「5時間ウィンドウ」で管理され、`追加の週次制限が適用される場合あり`（固定の週次数値は公開上は一律で明記されていません）。
+[stdout] 
+[stdout] 自分の正確な現在上限は `Codex usage dashboard` で確認するのが確実です。
+[stdout] 
+[stdout] 参照:
+[stdout] - https://developers.openai.com/codex/pricing
+[stdout] - https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan
+[stdout] __CODEX_STREAM_END__
