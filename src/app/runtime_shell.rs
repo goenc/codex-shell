@@ -679,7 +679,6 @@ impl CodexShellApp {
         app.launch_configured_auto_start_executables();
         app.refresh_project_declarations();
         app.start_powershell_session();
-        app.reload_codex_output_from_event_end_file(true);
         app.save_config();
         Ok(app)
     }
