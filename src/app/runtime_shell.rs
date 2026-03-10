@@ -61,7 +61,6 @@ const FIXED_INPUT_HEIGHT_PADDING: f32 = 12.0;
 const INPUT_COMMAND_ID_SALT: &str = "input_command_text_edit";
 const CODEX_OUTPUT_TEXT_EDIT_ID_SALT: &str = "codex_output_text_edit";
 const CODEX_OUTPUT_LINE_COUNT: usize = 5;
-const CODEX_OUTPUT_EVENT_END_PATH: &str = r"C:\Users\gonec\.codex\runtime\agent_event_end.md";
 const CODEX_RAW_RUNTIME_LOG_DIR_RELATIVE_PATH: &str = "runtime/codex_raw_logs";
 const CODEX_OUTPUT_RELOAD_CHECK_INTERVAL_MS: u64 = 250;
 const CODEX_OUTPUT_FLASH_DURATION_MS: u64 = 700;
@@ -518,8 +517,6 @@ struct CodexShellApp {
     project_declarations: Vec<ProjectDeclarationEntry>,
     project_selected_index: Option<usize>,
     moved_project_highlight_key: Option<String>,
-    codex_output_event_last_modified: Option<SystemTime>,
-    codex_output_last_reload_check: Instant,
     codex_output_waiting_stderr_body: bool,
     codex_flash_until: Option<Instant>,
     is_codex_running: bool,
@@ -659,8 +656,6 @@ impl CodexShellApp {
             project_declarations: Vec::new(),
             project_selected_index: None,
             moved_project_highlight_key: None,
-            codex_output_event_last_modified: None,
-            codex_output_last_reload_check: Instant::now(),
             codex_output_waiting_stderr_body: false,
             codex_flash_until: None,
             is_codex_running: false,
@@ -2068,43 +2063,6 @@ impl CodexShellApp {
         }
     }
 
-    fn reload_codex_output_from_event_end_file(&mut self, force: bool) {
-        if !force
-            && self.codex_output_last_reload_check.elapsed()
-                < Duration::from_millis(CODEX_OUTPUT_RELOAD_CHECK_INTERVAL_MS)
-        {
-            return;
-        }
-        self.codex_output_last_reload_check = Instant::now();
-        let path = Path::new(CODEX_OUTPUT_EVENT_END_PATH);
-        let Ok(metadata) = fs::metadata(path) else {
-            return;
-        };
-        let Ok(modified) = metadata.modified() else {
-            return;
-        };
-        if !force && self.codex_output_event_last_modified == Some(modified) {
-            return;
-        }
-        let Ok(body) = fs::read_to_string(path) else {
-            return;
-        };
-        self.codex_output_event_last_modified = Some(modified);
-        let filtered = body
-            .lines()
-            .map(str::trim)
-            .filter(|line| !line.is_empty())
-            .filter(|line| !is_codex_output_noise_line(line))
-            .collect::<Vec<_>>()
-            .join("\n");
-        if !filtered.is_empty() {
-            if !self.codex_output_text.is_empty() {
-                self.codex_output_text.push('\n');
-            }
-            self.codex_output_text.push_str(&filtered);
-        }
-    }
-
     fn render_obj_image(&self, ctx: &mut RenderObjCtx<'_>) {
         let image_key = ctx.object.visual.background.image.trim();
         let text = if image_key.is_empty() {
@@ -2884,7 +2842,6 @@ impl eframe::App for CodexShellApp {
         self.apply_window_resize_policy(ctx);
         self.refresh_powershell_session();
         self.drain_powershell_output();
-        self.reload_codex_output_from_event_end_file(false);
         let next_window_size = ctx.content_rect().size();
         if self.ui_edit_mode {
             let width_changed = (next_window_size.x - self.window_size.x).abs() >= 1.0;
