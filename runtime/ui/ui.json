@@ -3,11 +3,11 @@
   "assets": {
     "base_dir": "assets/ui",
     "images": {
-      "icon_voice": "icons/voice.png",
-      "btn_primary": "buttons/primary.png",
+      "btn_pressed": "buttons/pressed.png",
       "btn_hover": "buttons/hover.png",
-      "icon_build": "icons/build.png",
-      "btn_pressed": "buttons/pressed.png"
+      "btn_primary": "buttons/primary.png",
+      "icon_voice": "icons/voice.png",
+      "icon_build": "icons/build.png"
     }
   },
   "screens": [
@@ -20,7 +20,7 @@
           "z_index": 30,
           "checked": false,
           "position": {
-            "x": 819.0,
+            "x": 815.0,
             "y": 384.0
           },
           "size": {
@@ -153,7 +153,7 @@
           "checked": false,
           "position": {
             "x": 35.0,
-            "y": 573.0
+            "y": 550.0
           },
           "size": {
             "w": 780.0,
@@ -218,8 +218,8 @@
           "z_index": 60,
           "checked": false,
           "position": {
-            "x": 30.0,
-            "y": 533.0
+            "x": 29.0,
+            "y": 508.0
           },
           "size": {
             "w": 767.0,
@@ -285,7 +285,7 @@
           "checked": false,
           "position": {
             "x": 815.0,
-            "y": 224.0
+            "y": 245.0
           },
           "size": {
             "w": 96.0,
@@ -348,7 +348,7 @@
           "id": "chk_ui_edit",
           "type": "checkbox",
           "z_index": 90,
-          "checked": true,
+          "checked": false,
           "position": {
             "x": 818.0,
             "y": 540.0
@@ -680,8 +680,8 @@
           "z_index": 70,
           "checked": false,
           "position": {
-            "x": 813.0,
-            "y": 146.0
+            "x": 815.0,
+            "y": 180.0
           },
           "size": {
             "w": 96.0,
@@ -1010,8 +1010,8 @@
           "z_index": 104,
           "checked": false,
           "position": {
-            "x": 30.0,
-            "y": 347.0
+            "x": 835.0,
+            "y": 143.0
           },
           "size": {
             "w": 120.0,
@@ -1739,10 +1739,10 @@
           "id": "chk_settings_ui_edit",
           "type": "checkbox",
           "z_index": 130,
-          "checked": false,
+          "checked": true,
           "position": {
-            "x": 494.0,
-            "y": 413.0
+            "x": 788.0,
+            "y": 285.0
           },
           "size": {
             "w": 120.0,

@@ -5,12 +5,12 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, ErrorKind, Write};
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 #[cfg(windows)]
@@ -63,6 +63,7 @@ const CODEX_OUTPUT_TEXT_EDIT_ID_SALT: &str = "codex_output_text_edit";
 const CODEX_OUTPUT_LINE_COUNT: usize = 5;
 const CODEX_OUTPUT_EVENT_END_PATH: &str = r"C:\Users\gonec\.codex\runtime\agent_event_end.md";
 const CODEX_OUTPUT_RUNTIME_LOG_DIR_RELATIVE_PATH: &str = "runtime/codex_output_logs";
+const CODEX_RAW_RUNTIME_LOG_DIR_RELATIVE_PATH: &str = "runtime/codex_raw_logs";
 const CODEX_OUTPUT_RELOAD_CHECK_INTERVAL_MS: u64 = 250;
 const CODEX_OUTPUT_FLASH_DURATION_MS: u64 = 700;
 const CODEX_INDICATOR_LABEL_ID: &str = "lbl_codex_indicator";
@@ -546,6 +547,13 @@ struct PowerShellSession {
 struct PowerShellOutputLine {
     text: String,
     is_stderr: bool,
+    raw_log_error: Option<String>,
+}
+
+#[derive(Default)]
+struct CodexRawLogSharedState {
+    file: Option<fs::File>,
+    failure_recorded: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -554,7 +562,12 @@ struct CodexResponseChoice {
     value: String,
 }
 
-fn spawn_powershell_stream_reader<R>(reader: R, is_stderr: bool, sender: Sender<PowerShellOutputLine>)
+fn spawn_powershell_stream_reader<R>(
+    reader: R,
+    is_stderr: bool,
+    sender: Sender<PowerShellOutputLine>,
+    raw_log_state: Arc<Mutex<CodexRawLogSharedState>>,
+)
 where
     R: std::io::Read + Send + 'static,
 {
@@ -566,8 +579,17 @@ where
             match reader.read_line(&mut line) {
                 Ok(0) => break,
                 Ok(_) => {
+                    let raw_log_error =
+                        append_codex_raw_runtime_log_line(&raw_log_state, &line, is_stderr);
                     let text = line.trim_end_matches(['\r', '\n']).to_string();
-                    if sender.send(PowerShellOutputLine { text, is_stderr }).is_err() {
+                    if sender
+                        .send(PowerShellOutputLine {
+                            text,
+                            is_stderr,
+                            raw_log_error,
+                        })
+                        .is_err()
+                    {
                         break;
                     }
                 }
@@ -575,6 +597,7 @@ where
                     let _ = sender.send(PowerShellOutputLine {
                         text: format!("PowerShell出力読み取り失敗: {err}"),
                         is_stderr: true,
+                        raw_log_error: None,
                     });
                     break;
                 }
@@ -776,8 +799,9 @@ impl CodexShellApp {
                     return;
                 };
                 let (tx, rx) = mpsc::channel();
-                spawn_powershell_stream_reader(stdout, false, tx.clone());
-                spawn_powershell_stream_reader(stderr, true, tx);
+                let raw_log_state = Arc::new(Mutex::new(CodexRawLogSharedState::default()));
+                spawn_powershell_stream_reader(stdout, false, tx.clone(), raw_log_state.clone());
+                spawn_powershell_stream_reader(stderr, true, tx, raw_log_state);
                 #[cfg(windows)]
                 if find_visible_window_by_pid(child.id()).is_some()
                     && let Err(err) = disable_window_close_button_for_pid(child.id())
@@ -879,6 +903,9 @@ impl CodexShellApp {
         }
 
         for line in lines {
+            if let Some(raw_log_error) = line.raw_log_error.as_ref() {
+                self.push_history(format!("Codex rawログ書き込み失敗: {raw_log_error}"));
+            }
             let trimmed = line.text.trim();
             if trimmed == CODEX_STREAM_BEGIN_MARKER {
                 self.codex_output_streaming_active = true;
@@ -3265,6 +3292,103 @@ fn create_codex_output_runtime_log_path() -> Result<PathBuf> {
 
 fn codex_output_runtime_log_dir_path() -> PathBuf {
     ui_runtime_base_dir().join(CODEX_OUTPUT_RUNTIME_LOG_DIR_RELATIVE_PATH)
+}
+
+fn append_codex_raw_runtime_log_line(
+    raw_log_state: &Arc<Mutex<CodexRawLogSharedState>>,
+    raw_line: &str,
+    is_stderr: bool,
+) -> Option<String> {
+    let mut state = match raw_log_state.lock() {
+        Ok(state) => state,
+        Err(err) => err.into_inner(),
+    };
+    let trimmed = raw_line.trim();
+    let mut error = None;
+
+    if trimmed == CODEX_STREAM_BEGIN_MARKER {
+        match create_codex_raw_runtime_log_file() {
+            Ok(file) => {
+                state.file = Some(file);
+                state.failure_recorded = false;
+            }
+            Err(err) => {
+                state.file = None;
+                if !state.failure_recorded {
+                    state.failure_recorded = true;
+                    error = Some(format!("rawログ初期化失敗: {err}"));
+                }
+            }
+        }
+    }
+
+    if let Some(file) = state.file.as_mut() {
+        let prefix = if is_stderr { "[stderr] " } else { "[stdout] " };
+        if let Err(err) = write_codex_raw_runtime_log_line(file, prefix, raw_line) {
+            state.file = None;
+            if !state.failure_recorded {
+                state.failure_recorded = true;
+                error = Some(format!("rawログ追記失敗: {err}"));
+            }
+        }
+    }
+
+    if trimmed == CODEX_STREAM_END_MARKER {
+        state.file = None;
+        state.failure_recorded = false;
+    }
+
+    error
+}
+
+fn write_codex_raw_runtime_log_line(file: &mut fs::File, prefix: &str, raw_line: &str) -> Result<()> {
+    file.write_all(prefix.as_bytes())
+        .context("rawログprefix書き込みに失敗")?;
+    file.write_all(raw_line.as_bytes())
+        .context("rawログ本文書き込みに失敗")?;
+    if !raw_line.ends_with('\n') {
+        file.write_all(b"\n")
+            .context("rawログ改行書き込みに失敗")?;
+    }
+    Ok(())
+}
+
+fn create_codex_raw_runtime_log_file() -> Result<fs::File> {
+    let log_dir = codex_raw_runtime_log_dir_path();
+    fs::create_dir_all(&log_dir)
+        .with_context(|| format!("Codex rawログディレクトリ作成に失敗: {}", log_dir.display()))?;
+    let base_timestamp = unix_timestamp_millis();
+    for suffix in 0..1000usize {
+        let file_name = if suffix == 0 {
+            format!("codex_raw_{base_timestamp}.log")
+        } else {
+            format!("codex_raw_{base_timestamp}_{suffix}.log")
+        };
+        let log_path = log_dir.join(file_name);
+        match fs::OpenOptions::new()
+            .create_new(true)
+            .append(true)
+            .open(&log_path)
+        {
+            Ok(file) => return Ok(file),
+            Err(err) if err.kind() == ErrorKind::AlreadyExists => continue,
+            Err(err) => {
+                return Err(anyhow!(
+                    "Codex rawログ作成に失敗: {} ({err})",
+                    log_path.display()
+                ));
+            }
+        }
+    }
+
+    Err(anyhow!(
+        "Codex rawログ作成に失敗: 連番上限に到達しました ({})",
+        log_dir.display()
+    ))
+}
+
+fn codex_raw_runtime_log_dir_path() -> PathBuf {
+    ui_runtime_base_dir().join(CODEX_RAW_RUNTIME_LOG_DIR_RELATIVE_PATH)
 }
 
 fn ui_definition_file_path() -> PathBuf {
