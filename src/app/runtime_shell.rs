@@ -3718,7 +3718,10 @@ fn copy_text_to_clipboard(text: &str) -> Result<()> {
         "$text = @'\n{text}\n'@\nSet-Clipboard -Value $text\n",
         text = text
     );
-    let output = Command::new(POWERSHELL_EXECUTABLE)
+    let mut command = Command::new(POWERSHELL_EXECUTABLE);
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW_FLAG);
+    let output = command
         .arg("-NoLogo")
         .arg("-NoProfile")
         .arg("-Command")
