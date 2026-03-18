@@ -754,7 +754,17 @@ impl CodexShellApp {
     }
 
     fn handle_input_confirm(&mut self) {
-        match current_github_review_prompt() {
+        let Some(project_name) = self.selected_project_name() else {
+            self.update_status("確認用定型文の生成失敗: プロジェクト未選択");
+            self.push_history("確認用定型文の生成失敗: プロジェクト未選択");
+            return;
+        };
+        let Some(project_dir) = self.selected_project_dir_path() else {
+            self.update_status("確認用定型文の生成失敗: プロジェクトフォルダ未取得");
+            self.push_history("確認用定型文の生成失敗: プロジェクトフォルダ未取得");
+            return;
+        };
+        match current_github_review_prompt(&project_name, &project_dir) {
             Ok(prompt) => match copy_text_to_clipboard(&prompt) {
                 Ok(()) => {
                     self.update_status("確認用定型文をコピーしました");
@@ -1088,6 +1098,12 @@ impl CodexShellApp {
         self.project_selected_index
             .and_then(|index| self.project_declarations.get(index))
             .map(Self::project_entry_highlight_key)
+    }
+
+    fn selected_project_name(&self) -> Option<String> {
+        self.project_selected_index
+            .and_then(|index| self.project_declarations.get(index))
+            .map(|entry| entry.name.clone())
     }
 
     fn is_selected_project_highlighted(&self) -> bool {
@@ -3557,12 +3573,14 @@ fn load_reasoning_effort() -> String {
     }
 }
 
-fn current_github_review_prompt() -> Result<String> {
-    let head_sha = current_git_head_sha()?;
+fn current_github_review_prompt(project_name: &str, project_dir: &Path) -> Result<String> {
+    let review_info = current_project_github_review_info(project_dir)?;
     Ok(format!(
         concat!(
+            "対象プロジェクト\n",
+            "{project_name}\n\n",
             "対象リポジトリ\n",
-            "https://github.com/goenc/codex-shell\n\n",
+            "{repository_url}\n\n",
             "対象ブランチ\n",
             "work\n\n",
             "対象コミット\n",
@@ -3574,17 +3592,61 @@ fn current_github_review_prompt() -> Result<String> {
             "3. 要注意箇所\n",
             "4. 総評\n"
         ),
-        head_sha = head_sha
+        project_name = project_name,
+        repository_url = review_info.repository_url,
+        head_sha = review_info.head_sha
     ))
 }
 
-fn current_git_head_sha() -> Result<String> {
+struct ProjectGithubReviewInfo {
+    repository_url: String,
+    head_sha: String,
+}
+
+fn current_project_github_review_info(project_dir: &Path) -> Result<ProjectGithubReviewInfo> {
+    let repository_url = current_project_repository_url(project_dir)?;
+    let head_sha = current_project_short_head_sha(project_dir)?;
+    Ok(ProjectGithubReviewInfo {
+        repository_url,
+        head_sha,
+    })
+}
+
+fn current_project_repository_url(project_dir: &Path) -> Result<String> {
+    let output = Command::new("git")
+        .arg("remote")
+        .arg("get-url")
+        .arg("origin")
+        .current_dir(project_dir)
+        .output()
+        .with_context(|| format!("origin URL取得に失敗しました: {}", project_dir.display()))?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "origin URL取得に失敗しました: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let raw_url =
+        String::from_utf8(output.stdout).context("origin URLの文字列変換に失敗しました")?;
+    let raw_url = raw_url.trim();
+    if raw_url.is_empty() {
+        return Err(anyhow!("origin URLが空です"));
+    }
+    Ok(normalize_github_repo_url(raw_url))
+}
+
+fn current_project_short_head_sha(project_dir: &Path) -> Result<String> {
+    if let Some(remote_sha) = current_project_remote_work_short_sha(project_dir)? {
+        return Ok(remote_sha);
+    }
+
     let output = Command::new("git")
         .arg("rev-parse")
+        .arg("--short")
         .arg("HEAD")
-        .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")))
+        .current_dir(project_dir)
         .output()
-        .context("HEADコミット取得に失敗しました")?;
+        .with_context(|| format!("HEADコミット取得に失敗しました: {}", project_dir.display()))?;
     if !output.status.success() {
         return Err(anyhow!(
             "HEADコミット取得に失敗しました: {}",
@@ -3598,6 +3660,57 @@ fn current_git_head_sha() -> Result<String> {
         return Err(anyhow!("HEAD SHAが空です"));
     }
     Ok(head_sha.to_string())
+}
+
+fn current_project_remote_work_short_sha(project_dir: &Path) -> Result<Option<String>> {
+    let output = Command::new("git")
+        .arg("ls-remote")
+        .arg("--heads")
+        .arg("origin")
+        .arg("work")
+        .current_dir(project_dir)
+        .output()
+        .with_context(|| format!("origin/work取得に失敗しました: {}", project_dir.display()))?;
+    if !output.status.success() {
+        return Ok(None);
+    }
+    let body = String::from_utf8(output.stdout).context("origin/workの文字列変換に失敗しました")?;
+    let Some(first_line) = body.lines().next() else {
+        return Ok(None);
+    };
+    let Some(full_sha) = first_line.split_whitespace().next() else {
+        return Ok(None);
+    };
+    if full_sha.len() < 7 {
+        return Ok(None);
+    }
+    Ok(Some(full_sha.chars().take(7).collect()))
+}
+
+fn normalize_github_repo_url(raw_url: &str) -> String {
+    let trimmed = raw_url.trim();
+    if let Some(rest) = trimmed.strip_prefix("git@github.com:") {
+        return format!(
+            "https://github.com/{}",
+            rest.trim_end_matches(".git").trim_end_matches('/')
+        );
+    }
+    if let Some(rest) = trimmed.strip_prefix("ssh://git@github.com/") {
+        return format!(
+            "https://github.com/{}",
+            rest.trim_end_matches(".git").trim_end_matches('/')
+        );
+    }
+    if let Some(rest) = trimmed.strip_prefix("https://github.com/") {
+        return format!(
+            "https://github.com/{}",
+            rest.trim_end_matches(".git").trim_end_matches('/')
+        );
+    }
+    trimmed
+        .trim_end_matches(".git")
+        .trim_end_matches('/')
+        .to_string()
 }
 
 fn copy_text_to_clipboard(text: &str) -> Result<()> {
