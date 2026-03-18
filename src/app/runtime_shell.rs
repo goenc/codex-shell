@@ -14,11 +14,19 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 #[cfg(windows)]
-use windows::Win32::Foundation::{HWND, LPARAM};
+use windows::Win32::Foundation::{GetLastError, GlobalFree, HANDLE, HGLOBAL, HWND, LPARAM};
+#[cfg(windows)]
+use windows::Win32::System::DataExchange::{
+    CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
+};
+#[cfg(windows)]
+use windows::Win32::System::Memory::{GHND, GlobalAlloc, GlobalLock};
+#[cfg(windows)]
+use windows::Win32::UI::Input::KeyboardAndMouse::GetActiveWindow;
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{
-    DeleteMenu, DrawMenuBar, EnumWindows, GetSystemMenu, GetWindowThreadProcessId, IsWindowVisible,
-    MENU_ITEM_FLAGS, MF_BYCOMMAND, SC_CLOSE,
+    DeleteMenu, DrawMenuBar, EnumWindows, GetForegroundWindow, GetSystemMenu,
+    GetWindowThreadProcessId, IsWindowVisible, MENU_ITEM_FLAGS, MF_BYCOMMAND, SC_CLOSE,
 };
 #[cfg(windows)]
 use windows::core::BOOL;
@@ -75,6 +83,8 @@ const MODEL_CANDIDATES: [&str; 3] = ["gpt-5.3-codex", "gpt-5.4-mini", "gpt-5.4"]
 const REASONING_EFFORT_CANDIDATES: [&str; 4] = ["low", "medium", "high", "xhigh"];
 #[cfg(windows)]
 const CREATE_NO_WINDOW_FLAG: u32 = 0x0800_0000;
+#[cfg(windows)]
+const CF_UNICODETEXT_FORMAT: u32 = 13;
 
 #[cfg(windows)]
 #[derive(Default)]
@@ -544,6 +554,78 @@ struct PowerShellOutputLine {
     text: String,
     is_stderr: bool,
     raw_log_error: Option<String>,
+}
+
+#[cfg(windows)]
+struct ClipboardGuard;
+
+#[cfg(windows)]
+impl Drop for ClipboardGuard {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = CloseClipboard();
+        }
+    }
+}
+
+#[cfg(windows)]
+struct ClipboardGlobalMemory(Option<HGLOBAL>);
+
+#[cfg(windows)]
+impl ClipboardGlobalMemory {
+    fn allocate(size: usize) -> Result<Self> {
+        let handle =
+            unsafe { GlobalAlloc(GHND, size) }.context("クリップボードメモリ確保に失敗しました")?;
+        Ok(Self(Some(handle)))
+    }
+
+    fn handle(&self) -> HGLOBAL {
+        self.0.expect("clipboard global memory handle missing")
+    }
+
+    unsafe fn lock(&self) -> Result<*mut u16> {
+        let pointer = unsafe { GlobalLock(self.handle()) }.cast::<u16>();
+        if pointer.is_null() {
+            return Err(anyhow!("クリップボードメモリのロックに失敗しました"));
+        }
+        Ok(pointer)
+    }
+
+    fn release_to_clipboard(mut self) -> HANDLE {
+        let handle = self
+            .0
+            .take()
+            .expect("clipboard global memory handle missing");
+        HANDLE(handle.0)
+    }
+}
+
+#[cfg(windows)]
+impl Drop for ClipboardGlobalMemory {
+    fn drop(&mut self) {
+        if let Some(handle) = self.0.take() {
+            unsafe {
+                let _ = GlobalFree(Some(handle));
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+unsafe fn unlock_global_memory(handle: HGLOBAL) -> Result<()> {
+    windows::core::link!("kernel32.dll" "system" fn GlobalUnlock(hmem : *mut core::ffi::c_void) -> windows::core::BOOL);
+    let result = unsafe { GlobalUnlock(handle.0) };
+    if result.as_bool() {
+        return Ok(());
+    }
+    let error = unsafe { GetLastError() };
+    if error.0 == 0 {
+        return Ok(());
+    }
+    Err(anyhow!(
+        "クリップボードメモリのアンロックに失敗しました: {}",
+        error.0
+    ))
 }
 
 #[derive(Default)]
@@ -3714,27 +3796,46 @@ fn normalize_github_repo_url(raw_url: &str) -> String {
 }
 
 fn copy_text_to_clipboard(text: &str) -> Result<()> {
-    let script = format!(
-        "$text = @'\n{text}\n'@\nSet-Clipboard -Value $text\n",
-        text = text
-    );
-    let mut command = Command::new(POWERSHELL_EXECUTABLE);
     #[cfg(windows)]
-    command.creation_flags(CREATE_NO_WINDOW_FLAG);
-    let output = command
-        .arg("-NoLogo")
-        .arg("-NoProfile")
-        .arg("-Command")
-        .arg(script)
-        .output()
-        .context("クリップボードコピーに失敗しました")?;
-    if !output.status.success() {
-        return Err(anyhow!(
-            "クリップボードコピーに失敗しました: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
+    {
+        let owner = unsafe {
+            let active = GetActiveWindow();
+            if active.0.is_null() {
+                GetForegroundWindow()
+            } else {
+                active
+            }
+        };
+        if owner.0.is_null() {
+            return Err(anyhow!("クリップボード所有ウィンドウの取得に失敗しました"));
+        }
+
+        let utf16 = text
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect::<Vec<u16>>();
+        let byte_len = utf16.len() * std::mem::size_of::<u16>();
+
+        unsafe {
+            OpenClipboard(Some(owner)).context("クリップボードを開けませんでした")?;
+            let _clipboard_guard = ClipboardGuard;
+            EmptyClipboard().context("クリップボード初期化に失敗しました")?;
+
+            let memory = ClipboardGlobalMemory::allocate(byte_len)?;
+            let pointer = memory.lock()?;
+            std::ptr::copy_nonoverlapping(utf16.as_ptr(), pointer, utf16.len());
+            unlock_global_memory(memory.handle())?;
+            SetClipboardData(CF_UNICODETEXT_FORMAT, Some(memory.release_to_clipboard()))
+                .context("クリップボードコピーに失敗しました")?;
+        }
+
+        Ok(())
     }
-    Ok(())
+    #[cfg(not(windows))]
+    {
+        let _ = text;
+        Err(anyhow!("Windows以外ではクリップボードコピー未対応です"))
+    }
 }
 
 fn update_codex_config_key(key: &str, value: &str) -> Result<(), String> {
