@@ -10,8 +10,8 @@ use std::io::{BufRead, BufReader, ErrorKind, Write};
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 #[cfg(windows)]
 use windows::Win32::Foundation::{HWND, LPARAM};
@@ -27,9 +27,9 @@ use super::process_runtime;
 use crate::tools::ui_edit::api as ui_tool;
 
 use ui_tool::{
-    CONFIG_SAVE, INPUT_SEND, INPUT_VOICE_TOGGLE, MODE_PROJECT_DEBUG_RUN, MODE_PROJECT_TARGET_MOVE,
-    NAV_BACK_MAIN, REASONING_HIGH, REASONING_LOW, REASONING_MEDIUM, REASONING_XHIGH,
-    UI_EDIT_TOGGLE, UI_SETTINGS, is_known_ui_command,
+    CONFIG_SAVE, INPUT_CONFIRM, INPUT_SEND, INPUT_VOICE_TOGGLE, MODE_PROJECT_DEBUG_RUN,
+    MODE_PROJECT_TARGET_MOVE, NAV_BACK_MAIN, REASONING_HIGH, REASONING_LOW, REASONING_MEDIUM,
+    REASONING_XHIGH, UI_EDIT_TOGGLE, UI_SETTINGS, is_known_ui_command,
 };
 
 const MAX_HISTORY: usize = 200;
@@ -563,8 +563,7 @@ fn spawn_powershell_stream_reader<R>(
     is_stderr: bool,
     sender: Sender<PowerShellOutputLine>,
     raw_log_state: Arc<Mutex<CodexRawLogSharedState>>,
-)
-where
+) where
     R: std::io::Read + Send + 'static,
 {
     std::thread::spawn(move || {
@@ -754,6 +753,21 @@ impl CodexShellApp {
         sent
     }
 
+    fn handle_input_confirm(&mut self) {
+        match current_github_review_prompt() {
+            Ok(prompt) => {
+                self.input_command = prompt;
+                self.pending_input_focus = true;
+                self.update_status("確認用定型文を生成しました");
+                self.push_history("確認用定型文を生成しました");
+            }
+            Err(err) => {
+                self.update_status(format!("確認用定型文の生成失敗: {err}"));
+                self.push_history(format!("確認用定型文の生成失敗: {err}"));
+            }
+        }
+    }
+
     fn start_powershell_session(&mut self) {
         if self.powershell_session.is_some() {
             return;
@@ -861,8 +875,7 @@ impl CodexShellApp {
         self.codex_output_runtime_log_path = None;
     }
 
-    fn append_codex_output_runtime_log_line(&mut self, _line: &str) {
-    }
+    fn append_codex_output_runtime_log_line(&mut self, _line: &str) {}
 
     fn drain_powershell_output(&mut self) {
         let mut lines = Vec::new();
@@ -1604,10 +1617,7 @@ impl CodexShellApp {
         match Command::new("explorer").arg(&log_dir).spawn() {
             Ok(_) => {
                 self.update_status("ログフォルダを開きました");
-                self.push_history(format!(
-                    "ログフォルダを開きました: {}",
-                    log_dir.display()
-                ));
+                self.push_history(format!("ログフォルダを開きました: {}", log_dir.display()));
             }
             Err(err) => {
                 self.update_status(format!("ログフォルダを開けません: {err}"));
@@ -1736,6 +1746,7 @@ impl CodexShellApp {
             MODE_PROJECT_DEBUG_RUN => self.handle_mode_project_debug_run(),
             MODE_PROJECT_TARGET_MOVE => self.handle_mode_project_target_move(),
             INPUT_SEND => self.handle_input_send(),
+            INPUT_CONFIRM => self.handle_input_confirm(),
             INPUT_VOICE_TOGGLE => self.handle_input_voice_toggle(),
             UI_SETTINGS => self.handle_ui_settings(),
             NAV_BACK_MAIN => self.handle_nav_back_main(),
@@ -1882,7 +1893,9 @@ impl CodexShellApp {
             "right" => egui::Align::Max,
             _ => egui::Align::Center,
         };
-        let mut rich = RichText::new(text).font(ctx.text_font.clone()).color(text_color);
+        let mut rich = RichText::new(text)
+            .font(ctx.text_font.clone())
+            .color(text_color);
         if ctx.object.visual.text.bold {
             rich = rich.strong();
         }
@@ -3258,14 +3271,17 @@ fn append_codex_raw_runtime_log_line(
     error
 }
 
-fn write_codex_raw_runtime_log_line(file: &mut fs::File, prefix: &str, raw_line: &str) -> Result<()> {
+fn write_codex_raw_runtime_log_line(
+    file: &mut fs::File,
+    prefix: &str,
+    raw_line: &str,
+) -> Result<()> {
     file.write_all(prefix.as_bytes())
         .context("rawログprefix書き込みに失敗")?;
     file.write_all(raw_line.as_bytes())
         .context("rawログ本文書き込みに失敗")?;
     if !raw_line.ends_with('\n') {
-        file.write_all(b"\n")
-            .context("rawログ改行書き込みに失敗")?;
+        file.write_all(b"\n").context("rawログ改行書き込みに失敗")?;
     }
     Ok(())
 }
@@ -3535,6 +3551,49 @@ fn load_reasoning_effort() -> String {
     } else {
         "medium".to_string()
     }
+}
+
+fn current_github_review_prompt() -> Result<String> {
+    let head_sha = current_git_head_sha()?;
+    Ok(format!(
+        concat!(
+            "対象リポジトリ\n",
+            "https://github.com/goenc/codex-shell\n\n",
+            "対象ブランチ\n",
+            "work\n\n",
+            "対象コミット\n",
+            "{head_sha}\n\n",
+            "このコミットの実装内容をGitHub上のソースから確認すること。\n\n",
+            "確認項目\n",
+            "1. 実装内容の要約\n",
+            "2. 問題点の有無\n",
+            "3. 要注意箇所\n",
+            "4. 総評\n"
+        ),
+        head_sha = head_sha
+    ))
+}
+
+fn current_git_head_sha() -> Result<String> {
+    let output = Command::new("git")
+        .arg("rev-parse")
+        .arg("HEAD")
+        .current_dir(Path::new(env!("CARGO_MANIFEST_DIR")))
+        .output()
+        .context("HEADコミット取得に失敗しました")?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "HEADコミット取得に失敗しました: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let head_sha =
+        String::from_utf8(output.stdout).context("HEAD SHAの文字列変換に失敗しました")?;
+    let head_sha = head_sha.trim();
+    if head_sha.is_empty() {
+        return Err(anyhow!("HEAD SHAが空です"));
+    }
+    Ok(head_sha.to_string())
 }
 
 fn update_codex_config_key(key: &str, value: &str) -> Result<(), String> {

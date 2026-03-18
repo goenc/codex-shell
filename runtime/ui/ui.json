@@ -741,6 +741,72 @@
           }
         },
         {
+          "id": "btn_input_confirm",
+          "type": "button",
+          "z_index": 70,
+          "checked": false,
+          "position": {
+            "x": 815.0,
+            "y": 236.0
+          },
+          "size": {
+            "w": 96.0,
+            "h": 50.0
+          },
+          "visible": true,
+          "enabled": true,
+          "bind": {
+            "command": "input.confirm",
+            "group": ""
+          },
+          "visual": {
+            "background": {
+              "image": "",
+              "fit": ""
+            },
+            "icon": {
+              "image": "",
+              "anchor": "center",
+              "offset": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "size": {
+                "w": 120.0,
+                "h": 32.0
+              }
+            },
+            "text": {
+              "value": "確認",
+              "align": "center",
+              "font_size": 16.0,
+              "font_family": "noto_sans_jp",
+              "bold": false,
+              "italic": false
+            },
+            "states": {
+              "hover": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "pressed": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "disabled": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              }
+            }
+          }
+        },
+        {
           "id": "lbl_main_model",
           "type": "label",
           "z_index": 100,
