@@ -48,7 +48,6 @@ const FONT_SOURCE_RELATIVE_PATH: &str = "assets/fonts/FONT_SOURCE.txt";
 const CODEX_CONFIG_PATH: &str = r"C:\Users\gonec\.codex\config.toml";
 const CODEX_CONFIG_BACKUP_PATH: &str = r"C:\Users\gonec\.codex\config.toml.bak";
 const UI_RUNTIME_RELATIVE_PATH: &str = "runtime/ui/ui.json";
-const UI_INIT_RELATIVE_PATH: &str = "runtime/ui/init/ui.json";
 pub(crate) const UI_RELOAD_CHECK_INTERVAL_MS: u64 = 250;
 pub(crate) const UI_MAIN_SCREEN_ID: &str = "main";
 const UI_SETTINGS_SCREEN_ID: &str = "settings";
@@ -3446,22 +3445,7 @@ fn ensure_runtime_ui_file() -> Result<PathBuf> {
     if ui_path.is_file() {
         return Ok(ui_path);
     }
-
-    let runtime_base = ui_runtime_base_dir();
-    let source_path = runtime_base.join(UI_INIT_RELATIVE_PATH);
-    if !source_path.is_file() {
-        return Err(anyhow!("UI定義が見つかりません: {}", ui_path.display()));
-    }
-    let body = fs::read_to_string(&source_path)
-        .with_context(|| format!("UI定義移行元の読み込みに失敗: {}", source_path.display()))?;
-    if let Some(parent) = ui_path.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("UI定義ディレクトリ作成に失敗: {}", parent.display()))?;
-    }
-    fs::write(&ui_path, body)
-        .with_context(|| format!("UI定義移行に失敗: {}", ui_path.display()))?;
-
-    Ok(ui_path)
+    Err(anyhow!("UI定義が見つかりません: {}", ui_path.display()))
 }
 
 fn load_ui_definition(path: &Path) -> Result<UiDefinition> {
