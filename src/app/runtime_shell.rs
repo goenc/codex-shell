@@ -755,12 +755,16 @@ impl CodexShellApp {
 
     fn handle_input_confirm(&mut self) {
         match current_github_review_prompt() {
-            Ok(prompt) => {
-                self.input_command = prompt;
-                self.pending_input_focus = true;
-                self.update_status("確認用定型文を生成しました");
-                self.push_history("確認用定型文を生成しました");
-            }
+            Ok(prompt) => match copy_text_to_clipboard(&prompt) {
+                Ok(()) => {
+                    self.update_status("確認用定型文をコピーしました");
+                    self.push_history("確認用定型文をコピーしました");
+                }
+                Err(err) => {
+                    self.update_status(format!("確認用定型文のコピー失敗: {err}"));
+                    self.push_history(format!("確認用定型文のコピー失敗: {err}"));
+                }
+            },
             Err(err) => {
                 self.update_status(format!("確認用定型文の生成失敗: {err}"));
                 self.push_history(format!("確認用定型文の生成失敗: {err}"));
@@ -3594,6 +3598,27 @@ fn current_git_head_sha() -> Result<String> {
         return Err(anyhow!("HEAD SHAが空です"));
     }
     Ok(head_sha.to_string())
+}
+
+fn copy_text_to_clipboard(text: &str) -> Result<()> {
+    let script = format!(
+        "$text = @'\n{text}\n'@\nSet-Clipboard -Value $text\n",
+        text = text
+    );
+    let output = Command::new(POWERSHELL_EXECUTABLE)
+        .arg("-NoLogo")
+        .arg("-NoProfile")
+        .arg("-Command")
+        .arg(script)
+        .output()
+        .context("クリップボードコピーに失敗しました")?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "クリップボードコピーに失敗しました: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(())
 }
 
 fn update_codex_config_key(key: &str, value: &str) -> Result<(), String> {
