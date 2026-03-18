@@ -2062,6 +2062,10 @@ impl CodexShellApp {
             Color32::WHITE
         };
         if ctx.object_id == "input_command" {
+            let request_input_focus = enabled && self.pending_input_focus;
+            let request_select_all = enabled && self.pending_input_select_all;
+            let mut input_focus_handled = false;
+            let mut input_select_all_handled = false;
             let input_response = egui::Frame::default()
                 .fill(frame_fill)
                 .stroke(frame_stroke)
@@ -2101,11 +2105,35 @@ impl CodexShellApp {
                         .show(ui, |ui| {
                             ui.set_width((ctx.object_size.x - 8.0).max(1.0));
                             ui.set_min_height(editor_height);
-                            editor.show(ui)
+                            let mut text_output = editor.show(ui);
+                            if request_input_focus {
+                                text_output.response.request_focus();
+                                input_focus_handled = true;
+                            }
+                            if request_select_all {
+                                let cursor_range = egui::text::CCursorRange::two(
+                                    text_output.galley.begin(),
+                                    text_output.galley.end(),
+                                );
+                                text_output.state.cursor.set_char_range(Some(cursor_range));
+                                text_output
+                                    .state
+                                    .clone()
+                                    .store(ui.ctx(), text_output.response.id);
+                                let selection_end_rect = text_output
+                                    .galley
+                                    .pos_from_cursor(cursor_range.primary)
+                                    .translate(text_output.galley_pos.to_vec2())
+                                    .expand2(egui::vec2(0.0, 2.0));
+                                ui.scroll_to_rect(selection_end_rect, Some(egui::Align::BOTTOM));
+                                ui.ctx().request_repaint();
+                                input_select_all_handled = true;
+                            }
+                            text_output
                         })
                         .inner
                 });
-            let mut text_output = input_response.inner;
+            let text_output = input_response.inner;
             if enabled && text_output.response.has_focus() && text_output.response.secondary_clicked()
             {
                 if let Ok(Some(clipboard_text)) = read_unicode_text_from_clipboard() {
@@ -2113,17 +2141,10 @@ impl CodexShellApp {
                 }
                 text_output.response.request_focus();
             }
-            if enabled && self.pending_input_focus {
-                text_output.response.request_focus();
+            if input_focus_handled {
                 self.pending_input_focus = false;
             }
-            if enabled && self.pending_input_select_all {
-                let cursor_range = egui::text::CCursorRange::two(
-                    egui::text::CCursor::new(0),
-                    egui::text::CCursor::new(self.input_command.chars().count()),
-                );
-                text_output.state.cursor.set_char_range(Some(cursor_range));
-                text_output.state.store(ctx.ui.ctx(), text_output.response.id);
+            if input_select_all_handled {
                 self.pending_input_select_all = false;
             }
             self.input_area_size = input_response.response.rect.size();
