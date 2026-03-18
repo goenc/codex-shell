@@ -67,6 +67,7 @@ const FIXED_WINDOW_HEIGHT: f32 = 400.0;
 const INPUT_FONT_SIZE: f32 = 15.0;
 const FIXED_INPUT_HEIGHT_PADDING: f32 = 12.0;
 const INPUT_COMMAND_ID_SALT: &str = "input_command_text_edit";
+const INPUT_SELECT_ALL: &str = "input.select_all";
 const CODEX_OUTPUT_TEXT_EDIT_ID_SALT: &str = "codex_output_text_edit";
 const CODEX_OUTPUT_LINE_COUNT: usize = 5;
 const CODEX_RAW_RUNTIME_LOG_DIR_RELATIVE_PATH: &str = "runtime/codex_raw_logs";
@@ -518,6 +519,7 @@ struct CodexShellApp {
     resize_enabled: bool,
     voice_input_active: bool,
     pending_input_focus: bool,
+    pending_input_select_all: bool,
     powershell_session: Option<PowerShellSession>,
     powershell_output_rx: Option<Receiver<PowerShellOutputLine>>,
     codex_output_streaming_active: bool,
@@ -728,6 +730,7 @@ impl CodexShellApp {
             resize_enabled: true,
             voice_input_active: false,
             pending_input_focus: false,
+            pending_input_select_all: false,
             powershell_session: None,
             powershell_output_rx: None,
             codex_output_streaming_active: false,
@@ -1656,6 +1659,11 @@ impl CodexShellApp {
         }
     }
 
+    fn handle_input_select_all(&mut self) {
+        self.pending_input_focus = true;
+        self.pending_input_select_all = true;
+    }
+
     fn handle_working_dir_browse(&mut self) {
         match process_runtime::select_directory_path() {
             Ok(Some(path)) => {
@@ -1839,7 +1847,7 @@ impl CodexShellApp {
     fn dispatch_ui_command(&mut self, command: &str) {
         let command = command.trim();
         #[cfg(debug_assertions)]
-        if !command.is_empty() && !is_known_ui_command(command) {
+        if !command.is_empty() && command != INPUT_SELECT_ALL && !is_known_ui_command(command) {
             self.push_history(format!("未知UIコマンドを検出しました: {command}"));
         }
 
@@ -1848,6 +1856,7 @@ impl CodexShellApp {
             MODE_PROJECT_DEBUG_RUN => self.handle_mode_project_debug_run(),
             MODE_PROJECT_TARGET_MOVE => self.handle_mode_project_target_move(),
             INPUT_SEND => self.handle_input_send(),
+            INPUT_SELECT_ALL => self.handle_input_select_all(),
             INPUT_CONFIRM => self.handle_input_confirm(),
             INPUT_VOICE_TOGGLE => self.handle_input_voice_toggle(),
             UI_SETTINGS => self.handle_ui_settings(),
@@ -2052,6 +2061,74 @@ impl CodexShellApp {
         } else {
             Color32::WHITE
         };
+        if ctx.object_id == "input_command" {
+            let input_response = egui::Frame::default()
+                .fill(frame_fill)
+                .stroke(frame_stroke)
+                .inner_margin(egui::Margin::same(4))
+                .show(ctx.ui, |ui| {
+                    let input_line_count =
+                        self.input_command.chars().filter(|ch| *ch == '\n').count() + 1;
+                    let ime_commit_this_frame = ui.input(|input| {
+                        input.events.iter().any(|event| {
+                            matches!(event, egui::Event::Ime(egui::ImeEvent::Commit(_)))
+                        })
+                    });
+                    let input_return_key = if ime_commit_this_frame {
+                        None
+                    } else {
+                        Some(egui::KeyboardShortcut::new(
+                            egui::Modifiers::NONE,
+                            egui::Key::Enter,
+                        ))
+                    };
+                    let editor = TextEdit::multiline(&mut self.input_command)
+                        .id_source(INPUT_COMMAND_ID_SALT)
+                        .font(input_font_id)
+                        .interactive(enabled)
+                        .desired_width(f32::INFINITY)
+                        .desired_rows(desired_rows)
+                        .frame(false)
+                        .return_key(input_return_key);
+                    let visible_height = (ctx.object_size.y - 8.0).max(1.0);
+                    let editor_height = ((input_line_count.max(desired_rows) as f32) * row_height
+                        + FIXED_INPUT_HEIGHT_PADDING)
+                        .max(visible_height);
+                    egui::ScrollArea::vertical()
+                        .id_salt("input_command_vertical_scroll")
+                        .auto_shrink([false, false])
+                        .max_height(visible_height)
+                        .show(ui, |ui| {
+                            ui.set_width((ctx.object_size.x - 8.0).max(1.0));
+                            ui.set_min_height(editor_height);
+                            editor.show(ui)
+                        })
+                        .inner
+                });
+            let mut text_output = input_response.inner;
+            if enabled && text_output.response.has_focus() && text_output.response.secondary_clicked()
+            {
+                if let Ok(Some(clipboard_text)) = read_unicode_text_from_clipboard() {
+                    self.input_command = clipboard_text;
+                }
+                text_output.response.request_focus();
+            }
+            if enabled && self.pending_input_focus {
+                text_output.response.request_focus();
+                self.pending_input_focus = false;
+            }
+            if enabled && self.pending_input_select_all {
+                let cursor_range = egui::text::CCursorRange::two(
+                    egui::text::CCursor::new(0),
+                    egui::text::CCursor::new(self.input_command.chars().count()),
+                );
+                text_output.state.cursor.set_char_range(Some(cursor_range));
+                text_output.state.store(ctx.ui.ctx(), text_output.response.id);
+                self.pending_input_select_all = false;
+            }
+            self.input_area_size = input_response.response.rect.size();
+            return;
+        }
         let input_response = egui::Frame::default()
             .fill(frame_fill)
             .stroke(frame_stroke)

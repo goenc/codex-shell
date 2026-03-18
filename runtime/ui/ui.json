@@ -543,6 +543,72 @@
           }
         },
         {
+          "id": "btn_input_select_all",
+          "type": "button",
+          "z_index": 70,
+          "checked": false,
+          "position": {
+            "x": 815.0,
+            "y": 141.0
+          },
+          "size": {
+            "w": 96.0,
+            "h": 28.0
+          },
+          "visible": true,
+          "enabled": true,
+          "bind": {
+            "command": "input.select_all",
+            "group": ""
+          },
+          "visual": {
+            "background": {
+              "image": "",
+              "fit": ""
+            },
+            "icon": {
+              "image": "",
+              "anchor": "center",
+              "offset": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "size": {
+                "w": 120.0,
+                "h": 32.0
+              }
+            },
+            "text": {
+              "value": "全選択",
+              "align": "center",
+              "font_size": 16.0,
+              "font_family": "noto_sans_jp",
+              "bold": false,
+              "italic": false
+            },
+            "states": {
+              "hover": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "pressed": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              },
+              "disabled": {
+                "background": {
+                  "image": "",
+                  "fit": ""
+                }
+              }
+            }
+          }
+        },
+        {
           "id": "cmb_project_selector",
           "type": "combo_box",
           "z_index": 212,
