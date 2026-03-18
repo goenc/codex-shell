@@ -17,7 +17,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use windows::Win32::Foundation::{GetLastError, GlobalFree, HANDLE, HGLOBAL, HWND, LPARAM};
 #[cfg(windows)]
 use windows::Win32::System::DataExchange::{
-    CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
+    CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard,
+    SetClipboardData,
 };
 #[cfg(windows)]
 use windows::Win32::System::Memory::{GHND, GlobalAlloc, GlobalLock};
@@ -2107,6 +2108,16 @@ impl CodexShellApp {
                     editor,
                 )
             });
+        if ctx.object_id == "input_command"
+            && enabled
+            && input_response.inner.has_focus()
+            && input_response.inner.secondary_clicked()
+        {
+            if let Ok(Some(clipboard_text)) = read_unicode_text_from_clipboard() {
+                self.input_command = clipboard_text;
+            }
+            input_response.inner.request_focus();
+        }
         if enabled && self.pending_input_focus {
             input_response.inner.request_focus();
             self.pending_input_focus = false;
@@ -3848,6 +3859,66 @@ fn copy_text_to_clipboard(text: &str) -> Result<()> {
     {
         let _ = text;
         Err(anyhow!("Windows以外ではクリップボードコピー未対応です"))
+    }
+}
+
+fn read_unicode_text_from_clipboard() -> Result<Option<String>> {
+    #[cfg(windows)]
+    {
+        let owner = unsafe {
+            let active = GetActiveWindow();
+            if active.0.is_null() {
+                GetForegroundWindow()
+            } else {
+                active
+            }
+        };
+        if owner.0.is_null() {
+            return Ok(None);
+        }
+
+        unsafe {
+            OpenClipboard(Some(owner)).context("クリップボードを開けませんでした")?;
+            let _clipboard_guard = ClipboardGuard;
+
+            if IsClipboardFormatAvailable(CF_UNICODETEXT_FORMAT).is_err() {
+                return Ok(None);
+            }
+
+            let handle = match GetClipboardData(CF_UNICODETEXT_FORMAT) {
+                Ok(handle) => handle,
+                Err(_) => return Ok(None),
+            };
+
+            let memory = HGLOBAL(handle.0);
+            let pointer = GlobalLock(memory).cast::<u16>();
+            if pointer.is_null() {
+                return Ok(None);
+            }
+
+            let mut len = 0usize;
+            loop {
+                let ch = *pointer.add(len);
+                if ch == 0 {
+                    break;
+                }
+                len += 1;
+            }
+
+            if len == 0 {
+                unlock_global_memory(memory)?;
+                return Ok(None);
+            }
+
+            let text = std::slice::from_raw_parts(pointer, len);
+            let text = String::from_utf16(text).ok();
+            unlock_global_memory(memory)?;
+            Ok(text)
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        Ok(None)
     }
 }
 
