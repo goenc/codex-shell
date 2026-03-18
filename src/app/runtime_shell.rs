@@ -3680,6 +3680,13 @@ fn current_github_review_prompt(project_name: &str, project_dir: &Path) -> Resul
     ))
 }
 
+fn configure_hidden_command(command: &mut Command) {
+    #[cfg(windows)]
+    {
+        command.creation_flags(CREATE_NO_WINDOW_FLAG);
+    }
+}
+
 struct ProjectGithubReviewInfo {
     repository_url: String,
     head_sha: String,
@@ -3695,7 +3702,9 @@ fn current_project_github_review_info(project_dir: &Path) -> Result<ProjectGithu
 }
 
 fn current_project_repository_url(project_dir: &Path) -> Result<String> {
-    let output = Command::new("git")
+    let mut command = Command::new("git");
+    configure_hidden_command(&mut command);
+    let output = command
         .arg("remote")
         .arg("get-url")
         .arg("origin")
@@ -3722,7 +3731,9 @@ fn current_project_short_head_sha(project_dir: &Path) -> Result<String> {
         return Ok(remote_sha);
     }
 
-    let output = Command::new("git")
+    let mut command = Command::new("git");
+    configure_hidden_command(&mut command);
+    let output = command
         .arg("rev-parse")
         .arg("--short")
         .arg("HEAD")
@@ -3745,7 +3756,9 @@ fn current_project_short_head_sha(project_dir: &Path) -> Result<String> {
 }
 
 fn current_project_remote_work_short_sha(project_dir: &Path) -> Result<Option<String>> {
-    let output = Command::new("git")
+    let mut command = Command::new("git");
+    configure_hidden_command(&mut command);
+    let output = command
         .arg("ls-remote")
         .arg("--heads")
         .arg("origin")
