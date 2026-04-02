@@ -828,7 +828,7 @@ impl CodexShellApp {
         let input = self.input_command.clone();
         self.clear_codex_response_state();
         let command = format!(
-            "$prompt = @\"\n{input}\n\"@\nWrite-Output \"{CODEX_STREAM_BEGIN_MARKER}\"\ncodex exec $prompt\nWrite-Output \"{CODEX_STREAM_END_MARKER}\"\n"
+            "$prompt = @\"\n{input}\n\"@\nWrite-Output \"{CODEX_STREAM_BEGIN_MARKER}\"\n@() | codex exec $prompt\nWrite-Output \"{CODEX_STREAM_END_MARKER}\"\n"
         );
         let sent = self.send_text_to_powershell(&command);
         if sent {
