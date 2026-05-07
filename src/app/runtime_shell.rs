@@ -80,7 +80,7 @@ const CODEX_TURN_SEPARATOR: &str = "--------------------------------------------
 const VOICE_INPUT_HOTKEY_LABEL: &str = "Ctrl+Alt+Right";
 const POWERSHELL_EXECUTABLE: &str = "pwsh.exe";
 const AUTO_START_SLOT_COUNT: usize = 4;
-const MODEL_CANDIDATES: [&str; 3] = ["gpt-5.3-codex", "gpt-5.4-mini", "gpt-5.4"];
+const MODEL_CANDIDATES: [&str; 4] = ["gpt-5.3-codex", "gpt-5.4-mini", "gpt-5.4", "gpt-5.5"];
 const REASONING_EFFORT_CANDIDATES: [&str; 4] = ["low", "medium", "high", "xhigh"];
 #[cfg(windows)]
 const CREATE_NO_WINDOW_FLAG: u32 = 0x0800_0000;
