@@ -530,7 +530,6 @@ struct CodexShellApp {
     project_selected_index: Option<usize>,
     moved_project_highlight_key: Option<String>,
     codex_output_waiting_stderr_body: bool,
-    latest_rate_limit_status: Option<String>,
     codex_flash_until: Option<Instant>,
     is_codex_running: bool,
     codex_response_choices: Vec<CodexResponseChoice>,
@@ -742,7 +741,6 @@ impl CodexShellApp {
             project_selected_index: None,
             moved_project_highlight_key: None,
             codex_output_waiting_stderr_body: false,
-            latest_rate_limit_status: None,
             codex_flash_until: None,
             is_codex_running: false,
             codex_response_choices: Vec::new(),
@@ -829,9 +827,8 @@ impl CodexShellApp {
     fn send_input_command_by_button(&mut self) -> bool {
         let input = self.input_command.clone();
         self.clear_codex_response_state();
-        let prompt_bytes = utf8_byte_array_literal(&input);
         let command = format!(
-            "$promptBytes = [byte[]]({prompt_bytes})\n$prompt = [System.Text.Encoding]::UTF8.GetString($promptBytes)\nWrite-Output \"{CODEX_STREAM_BEGIN_MARKER}\"\n@() | codex exec $prompt\nWrite-Output \"{CODEX_STREAM_END_MARKER}\"\n"
+            "$prompt = @\"\n{input}\n\"@\nWrite-Output \"{CODEX_STREAM_BEGIN_MARKER}\"\n@() | codex exec $prompt\nWrite-Output \"{CODEX_STREAM_END_MARKER}\"\n"
         );
         let sent = self.send_text_to_powershell(&command);
         if sent {
@@ -1018,9 +1015,6 @@ impl CodexShellApp {
                 continue;
             }
             self.trigger_codex_output_flash();
-            if let Some(rate_limit_status) = extract_rate_limit_status(trimmed) {
-                self.latest_rate_limit_status = Some(rate_limit_status);
-            }
             if trimmed.is_empty() || is_codex_output_noise_line(trimmed) {
                 continue;
             }
@@ -1610,13 +1604,7 @@ impl CodexShellApp {
 
     fn resolve_object_text(&self, object: &UiObject) -> String {
         match object.bind.command.trim() {
-            ui_tool::STATUS_MESSAGE => {
-                if let Some(rate_limit_status) = self.latest_rate_limit_status.as_deref() {
-                    format!("状態: {} / {}", self.status_message, rate_limit_status)
-                } else {
-                    format!("状態: {}", self.status_message)
-                }
-            }
+            ui_tool::STATUS_MESSAGE => format!("状態: {}", self.status_message),
             ui_tool::UI_EDIT_LOCKED_HINT => "編集モード中のため操作は無効".to_string(),
             ui_tool::INPUT_VOICE_TOGGLE => {
                 if self.voice_input_active {
@@ -3075,8 +3063,8 @@ impl eframe::App for CodexShellApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.apply_window_resize_policy(ctx);
-        self.drain_powershell_output();
         self.refresh_powershell_session();
+        self.drain_powershell_output();
         let next_window_size = ctx.content_rect().size();
         if self.ui_edit_mode {
             let width_changed = (next_window_size.x - self.window_size.x).abs() >= 1.0;
@@ -3112,25 +3100,6 @@ fn is_codex_output_noise_line(line: &str) -> bool {
         || lowered.contains("elapsed")
         || lowered.starts_with("stdout")
         || lowered.starts_with("stderr")
-}
-
-fn extract_rate_limit_status(line: &str) -> Option<String> {
-    let trimmed = line.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-    let lowered = trimmed.to_ascii_lowercase();
-    let mentions_limit = lowered.contains("rate limit")
-        || lowered.contains("usage limit")
-        || lowered.contains("usage remaining")
-        || lowered.contains("remaining usage");
-    let mentions_remaining =
-        lowered.contains("remaining") || lowered.contains("reset") || lowered.contains("resets");
-    if mentions_limit && mentions_remaining {
-        Some(format!("レート制限: {trimmed}"))
-    } else {
-        None
-    }
 }
 
 fn choices_are_numbered(choices: &[CodexResponseChoice]) -> bool {
@@ -3202,17 +3171,6 @@ fn decorate_codex_output_display_lines(text: &str) -> String {
         .map(|line| format!("- {}", line))
         .collect::<Vec<_>>()
         .join("\n")
-}
-
-fn utf8_byte_array_literal(text: &str) -> String {
-    let mut literal = String::new();
-    for (index, byte) in text.as_bytes().iter().enumerate() {
-        if index > 0 {
-            literal.push(',');
-        }
-        literal.push_str(&byte.to_string());
-    }
-    literal
 }
 
 fn unix_timestamp() -> String {
